@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --silo-light-purple: #f0f1fe;
+  --silo-white: #ffffff;
+  --silo-soft-purple: #dbe1fa;
+  --silo-node-purple: #c4cefd;
+  --silo-deep-purple: #9dadfb;
+  --silo-surface-light: #d7dfea;
+  --silo-surface-muted: #778ea3;
+  --silo-surface-strong: #44525f;
+  --silo-almost-white: #f2f4f7;
+  --silo-strong-violet: #c7b1e6;
+  --silo-soft-cyan: #cce4f5;
+
+  --silo-bg: var(--silo-light-purple);
+  --silo-surface: var(--silo-white);
+  --silo-surface-2: var(--silo-almost-white);
+  --silo-border: var(--silo-surface-light);
+  --silo-text: var(--silo-surface-strong);
+  --silo-text-soft: var(--silo-surface-muted);
+  --silo-text-faint: #8a96a8;
+  --silo-global-pattern: none;
+
+  --header-bg: rgba(247, 248, 250, 0.94);
+  --header-border: #d8dce3;
+  --header-text: var(--silo-text);
+  --header-text-soft: var(--silo-text-soft);
+  --header-toggle-border: var(--silo-border);
+  --header-toggle-on-bg: var(--silo-surface);
+  --header-toggle-on-text: var(--silo-text);
+  --header-toggle-off-bg: transparent;
+  --header-toggle-off-bg-hover: #eef0f4;
+  --header-toggle-off-text: var(--silo-text-soft);
+  --header-logo-filter: none;
+}
+
+body {
+  color: rgb(68, 82, 95);
+  background-color: var(--silo-bg);
+  background-image:
+    var(--silo-global-pattern),
+    var(--silo-global-pattern),
+    radial-gradient(880px 500px at -8% 10%, color-mix(in srgb, #d0f1d5 55%, transparent) 0%, transparent 58%),
+    radial-gradient(920px 520px at 108% 8%, color-mix(in srgb, var(--silo-strong-violet) 35%, transparent) 0%, transparent 62%),
+    linear-gradient(100deg, #ffffff 0%, var(--silo-soft-purple) 38%, var(--silo-soft-cyan) 72%, var(--silo-light-purple) 100%);
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-size: 476px 449px, 952px 898px, cover, cover, cover;
+  background-position: -238px -58px, calc(100% + 476px) 42px, top left, top right, center;
+}
+
+.theme-dark {
+  --silo-bg: #232b33;
+  --silo-surface: #2c3540;
+  --silo-surface-2: #343e4c;
+  --silo-border: #4a5666;
+  --silo-text: #f2f4f7;
+  --silo-text-soft: #aab4c9;
+  --silo-text-faint: #8b97ab;
+  --header-bg: rgba(42, 54, 72, 0.8);
+  --header-border: #30384b;
+  --header-text: var(--silo-text);
+  --header-text-soft: var(--silo-text-soft);
+  --header-toggle-border: var(--silo-border);
+  --header-toggle-on-bg: rgba(128, 147, 255, 0.24);
+  --header-toggle-on-text: #dce4ff;
+  --header-toggle-off-bg: transparent;
+  --header-toggle-off-bg-hover: rgba(128, 147, 255, 0.12);
+  --header-toggle-off-text: var(--silo-text-soft);
+  --header-logo-filter: brightness(0) invert(0.92);
+}
+
+.theme-dark body {
+  background-image:
+    var(--silo-global-pattern),
+    var(--silo-global-pattern),
+    radial-gradient(880px 500px at -8% 10%, color-mix(in srgb, var(--silo-node-purple) 25%, transparent) 0%, transparent 55%),
+    radial-gradient(920px 520px at 108% 8%, color-mix(in srgb, #b193dc 22%, transparent) 0%, transparent 58%),
+    linear-gradient(100deg, #232b33 0%, #2c3540 45%, #323e52 100%);
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-size: 476px 449px, 952px 898px, cover, cover, cover;
+  background-position: -238px -58px, calc(100% + 476px) 42px, top left, top right, center;
+}
+
+.animated-circles-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.animated-circles-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.silo-page {
+  min-height: calc(100vh - 180px);
+  color: var(--silo-text);
+}
+
+.silo-panel {
+  background: var(--silo-surface);
+  border: 1px solid var(--silo-border);
+  border-radius: 18px;
+}
+
+.silo-top-card {
+  border-width: 2px;
+  border-color: rgba(255, 255, 255, 0.88);
+  background-image:
+    var(--pattern-circles-static-url),
+    linear-gradient(180deg, color-mix(in srgb, var(--silo-deep-purple) 38%, transparent) 0%, color-mix(in srgb, var(--silo-soft-purple) 22%, transparent) 32%, rgba(255, 255, 255, 0) 58%);
+  background-repeat: no-repeat, no-repeat;
+  background-size: 210px 198px, cover;
+  background-position: -38px -76px, top left;
+}
+
+.theme-dark .silo-top-card {
+  border-color: color-mix(in srgb, #ffffff 30%, var(--silo-border));
+  background-image:
+    var(--pattern-circles-static-url),
+    linear-gradient(180deg, rgba(132, 148, 255, 0.34) 0%, rgba(132, 148, 255, 0.16) 32%, rgba(26, 32, 45, 0) 58%);
+}
+
+.silo-panel-soft {
+  background: var(--silo-surface-2);
+  border: 1px solid var(--silo-border);
+}
+
+.silo-text-main { color: var(--silo-text); }
+.silo-text-soft { color: var(--silo-text-soft); }
+.silo-text-faint { color: var(--silo-text-faint); }
+
+.header-shell { background-color: var(--header-bg); border-color: var(--header-border); }
+.header-text { color: var(--header-text); }
+.header-text-soft { color: var(--header-text-soft); }
+.header-theme-toggle { border: 1px solid var(--header-toggle-border); }
+.header-theme-toggle-button { background-color: var(--header-toggle-off-bg); color: var(--header-toggle-off-text); }
+.header-theme-toggle-button:hover { background-color: var(--header-toggle-off-bg-hover); }
+.header-theme-toggle-button[aria-pressed='true'] { background-color: var(--header-toggle-on-bg); color: var(--header-toggle-on-text); }
+.header-logo { filter: var(--header-logo-filter); }
