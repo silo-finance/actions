@@ -1,11 +1,17 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.0] - 2026-04-08
+
+### Added
+- Withdraw-queue market removal
+  Flow to remove a market from the **withdraw queue** (and optionally the **supply queue**) via the same **Safe proposal** stack.
 
 ### Fixed
-- fix changing network
+
+- Network switching in the app shell.
 
 ## [0.1.0] - 2026-04-08
+
 ### Added — Set supply queue to zero
 
 Initial on-chain reset of the vault supply queue via `setSupplyQueue([])`.
