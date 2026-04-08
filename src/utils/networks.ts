@@ -103,6 +103,14 @@ export function getExplorerAddressUrl(chainId: number | string, address: string)
   return `${baseUrl}/address/${address}`
 }
 
+/** Block explorer URL for an on-chain transaction hash (supported networks only). */
+export function getExplorerTxUrl(chainId: number | string, txHash: string): string | null {
+  const config = getNetworkConfig(chainId)
+  if (!config) return null
+  const h = typeof txHash === 'string' && txHash.startsWith('0x') ? txHash : `0x${txHash}`
+  return `${config.explorerBaseUrl}/tx/${h}`
+}
+
 export function isChainSupported(chainId: number | string): boolean {
   const id = typeof chainId === 'string' ? parseInt(chainId, 10) : chainId
   return NETWORK_CONFIG_MAP.has(id)

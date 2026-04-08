@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import CopyButton from '@/components/CopyButton'
 import { getExplorerAddressUrl } from '@/utils/networks'
 import { formatTimelockSeconds } from '@/utils/timelockFormat'
@@ -72,27 +73,44 @@ type Props = {
   ownerAddress: string
   timelockSeconds: bigint
   ownerKind: OwnerKind
+  actions?: ReactNode
 }
 
-export default function VaultSummaryPanel({ chainId, vaultAddress, ownerAddress, timelockSeconds, ownerKind }: Props) {
+export default function VaultSummaryPanel({
+  chainId,
+  vaultAddress,
+  ownerAddress,
+  timelockSeconds,
+  ownerKind,
+  actions,
+}: Props) {
   const { daysText, rawSeconds } = formatTimelockSeconds(timelockSeconds)
 
   return (
     <div className="silo-panel silo-top-card p-5 mb-6">
-      <h2 className="text-lg font-semibold silo-text-main mb-2">Vault details</h2>
-      <div className="divide-y divide-[var(--silo-border)]">
-        <AddressLine label="Vault" chainId={chainId} address={vaultAddress} />
-        <AddressLine label="Owner" chainId={chainId} address={ownerAddress} />
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2">
-          <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Owner type</span>
-          <span className="text-sm silo-text-main">{ownerKindLabel(ownerKind)}</span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold silo-text-main mb-2">Vault details</h2>
+          <div className="divide-y divide-[var(--silo-border)]">
+            <AddressLine label="Vault" chainId={chainId} address={vaultAddress} />
+            <AddressLine label="Owner" chainId={chainId} address={ownerAddress} />
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2">
+              <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Owner type</span>
+              <span className="text-sm silo-text-main">{ownerKindLabel(ownerKind)}</span>
+            </div>
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2">
+              <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Timelock</span>
+              <span className="text-sm silo-text-main">
+                {daysText} <span className="silo-text-soft">({rawSeconds} s)</span>
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2">
-          <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Timelock</span>
-          <span className="text-sm silo-text-main">
-            {daysText} <span className="silo-text-soft">({rawSeconds} s)</span>
-          </span>
-        </div>
+        {actions != null ? (
+          <div className="min-w-0 lg:border-l lg:border-[var(--silo-border)] lg:pl-10 pt-6 lg:pt-0 border-t lg:border-t-0 border-[var(--silo-border)]">
+            {actions}
+          </div>
+        ) : null}
       </div>
     </div>
   )

@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import QueueColumn from '@/components/QueueColumn'
+import VaultActionsColumn from '@/components/VaultActionsColumn'
 import VaultSummaryPanel from '@/components/VaultSummaryPanel'
 import { useWeb3 } from '@/contexts/Web3Context'
 import { extractHexAddressLike } from '@/utils/addressFromInput'
@@ -164,6 +165,15 @@ export default function VaultPage() {
           ownerAddress={summary.owner}
           timelockSeconds={summary.timelockSeconds}
           ownerKind={summary.ownerKind}
+          actions={
+            <VaultActionsColumn
+              chainId={chainId}
+              vaultAddress={summary.vault}
+              ownerAddress={summary.owner}
+              ownerKind={summary.ownerKind}
+              supplyQueueMarkets={supply}
+            />
+          }
         />
       )}
 
