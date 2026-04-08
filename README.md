@@ -46,18 +46,31 @@ Step-by-step instructions for doing the same thing inside a multisig UI (e.g. Sa
 
 ---
 
-### Remove a market from the withdraw queue (curator / Safe flow)
+### Remove a market from the withdraw queue and reallocate
 
-The in-app flow **Reallocate & remove from withdraw queue** builds a **single Safe proposal** to the vault. Depending on on-chain state and your choices, the vault executes up to **four** methods (in this order; several are often batched as one `multicall` on the vault):
+1. **`reallocate`** — `_allocations` (`MarketAllocation[]`): pull the vault’s liquidity **from** the market you are removing, and supply it **into** destination market(s). On the **source** (the market you remove), `assets` must be **`0`** (full exit). On each **destination**, `assets` is **`type(uint256).max`** so the vault supplies everything it just withdrew (order and headroom matter on-chain).
 
-1. **`reallocate`** — `_allocations` (`MarketAllocation[]`): withdraw the vault’s full position from the market you remove (`assets == 0` on that market), then supply into one or more destination markets (encoding uses `type(uint256).max` on destination steps; caps and **headroom** `cap − current balance` are validated in the UI).
-2. **`submitCap`** — `_market` (address of the removed market), `_newSupplyCap` **`0`**. Included only when that market’s cap is currently greater than zero (lowering cap applies immediately on SiloVault).
-3. **`updateWithdrawQueue`** — **`_indexes`** (`uint256[]`): permutation of **previous** withdraw-queue indices with the removed index dropped (same ordering logic the app shows in the proposal preview).
-4. **`setSupplyQueue`** — **`_newSupplyQueue`** (`address[]`): current supply queue with the removed market omitted; order of the remaining markets unchanged. **Optional**: only if you tick “Also remove this market from the supply queue” in the wizard and the market appears in the supply queue.
+   **Example (exactly two markets — one “from”, one “to”):**  
+   - **From** = market you empty (`0xFrom…`).  
+   - **To** = market that receives the liquidity (`0xTo…`).  
+   - Paste as JSON (both tuple values quoted), one line:
 
-If there is **no** liquidity to move and **no** cap to zero and **no** supply-queue change, the proposal may be a **direct** `updateWithdrawQueue` call only (no `multicall`).
+   ```
+   [["0x1111111111111111111111111111111111111111","0"],["0x2222222222222222222222222222222222222222","115792089237316195423570985008687907853269984665640564039457584007913129639935"]]
+   ```
 
-In the wizard, each step shows **the method name and argument types** on the first line, and **copyable values only** below (no method prefix). For **`reallocate`**, the copied value is **valid JSON**: an array of two-element arrays, addresses and uint256s **both in double quotes**, e.g. `[["0x…","0"],["0x…","115792089237316195423570985008687907853269984665640564039457584007913129639935"]]`. Other steps copy as `0x…, 0` for **`submitCap`**, `[0,1,2]` for **`updateWithdrawQueue`**, and `[0x…,0x…]` for **`setSupplyQueue`**.
+2. **`submitCap`** — `_market` (address), `_newSupplyCap` (`uint256`). Only when that market’s cap is **&gt; 0** before the change; new cap is **0**.
+
+   **Example:** `_market` = `0x1111111111111111111111111111111111111111` (the same market you are removing), `_newSupplyCap` = `0`.  
+
+3. **`updateWithdrawQueue`** — `_indexes` (`uint256[]`): indices into the **previous** withdraw queue, in order, **without** the removed index.
+
+   **Example:** withdraw queue had **4** markets at indices `0,1,2,3` and you remove index **2**. New permutation: `[0, 1, 3]`.  
+
+4. **`setSupplyQueue`** — `_newSupplyQueue` (`address[]`): supply queue addresses **after** dropping the removed market; **relative order** of the rest unchanged. **Optional** (wizard checkbox).
+
+   **Example:** supply queue was `[0xA…, 0xB…, 0xC…]` and you remove `0xB…`. New queue: `[0xA…, 0xC…]`.  
+   Copy-paste: `[0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,0xcccccccccccccccccccccccccccccccccccccccc]`
 
 ---
 

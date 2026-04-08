@@ -12,8 +12,8 @@ import {
   buildReallocateAllocations,
   buildWithdrawQueueIndexesAfterRemoval,
   destinationsHaveEnoughHeadroom,
+  buildWithdrawMarketRemovalVaultCallDatas,
   encodeUpdateWithdrawQueueOnly,
-  encodeWithdrawMarketRemovalBundle,
   newSupplyQueueHasPositiveCaps,
   proposeReallocateRemoveWithdrawQueueMultisigOnly,
   supplyQueueAfterRemovingMarket,
@@ -244,10 +244,10 @@ export default function WithdrawQueueRemoveWizard({
       alsoRemoveFromSupplyQueue && inSupply
         ? supplyQueueAfterRemovingMarket(supplyQueueAddresses, removed.address)
         : undefined
-    let vaultCalldata: `0x${string}`
+    let vaultCallDatas: `0x${string}`[]
     try {
       if (amountToMove === Z && !needSubmitCap && newSupplyQueue === undefined) {
-        vaultCalldata = encodeUpdateWithdrawQueueOnly(indexes)
+        vaultCallDatas = [encodeUpdateWithdrawQueueOnly(indexes)]
       } else {
         const allocations =
           amountToMove > Z
@@ -258,7 +258,7 @@ export default function WithdrawQueueRemoveWizard({
                 capByMarket: capMap,
               })
             : null
-        vaultCalldata = encodeWithdrawMarketRemovalBundle({
+        vaultCallDatas = buildWithdrawMarketRemovalVaultCallDatas({
           allocations,
           removedMarket: removed.address,
           newQueueIndexes: indexes,
@@ -281,7 +281,7 @@ export default function WithdrawQueueRemoveWizard({
         ownerAddress,
         ownerKind,
         connectedAccount: account,
-        vaultCalldata,
+        vaultCallDatas,
       })
       setSuccessUrl(transactionUrl)
     } catch (e) {

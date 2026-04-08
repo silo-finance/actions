@@ -15,7 +15,8 @@ const vaultIface = new Interface(siloVaultAbi)
 
 export type MarketAllocationTuple = { market: string; assets: bigint }
 
-const SAFE_TX_ORIGIN = 'Silo Actions: withdraw-queue removal (reallocate / submitCap(0) / updateWithdrawQueue)'
+const SAFE_TX_ORIGIN =
+  'Silo Actions: withdraw-queue removal (separate vault calls via Safe batch / MultiSend)'
 
 const Z = BigInt(0)
 
@@ -158,36 +159,35 @@ export type EncodeWithdrawMarketRemovalParams = {
   /** `submitCap(market, 0)` — only when current cap &gt; 0 (lowering applies immediately on-chain). */
   includeSubmitCapZero: boolean
   /**
-   * When set (including `[]`), appends `setSupplyQueue` after `updateWithdrawQueue` in the same `multicall`.
+   * When set (including `[]`), appends `setSupplyQueue` after `updateWithdrawQueue` in the same Safe batch.
    * Omit to leave the supply queue unchanged.
    */
   newSupplyQueue?: string[]
 }
 
 /**
- * Single Safe tx: optional `reallocate`, optional `submitCap(0)`, then `updateWithdrawQueue`.
+ * Ordered vault calldata for withdraw-queue removal: separate top-level calls (no `vault.multicall`).
+ * Safe `createTransaction({ transactions })` batches these as one Safe exec (typically MultiSend).
  * Order matches on-chain prerequisites (empty market before zeroing cap is the safe curator order).
  */
-export function encodeWithdrawMarketRemovalBundle(params: EncodeWithdrawMarketRemovalParams): `0x${string}` {
-  const inners: string[] = []
+export function buildWithdrawMarketRemovalVaultCallDatas(
+  params: EncodeWithdrawMarketRemovalParams
+): `0x${string}`[] {
+  const out: `0x${string}`[] = []
   if (params.allocations != null && params.allocations.length > 0) {
-    inners.push(vaultIface.encodeFunctionData('reallocate', [params.allocations]))
+    out.push(vaultIface.encodeFunctionData('reallocate', [params.allocations]) as `0x${string}`)
   }
   if (params.includeSubmitCapZero) {
-    inners.push(
-      vaultIface.encodeFunctionData('submitCap', [getAddress(params.removedMarket), CAP_ARG_ZERO])
+    out.push(
+      vaultIface.encodeFunctionData('submitCap', [getAddress(params.removedMarket), CAP_ARG_ZERO]) as `0x${string}`
     )
   }
-  inners.push(vaultIface.encodeFunctionData('updateWithdrawQueue', [params.newQueueIndexes]))
+  out.push(vaultIface.encodeFunctionData('updateWithdrawQueue', [params.newQueueIndexes]) as `0x${string}`)
   if (params.newSupplyQueue !== undefined) {
     const addrs = params.newSupplyQueue.map((a) => getAddress(a))
-    inners.push(vaultIface.encodeFunctionData('setSupplyQueue', [addrs]))
+    out.push(vaultIface.encodeFunctionData('setSupplyQueue', [addrs]) as `0x${string}`)
   }
-
-  if (inners.length === 1) {
-    return inners[0] as `0x${string}`
-  }
-  return vaultIface.encodeFunctionData('multicall', [inners]) as `0x${string}`
+  return out
 }
 
 export function encodeUpdateWithdrawQueueOnly(newQueueIndexes: bigint[]): `0x${string}` {
@@ -200,19 +200,23 @@ export async function proposeReallocateRemoveWithdrawQueueViaSafe(params: {
   safeAddress: string
   vaultAddress: string
   proposerAccount: string
-  /** Calldata sent to the vault (single call or `multicall`). */
-  vaultCalldata: `0x${string}`
+  /** One or more direct vault calls; Safe SDK batches into a single proposed tx (MultiSend when &gt;1). */
+  vaultCallDatas: `0x${string}`[]
 }): Promise<void> {
   const baseUrl = getLegacySafeTransactionServiceBaseUrl(params.chainId)
   if (!baseUrl) {
     throw new Error(
-      'Safe Transaction Service URL is not configured for this chain. Submit the multicall from Safe{Wallet} manually.'
+      'Safe Transaction Service URL is not configured for this chain. Submit the transaction from Safe{Wallet} manually.'
     )
   }
 
   const safeAddress = getAddress(params.safeAddress)
   const vaultAddress = getAddress(params.vaultAddress)
   const sender = getAddress(params.proposerAccount)
+
+  if (params.vaultCallDatas.length === 0) {
+    throw new Error('No vault calls to propose.')
+  }
 
   const apiKit = new SafeApiKit({
     chainId: BigInt(params.chainId),
@@ -226,14 +230,12 @@ export async function proposeReallocateRemoveWithdrawQueueViaSafe(params: {
   })
 
   const safeTransaction = await protocolKit.createTransaction({
-    transactions: [
-      {
-        to: vaultAddress,
-        value: '0',
-        data: params.vaultCalldata,
-        operation: OperationType.Call,
-      },
-    ],
+    transactions: params.vaultCallDatas.map((data) => ({
+      to: vaultAddress,
+      value: '0',
+      data,
+      operation: OperationType.Call,
+    })),
   })
 
   const safeTxHash = await protocolKit.getTransactionHash(safeTransaction)
@@ -257,8 +259,8 @@ export type ReallocateRemoveWithdrawParams = {
   ownerAddress: string
   ownerKind: OwnerKind
   connectedAccount: string
-  /** Calldata for a single call on the vault (e.g. `multicall` or `updateWithdrawQueue`). */
-  vaultCalldata: `0x${string}`
+  /** Direct vault call data in execution order (no `vault.multicall`). */
+  vaultCallDatas: `0x${string}`[]
 }
 
 const ERR_NOT_OWNER_NOR_SAFE_SIGNER =
@@ -276,7 +278,7 @@ export type ReallocateRemoveWithdrawSuccess = {
 export async function proposeReallocateRemoveWithdrawQueueMultisigOnly(
   params: ReallocateRemoveWithdrawParams
 ): Promise<ReallocateRemoveWithdrawSuccess> {
-  const { ownerKind, ownerAddress, connectedAccount, vaultAddress, ethereum, chainId, provider, vaultCalldata } =
+  const { ownerKind, ownerAddress, connectedAccount, vaultAddress, ethereum, chainId, provider, vaultCallDatas } =
     params
 
   if (ownerKind !== 'safe') {
@@ -294,7 +296,7 @@ export async function proposeReallocateRemoveWithdrawQueueMultisigOnly(
     safeAddress: ownerAddress,
     vaultAddress,
     proposerAccount: connectedAccount,
-    vaultCalldata,
+    vaultCallDatas,
   })
 
   const transactionUrl = getSafeWalletQueueUrl(chainId, ownerAddress)
