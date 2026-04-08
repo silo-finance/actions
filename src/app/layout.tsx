@@ -5,6 +5,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import AnimatedCirclesBackground from '@/components/AnimatedCirclesBackground'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { Web3Provider } from '@/contexts/Web3Context'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -52,11 +53,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${dmSans.className} font-sans antialiased`}>
         <AnimatedCirclesBackground />
         <ThemeProvider>
-          <div className="relative z-[1]">
-            <Header />
-            <main className="pt-5 sm:pt-7">{children}</main>
-            <Footer />
-          </div>
+          <Web3Provider>
+            <div className="relative z-[1]">
+              <Header />
+              <main className="pt-5 sm:pt-7">{children}</main>
+              <Footer />
+            </div>
+          </Web3Provider>
         </ThemeProvider>
       </body>
     </html>
