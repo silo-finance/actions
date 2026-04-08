@@ -16,6 +16,8 @@ export type ResolvedMarket = {
   kind: 'IdleVault' | 'Silo' | 'Unknown'
   /** Vault principal in this market, e.g. `1.234 USDC` (same decimals/symbol as `vault.asset()`). */
   positionLabel?: string
+  /** From `SiloConfig.SILO_ID()` when this market is a Silo vault. */
+  siloConfigId?: bigint
 }
 
 async function readSymbol(provider: Provider, tokenAddress: string): Promise<string | undefined> {
@@ -86,7 +88,14 @@ export async function resolveMarketLabel(
     const [sym0, sym1] = await Promise.all([readSymbol(provider, asset0), readSymbol(provider, asset1)])
     const label =
       sym0 && sym1 ? `${sym0}/${sym1}` : sym0 || sym1 ? `${sym0 ?? '?'}/${sym1 ?? '?'}` : 'Unknown market'
-    const res: ResolvedMarket = { address: marketNorm, label, kind: 'Silo' }
+    let siloConfigId: bigint | undefined
+    try {
+      const idRaw = await cfg.SILO_ID()
+      siloConfigId = BigInt(idRaw.toString())
+    } catch {
+      siloConfigId = undefined
+    }
+    const res: ResolvedMarket = { address: marketNorm, label, kind: 'Silo', siloConfigId }
     cache.set(key, res)
     return res
   } catch {

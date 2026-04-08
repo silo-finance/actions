@@ -40,6 +40,7 @@ export default function QueueColumn({
               address={m.address}
               label={m.label}
               positionLabel={m.positionLabel}
+              siloConfigId={m.siloConfigId}
             />
           ))}
         </div>

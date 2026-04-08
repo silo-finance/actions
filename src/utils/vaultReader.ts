@@ -11,6 +11,29 @@ export type VaultUnderlyingMeta = {
   symbol: string
 }
 
+/**
+ * Human-readable whole tokens only: `raw / 10^decimals` with integer division (no fractional part).
+ * Appends `meta.symbol` when set. If `meta` is missing, returns `raw` as a decimal string.
+ */
+function pow10BigInt(exp: number): bigint {
+  let p = BigInt(1)
+  for (let i = 0; i < exp; i++) p *= BigInt(10)
+  return p
+}
+
+export function formatVaultAmountWholeTokens(raw: bigint, meta: VaultUnderlyingMeta | null): string {
+  if (!meta) return raw.toString()
+  const d = meta.decimals
+  if (!Number.isFinite(d) || d < 0 || d > 255) return raw.toString()
+  try {
+    const whole = raw / pow10BigInt(d)
+    const sym = meta.symbol.trim()
+    return sym.length > 0 ? `${whole.toString()} ${sym}` : whole.toString()
+  } catch {
+    return raw.toString()
+  }
+}
+
 /** `vault.asset()` ERC-20 decimals + symbol — one underlying asset for the whole vault UI. */
 export async function fetchVaultUnderlyingMeta(
   provider: Provider,

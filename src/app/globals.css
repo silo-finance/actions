@@ -155,9 +155,58 @@ body {
   border: 1px solid var(--silo-border);
 }
 
+.silo-selectable-card {
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.silo-selectable-card[data-selected='true'] {
+  border-color: color-mix(in srgb, var(--silo-deep-purple) 85%, #5a6bb8);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--silo-deep-purple) 25%, transparent);
+}
+
+.theme-dark .silo-selectable-card {
+  border-color: color-mix(in srgb, #ffffff 30%, var(--silo-border));
+}
+
+.theme-dark .silo-selectable-card[data-selected='true'] {
+  border-color: var(--silo-node-purple);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--silo-node-purple) 35%, transparent);
+}
+
+.silo-choice-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--silo-border);
+  background: var(--silo-surface);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.silo-choice-option[data-selected='false']:hover {
+  border-color: color-mix(in srgb, var(--silo-accent) 45%, var(--silo-border));
+}
+
+.silo-choice-option[data-no-interaction='true'][data-selected='false']:hover {
+  border-color: var(--silo-border);
+}
+
+.silo-choice-option[data-selected='true'] {
+  border-color: color-mix(in srgb, var(--silo-deep-purple) 88%, #6a7ac8);
+  background: color-mix(in srgb, var(--silo-soft-purple) 48%, var(--silo-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--silo-deep-purple) 18%, transparent);
+}
+
 .silo-text-main { color: var(--silo-text); }
 .silo-text-soft { color: var(--silo-text-soft); }
 .silo-text-faint { color: var(--silo-text-faint); }
+/** Emphasis using theme danger hue, blended with body text so it is not flat “alarm” red. */
+.silo-text-danger-muted {
+  color: color-mix(in srgb, var(--silo-danger) 68%, var(--silo-text));
+}
 
 .header-shell { background-color: var(--header-bg); border-color: var(--header-border); }
 .header-text { color: var(--header-text); }

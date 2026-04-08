@@ -4,10 +4,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { getAddress } from 'ethers'
 import CopyButton from '@/components/CopyButton'
 import ShareLinkCopyButton from '@/components/ShareLinkCopyButton'
+import WithdrawQueueRemoveWizard from '@/components/WithdrawQueueRemoveWizard'
 import { useWeb3 } from '@/contexts/Web3Context'
 import { clearSupplyQueueForOwner, type Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import type { OwnerKind } from '@/utils/ownerKind'
 import type { ResolvedMarket } from '@/utils/resolveVaultMarket'
+import type { VaultUnderlyingMeta } from '@/utils/vaultReader'
+import type { WithdrawMarketOnchainState } from '@/utils/withdrawMarketStates'
 
 function normalizeAddressList(markets: ResolvedMarket[]): string[] {
   return markets.map((m) => {
@@ -30,6 +33,10 @@ type Props = {
   ownerKind: OwnerKind
   /** Current supply queue as already loaded in the UI (order preserved). Used to show revert data after a successful clear. */
   supplyQueueMarkets: ResolvedMarket[]
+  withdrawQueueMarkets: ResolvedMarket[]
+  /** From the last vault Check — same length/order as `withdrawQueueMarkets`. */
+  withdrawQueueStates: WithdrawMarketOnchainState[]
+  vaultUnderlyingMeta: VaultUnderlyingMeta | null
 }
 
 export default function VaultActionsColumn({
@@ -38,6 +45,9 @@ export default function VaultActionsColumn({
   ownerAddress,
   ownerKind,
   supplyQueueMarkets,
+  withdrawQueueMarkets,
+  withdrawQueueStates,
+  vaultUnderlyingMeta,
 }: Props) {
   const { provider, account, isConnected } = useWeb3()
   const [busy, setBusy] = useState(false)
@@ -45,12 +55,14 @@ export default function VaultActionsColumn({
   const [successTransactionUrl, setSuccessTransactionUrl] = useState<string | null>(null)
   const [successLinkLabel, setSuccessLinkLabel] = useState<string>('Open queue')
   const [revertSupplyAddresses, setRevertSupplyAddresses] = useState<string[] | null>(null)
+  const [activeAction, setActiveAction] = useState<'none' | 'clear' | 'withdraw'>('none')
 
   useEffect(() => {
     setSuccessTransactionUrl(null)
     setSuccessLinkLabel('Open queue')
     setRevertSupplyAddresses(null)
     setLocalError('')
+    setActiveAction('none')
   }, [vaultAddress, ownerAddress, ownerKind, chainId])
 
   const canAttempt =
@@ -105,47 +117,109 @@ export default function VaultActionsColumn({
   const revertArgumentText =
     revertSupplyAddresses != null ? formatSupplyQueueArgumentJson(revertSupplyAddresses) : null
 
+  if (activeAction === 'withdraw') {
+    return (
+      <WithdrawQueueRemoveWizard
+        chainId={chainId}
+        vaultAddress={vaultAddress}
+        ownerAddress={ownerAddress}
+        ownerKind={ownerKind}
+        supplyQueueMarkets={supplyQueueMarkets}
+        withdrawMarkets={withdrawQueueMarkets}
+        withdrawMarketStates={withdrawQueueStates}
+        underlyingMeta={vaultUnderlyingMeta}
+        onCancel={() => setActiveAction('none')}
+      />
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <button
-        type="button"
-        disabled={!canAttempt || busy}
-        onClick={() => void handleClearSupplyQueue()}
-        className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {busy ? 'Waiting for wallet…' : 'Clear supply queue'}
-      </button>
-      {localError ? <p className="text-sm silo-alert silo-alert-error">{localError}</p> : null}
-      {successTransactionUrl ? (
-        <div className="flex flex-col gap-3 pt-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <a
-              href={successTransactionUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium silo-text-main hover:underline break-all min-w-0"
-            >
-              {successLinkLabel}
-            </a>
-            <ShareLinkCopyButton url={successTransactionUrl} />
-          </div>
-          {revertArgumentText != null ? (
-            <div className="rounded-md border border-[var(--silo-border)] bg-[var(--silo-surface-2)] p-3 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft">Inject revert changes</p>
-              <p className="text-sm silo-text-main">
-                Method: <code className="text-xs font-mono silo-text-main">setSupplyQueue</code>
-              </p>
-              <p className="text-sm silo-text-main">
-                Argument <code className="text-xs font-mono silo-text-main">_newSupplyQueue</code>:
-              </p>
-              <div className="flex flex-wrap items-start gap-2">
-                <pre className="text-xs font-mono silo-text-main whitespace-pre-wrap break-all flex-1 min-w-0 m-0">
-                  {revertArgumentText}
-                </pre>
-                <CopyButton value={revertArgumentText} />
-              </div>
+      {activeAction === 'none' ? (
+        <>
+          <button
+            type="button"
+            disabled={!canAttempt || busy}
+            onClick={() => setActiveAction('clear')}
+            className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Clear supply queue
+          </button>
+          <button
+            type="button"
+            disabled={withdrawQueueMarkets.length === 0}
+            onClick={() => setActiveAction('withdraw')}
+            className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Reallocate & remove from withdraw queue
+          </button>
+        </>
+      ) : null}
+
+      {activeAction === 'clear' ? (
+        <div className="silo-choice-option" data-selected="true">
+          <div className="w-full space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold silo-text-main">Clear supply queue</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveAction('none')
+                  setLocalError('')
+                  setSuccessTransactionUrl(null)
+                  setRevertSupplyAddresses(null)
+                }}
+                className="text-xs font-medium silo-text-soft hover:silo-text-main underline"
+              >
+                Back
+              </button>
             </div>
-          ) : null}
+
+            <button
+              type="button"
+              disabled={!canAttempt || busy}
+              onClick={() => void handleClearSupplyQueue()}
+              className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {busy ? 'Waiting for wallet…' : 'Execute clear supply queue'}
+            </button>
+
+            {localError ? <p className="text-sm silo-alert silo-alert-error">{localError}</p> : null}
+            {successTransactionUrl ? (
+              <div className="flex flex-col gap-3 pt-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={successTransactionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-medium silo-text-main hover:underline break-all min-w-0"
+                  >
+                    {successLinkLabel}
+                  </a>
+                  <ShareLinkCopyButton url={successTransactionUrl} />
+                </div>
+                {revertArgumentText != null ? (
+                  <div className="silo-choice-option" data-selected="true">
+                    <div className="w-full space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft">Inject revert changes</p>
+                      <p className="text-sm silo-text-main">
+                        Method: <code className="text-xs font-mono silo-text-main">setSupplyQueue</code>
+                      </p>
+                      <p className="text-sm silo-text-main">
+                        Argument <code className="text-xs font-mono silo-text-main">_newSupplyQueue</code>:
+                      </p>
+                      <div className="flex flex-wrap items-start gap-2">
+                        <pre className="text-xs font-mono silo-text-main whitespace-pre-wrap break-all flex-1 min-w-0 m-0">
+                          {revertArgumentText}
+                        </pre>
+                        <CopyButton value={revertArgumentText} />
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </div>
