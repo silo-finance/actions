@@ -7,6 +7,8 @@ const siloVaultAbi = loadAbi(siloVaultArtifact)
 const erc20Abi = loadAbi(erc20Artifact)
 
 export type VaultUnderlyingMeta = {
+  /** ERC-20 from `vault.asset()` (checksummed). */
+  address: string
   decimals: number
   symbol: string
 }
@@ -43,9 +45,10 @@ export async function fetchVaultUnderlyingMeta(
     const vaultNorm = getAddress(vaultAddress)
     const vault = new Contract(vaultNorm, siloVaultAbi, provider)
     const assetAddr = String(await vault.asset())
-    const token = new Contract(assetAddr, erc20Abi, provider)
+    const assetNorm = getAddress(assetAddr)
+    const token = new Contract(assetNorm, erc20Abi, provider)
     const [dec, sym] = await Promise.all([token.decimals(), token.symbol()])
-    return { decimals: Number(dec), symbol: String(sym) }
+    return { address: assetNorm, decimals: Number(dec), symbol: String(sym) }
   } catch {
     return null
   }

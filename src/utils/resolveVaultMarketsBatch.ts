@@ -79,16 +79,14 @@ export async function resolveMarketsForQueues(
   const cache = new Map<string, ResolvedMarket>()
   const unique = uniqueMarketAddressesOrdered(supplyAddrs, withdrawAddrs)
 
-  await Promise.all(
-    unique.map((addr) => resolveMarketLabel(provider, addr, vaultAddress, cache))
-  )
-
   const [underlying, withdrawMarketStates] = await Promise.all([
     fetchVaultUnderlyingMeta(provider, vaultAddress),
     withdrawAddrs.length === 0
       ? Promise.resolve([] as WithdrawMarketOnchainState[])
       : fetchWithdrawMarketStates(provider, vaultAddress, withdrawAddrs),
   ])
+
+  await Promise.all(unique.map((addr) => resolveMarketLabel(provider, addr, vaultAddress, cache, underlying)))
 
   if (underlying) {
     await Promise.all(
