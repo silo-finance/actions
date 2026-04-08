@@ -3,7 +3,8 @@ import idleVaultArtifact from '@/abis/IdleVault.json'
 import siloArtifact from '@/abis/Silo.json'
 import { loadAbi } from '@/utils/loadAbi'
 import { resolveMarketLabel, type ResolvedMarket } from '@/utils/resolveVaultMarket'
-import { fetchVaultUnderlyingMeta } from '@/utils/vaultReader'
+import { fetchWithdrawMarketStates, type WithdrawMarketOnchainState } from '@/utils/withdrawMarketStates'
+import { fetchVaultUnderlyingMeta, type VaultUnderlyingMeta } from '@/utils/vaultReader'
 
 const idleVaultAbi = loadAbi(idleVaultArtifact)
 const siloAbi = loadAbi(siloArtifact)
@@ -68,15 +69,25 @@ export async function resolveMarketsForQueues(
   vaultAddress: string,
   supplyAddrs: string[],
   withdrawAddrs: string[]
-): Promise<{ supply: ResolvedMarket[]; withdraw: ResolvedMarket[] }> {
+): Promise<{
+  supply: ResolvedMarket[]
+  withdraw: ResolvedMarket[]
+  /** Same order as `withdraw` — vault config + position per market (used by withdraw-queue actions without extra RPC). */
+  withdrawMarketStates: WithdrawMarketOnchainState[]
+  underlyingMeta: VaultUnderlyingMeta | null
+}> {
   const cache = new Map<string, ResolvedMarket>()
   const unique = uniqueMarketAddressesOrdered(supplyAddrs, withdrawAddrs)
 
-  await Promise.all(
-    unique.map((addr) => resolveMarketLabel(provider, addr, vaultAddress, cache))
-  )
+  const [underlying, withdrawMarketStates] = await Promise.all([
+    fetchVaultUnderlyingMeta(provider, vaultAddress),
+    withdrawAddrs.length === 0
+      ? Promise.resolve([] as WithdrawMarketOnchainState[])
+      : fetchWithdrawMarketStates(provider, vaultAddress, withdrawAddrs),
+  ])
 
-  const underlying = await fetchVaultUnderlyingMeta(provider, vaultAddress)
+  await Promise.all(unique.map((addr) => resolveMarketLabel(provider, addr, vaultAddress, cache, underlying)))
+
   if (underlying) {
     await Promise.all(
       unique.map(async (addr) => {
@@ -98,5 +109,7 @@ export async function resolveMarketsForQueues(
   return {
     supply: supplyAddrs.map(lookup),
     withdraw: withdrawAddrs.map(lookup),
+    withdrawMarketStates,
+    underlyingMeta: underlying,
   }
 }

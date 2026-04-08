@@ -7,6 +7,8 @@ declare global {
   interface Window {
     ethereum?: {
       request: (args: { method: string; params?: unknown[] }) => Promise<unknown>
+      on?: (event: string, handler: (...args: unknown[]) => void) => void
+      removeListener?: (event: string, handler: (...args: unknown[]) => void) => void
     }
   }
 }
@@ -29,12 +31,6 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
   const [chainId, setChainId] = useState<number | null>(null)
   const [browserProvider, setBrowserProvider] = useState<BrowserProvider | null>(null)
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.ethereum) {
-      setBrowserProvider(new BrowserProvider(window.ethereum))
-    }
-  }, [])
-
   const refreshChainId = useCallback(async () => {
     if (!window.ethereum) return
     try {
@@ -44,6 +40,32 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
       setChainId(null)
     }
   }, [])
+
+  /** Ethers v6 caches network on BrowserProvider; after wallet chain switch it must be recreated or RPC throws `network changed`. */
+  const recreateBrowserProvider = useCallback(() => {
+    if (typeof window === 'undefined' || !window.ethereum) {
+      setBrowserProvider(null)
+      return
+    }
+    setBrowserProvider(new BrowserProvider(window.ethereum))
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.ethereum) return
+    const eth = window.ethereum
+
+    recreateBrowserProvider()
+
+    const onChainChanged = () => {
+      void refreshChainId()
+      recreateBrowserProvider()
+    }
+
+    eth.on?.('chainChanged', onChainChanged)
+    return () => {
+      eth.removeListener?.('chainChanged', onChainChanged)
+    }
+  }, [recreateBrowserProvider, refreshChainId])
 
   const connect = useCallback(async () => {
     if (!window.ethereum) {
@@ -75,6 +97,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
           params: [{ chainId: `0x${targetChainId.toString(16)}` }],
         })
         await refreshChainId()
+        recreateBrowserProvider()
       } catch (error) {
         const walletError = error as { code?: number; message?: string }
         if (walletError.code === 4001) return
@@ -85,7 +108,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
         alert(`Failed to switch network.${walletError.message ? ` ${walletError.message}` : ''}`)
       }
     },
-    [refreshChainId]
+    [refreshChainId, recreateBrowserProvider]
   )
 
   const value = useMemo<Web3ContextValue>(

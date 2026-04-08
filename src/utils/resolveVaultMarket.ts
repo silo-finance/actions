@@ -4,6 +4,7 @@ import siloArtifact from '@/abis/Silo.json'
 import siloConfigArtifact from '@/abis/SiloConfig.json'
 import erc20Artifact from '@/abis/ERC20.json'
 import { loadAbi } from '@/utils/loadAbi'
+import type { VaultUnderlyingMeta } from '@/utils/vaultReader'
 
 const idleVaultAbi = loadAbi(idleVaultArtifact)
 const siloAbi = loadAbi(siloArtifact)
@@ -16,6 +17,8 @@ export type ResolvedMarket = {
   kind: 'IdleVault' | 'Silo' | 'Unknown'
   /** Vault principal in this market, e.g. `1.234 USDC` (same decimals/symbol as `vault.asset()`). */
   positionLabel?: string
+  /** From `SiloConfig.SILO_ID()` when this market is a Silo vault. */
+  siloConfigId?: bigint
 }
 
 async function readSymbol(provider: Provider, tokenAddress: string): Promise<string | undefined> {
@@ -33,7 +36,9 @@ export async function resolveMarketLabel(
   provider: Provider,
   marketAddress: string,
   vaultAddress: string,
-  cache: Map<string, ResolvedMarket>
+  cache: Map<string, ResolvedMarket>,
+  /** When set, Silo pair labels use only the non-vault asset symbol (one fewer `symbol()` RPC per Silo). */
+  vaultUnderlying: VaultUnderlyingMeta | null
 ): Promise<ResolvedMarket> {
   const key = marketAddress.toLowerCase()
   const cached = cache.get(key)
@@ -83,10 +88,43 @@ export async function resolveMarketLabel(
     const [a0, a1] = await Promise.all([silo0.asset(), silo1.asset()])
     const asset0 = String(a0)
     const asset1 = String(a1)
-    const [sym0, sym1] = await Promise.all([readSymbol(provider, asset0), readSymbol(provider, asset1)])
-    const label =
-      sym0 && sym1 ? `${sym0}/${sym1}` : sym0 || sym1 ? `${sym0 ?? '?'}/${sym1 ?? '?'}` : 'Unknown market'
-    const res: ResolvedMarket = { address: marketNorm, label, kind: 'Silo' }
+
+    let label: string
+    const vaultAsset = vaultUnderlying?.address
+    if (vaultAsset) {
+      try {
+        const vA = getAddress(vaultAsset)
+        const t0 = getAddress(asset0)
+        const t1 = getAddress(asset1)
+        if (t0 === vA) {
+          const sym = await readSymbol(provider, asset1)
+          label = sym ?? '?'
+        } else if (t1 === vA) {
+          const sym = await readSymbol(provider, asset0)
+          label = sym ?? '?'
+        } else {
+          const [sym0, sym1] = await Promise.all([readSymbol(provider, asset0), readSymbol(provider, asset1)])
+          label =
+            sym0 && sym1 ? `${sym0}/${sym1}` : sym0 || sym1 ? `${sym0 ?? '?'}/${sym1 ?? '?'}` : 'Unknown market'
+        }
+      } catch {
+        const [sym0, sym1] = await Promise.all([readSymbol(provider, asset0), readSymbol(provider, asset1)])
+        label =
+          sym0 && sym1 ? `${sym0}/${sym1}` : sym0 || sym1 ? `${sym0 ?? '?'}/${sym1 ?? '?'}` : 'Unknown market'
+      }
+    } else {
+      const [sym0, sym1] = await Promise.all([readSymbol(provider, asset0), readSymbol(provider, asset1)])
+      label =
+        sym0 && sym1 ? `${sym0}/${sym1}` : sym0 || sym1 ? `${sym0 ?? '?'}/${sym1 ?? '?'}` : 'Unknown market'
+    }
+    let siloConfigId: bigint | undefined
+    try {
+      const idRaw = await cfg.SILO_ID()
+      siloConfigId = BigInt(idRaw.toString())
+    } catch {
+      siloConfigId = undefined
+    }
+    const res: ResolvedMarket = { address: marketNorm, label, kind: 'Silo', siloConfigId }
     cache.set(key, res)
     return res
   } catch {

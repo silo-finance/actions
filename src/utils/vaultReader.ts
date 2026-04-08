@@ -7,8 +7,33 @@ const siloVaultAbi = loadAbi(siloVaultArtifact)
 const erc20Abi = loadAbi(erc20Artifact)
 
 export type VaultUnderlyingMeta = {
+  /** ERC-20 from `vault.asset()` (checksummed). */
+  address: string
   decimals: number
   symbol: string
+}
+
+/**
+ * Human-readable whole tokens only: `raw / 10^decimals` with integer division (no fractional part).
+ * Appends `meta.symbol` when set. If `meta` is missing, returns `raw` as a decimal string.
+ */
+function pow10BigInt(exp: number): bigint {
+  let p = BigInt(1)
+  for (let i = 0; i < exp; i++) p *= BigInt(10)
+  return p
+}
+
+export function formatVaultAmountWholeTokens(raw: bigint, meta: VaultUnderlyingMeta | null): string {
+  if (!meta) return raw.toString()
+  const d = meta.decimals
+  if (!Number.isFinite(d) || d < 0 || d > 255) return raw.toString()
+  try {
+    const whole = raw / pow10BigInt(d)
+    const sym = meta.symbol.trim()
+    return sym.length > 0 ? `${whole.toString()} ${sym}` : whole.toString()
+  } catch {
+    return raw.toString()
+  }
 }
 
 /** `vault.asset()` ERC-20 decimals + symbol — one underlying asset for the whole vault UI. */
@@ -20,9 +45,10 @@ export async function fetchVaultUnderlyingMeta(
     const vaultNorm = getAddress(vaultAddress)
     const vault = new Contract(vaultNorm, siloVaultAbi, provider)
     const assetAddr = String(await vault.asset())
-    const token = new Contract(assetAddr, erc20Abi, provider)
+    const assetNorm = getAddress(assetAddr)
+    const token = new Contract(assetNorm, erc20Abi, provider)
     const [dec, sym] = await Promise.all([token.decimals(), token.symbol()])
-    return { decimals: Number(dec), symbol: String(sym) }
+    return { address: assetNorm, decimals: Number(dec), symbol: String(sym) }
   } catch {
     return null
   }
