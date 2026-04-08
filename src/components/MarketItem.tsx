@@ -11,13 +11,15 @@ type Props = {
   label: string
   /** Vault position in this market (principal asset amount + symbol). */
   positionLabel?: string
+  /** `SiloConfig.SILO_ID()` for Silo markets. */
+  siloConfigId?: bigint
 }
 
 function shortAddr(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
 
-export default function MarketItem({ index, chainId, address, label, positionLabel }: Props) {
+export default function MarketItem({ index, chainId, address, label, positionLabel, siloConfigId }: Props) {
   const explorerUrl = getExplorerAddressUrl(chainId, address)
 
   return (
@@ -30,9 +32,17 @@ export default function MarketItem({ index, chainId, address, label, positionLab
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
-          <p className="text-sm font-semibold silo-text-main truncate">{label}</p>
+          <p className="text-sm font-semibold silo-text-main truncate shrink-0">{label}</p>
+          {siloConfigId !== undefined ? (
+            <span
+              className="text-sm font-mono tabular-nums silo-text-soft shrink-0"
+              title="Silo config ID"
+            >
+              #{siloConfigId.toString()}
+            </span>
+          ) : null}
           {positionLabel ? (
-            <p className="text-xs font-mono tabular-nums silo-text-soft shrink-0" title="Vault position (underlying)">
+            <p className="text-xs font-mono tabular-nums silo-text-soft shrink-0 min-w-0" title="Vault position (underlying)">
               {positionLabel}
             </p>
           ) : null}

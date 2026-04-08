@@ -14,6 +14,8 @@ import { analyzeOwnerKind, type OwnerKind } from '@/utils/ownerKind'
 import { fetchVaultOverview } from '@/utils/vaultReader'
 import { resolveMarketsForQueues } from '@/utils/resolveVaultMarketsBatch'
 import type { ResolvedMarket } from '@/utils/resolveVaultMarket'
+import type { VaultUnderlyingMeta } from '@/utils/vaultReader'
+import type { WithdrawMarketOnchainState } from '@/utils/withdrawMarketStates'
 
 export default function VaultPage() {
   const { provider, chainId, isConnected, connect, switchNetwork } = useWeb3()
@@ -22,6 +24,8 @@ export default function VaultPage() {
   const [loading, setLoading] = useState(false)
   const [supply, setSupply] = useState<ResolvedMarket[]>([])
   const [withdraw, setWithdraw] = useState<ResolvedMarket[]>([])
+  const [withdrawMarketStates, setWithdrawMarketStates] = useState<WithdrawMarketOnchainState[]>([])
+  const [vaultUnderlyingMeta, setVaultUnderlyingMeta] = useState<VaultUnderlyingMeta | null>(null)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [supplyQueueSize, setSupplyQueueSize] = useState<number | undefined>(undefined)
   const [withdrawQueueSize, setWithdrawQueueSize] = useState<number | undefined>(undefined)
@@ -36,6 +40,8 @@ export default function VaultPage() {
     setError('')
     setSupply([])
     setWithdraw([])
+    setWithdrawMarketStates([])
+    setVaultUnderlyingMeta(null)
     setHasLoaded(false)
     setSupplyQueueSize(undefined)
     setWithdrawQueueSize(undefined)
@@ -87,12 +93,14 @@ export default function VaultPage() {
       setSupplyQueueSize(overview.supply.length)
       setWithdrawQueueSize(overview.withdraw.length)
 
-      const [ownerKind, { supply: supplyResolved, withdraw: withdrawResolved }] = await Promise.all([
+      const [ownerKind, resolvedQueues] = await Promise.all([
         analyzeOwnerKind(provider, overview.owner),
         resolveMarketsForQueues(provider, vault, overview.supply, overview.withdraw),
       ])
-      setSupply(supplyResolved)
-      setWithdraw(withdrawResolved)
+      setSupply(resolvedQueues.supply)
+      setWithdraw(resolvedQueues.withdraw)
+      setWithdrawMarketStates(resolvedQueues.withdrawMarketStates)
+      setVaultUnderlyingMeta(resolvedQueues.underlyingMeta)
       setSummary({
         vault,
         owner: normalizeAddress(overview.owner) ?? overview.owner,
@@ -143,6 +151,12 @@ export default function VaultPage() {
             id="vault-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              if (loading) return
+              void handleCheck()
+            }}
             placeholder="0x… or https://…/address/0x…"
             className="flex-1 min-w-0 silo-input silo-input--md font-mono focus:outline-none focus:ring-0"
           />
@@ -172,6 +186,9 @@ export default function VaultPage() {
               ownerAddress={summary.owner}
               ownerKind={summary.ownerKind}
               supplyQueueMarkets={supply}
+              withdrawQueueMarkets={withdraw}
+              withdrawQueueStates={withdrawMarketStates}
+              vaultUnderlyingMeta={vaultUnderlyingMeta}
             />
           }
         />
