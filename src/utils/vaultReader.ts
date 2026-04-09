@@ -84,17 +84,21 @@ export type VaultOverview = {
   supply: string[]
   withdraw: string[]
   owner: string
+  curator: string
+  guardian: string
   timelockSeconds: bigint
 }
 
-/** Owner, timelock, and both queues in one flow (single vault Contract instance). */
+/** Owner, timelock, curator, guardian, and both queues in one flow (single vault Contract instance). */
 export async function fetchVaultOverview(provider: Provider, vaultAddress: string): Promise<VaultOverview> {
   const vault = new Contract(vaultAddress, siloVaultAbi, provider)
-  const [owner, timelock, supplyLen, withdrawLen] = await Promise.all([
+  const [owner, timelock, supplyLen, withdrawLen, curator, guardian] = await Promise.all([
     vault.owner(),
     vault.timelock(),
     vault.supplyQueueLength(),
     vault.withdrawQueueLength(),
+    vault.curator(),
+    vault.guardian(),
   ])
   const sLen = Number(supplyLen)
   const wLen = Number(withdrawLen)
@@ -103,6 +107,8 @@ export async function fetchVaultOverview(provider: Provider, vaultAddress: strin
     supply,
     withdraw,
     owner: String(owner),
+    curator: String(curator),
+    guardian: String(guardian),
     timelockSeconds: BigInt(timelock),
   }
 }

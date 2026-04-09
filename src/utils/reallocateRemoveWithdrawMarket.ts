@@ -7,6 +7,7 @@ import { getLegacySafeTransactionServiceBaseUrl } from '@/utils/safeTransactionS
 import { loadAbi } from '@/utils/loadAbi'
 import type { OwnerKind } from '@/utils/ownerKind'
 import { getSafeWalletQueueUrl } from '@/utils/safeAppLinks'
+import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import { isAddressSafeOwner } from '@/utils/safeOwnerList'
 import type { Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 
@@ -202,6 +203,8 @@ export async function proposeReallocateRemoveWithdrawQueueViaSafe(params: {
   proposerAccount: string
   /** One or more direct vault calls; Safe SDK batches into a single proposed tx (MultiSend when &gt;1). */
   vaultCallDatas: `0x${string}`[]
+  /** Defaults to withdraw-queue removal origin. */
+  origin?: string
 }): Promise<void> {
   const baseUrl = getLegacySafeTransactionServiceBaseUrl(params.chainId)
   if (!baseUrl) {
@@ -247,7 +250,7 @@ export async function proposeReallocateRemoveWithdrawQueueViaSafe(params: {
     safeTxHash,
     senderAddress: sender,
     senderSignature: signature.data,
-    origin: SAFE_TX_ORIGIN,
+    origin: params.origin ?? SAFE_TX_ORIGIN,
   })
 }
 
@@ -269,6 +272,7 @@ const ERR_NOT_OWNER_NOR_SAFE_SIGNER =
 export type ReallocateRemoveWithdrawSuccess = {
   transactionUrl: string
   successLinkLabel: string
+  outcome: TxSubmitOutcome
 }
 
 /**
@@ -303,5 +307,5 @@ export async function proposeReallocateRemoveWithdrawQueueMultisigOnly(
   if (!transactionUrl) {
     throw new Error('Could not build a Safe{Wallet} link for this network.')
   }
-  return { transactionUrl, successLinkLabel: 'Open queue' }
+  return { transactionUrl, successLinkLabel: 'Open queue', outcome: 'safe_queue' }
 }

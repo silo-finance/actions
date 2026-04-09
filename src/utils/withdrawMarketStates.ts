@@ -14,6 +14,8 @@ export type WithdrawMarketOnchainState = {
   supplyAssets: bigint
   cap: bigint
   enabled: boolean
+  /** Pending cap value from `pendingCap(market).value` (not yet applied until `acceptCap`). */
+  pendingCapValue: bigint
   pendingCapValidAt: bigint
   /** Non-zero while a forced removal timelock is pending (`submitMarketRemoval`). */
   removableAt: bigint
@@ -42,9 +44,18 @@ export async function fetchVaultMarketStates(
       const supplyAssets = BigInt(await m.convertToAssets(shares))
       const cap = BigInt(cfg.cap)
       const enabled = Boolean(cfg.enabled)
+      const pendingCapValue = BigInt(pending.value)
       const pendingCapValidAt = BigInt(pending.validAt)
       const removableAt = BigInt(cfg.removableAt)
-      return { address: addr, supplyAssets, cap, enabled, pendingCapValidAt, removableAt }
+      return {
+        address: addr,
+        supplyAssets,
+        cap,
+        enabled,
+        pendingCapValue,
+        pendingCapValidAt,
+        removableAt,
+      }
     })
   )
 }

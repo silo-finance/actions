@@ -15,23 +15,64 @@ type Props = {
   siloConfigId?: bigint
   /** Vault supply cap (whole underlying tokens), from queue load. */
   capLabel?: string
+  /** When set, replaces the index column with up/down controls. */
+  reorder?: { onUp: () => void; onDown: () => void; disableUp: boolean; disableDown: boolean }
+  /** Highlight row (e.g. market added in this session before the next Check). */
+  highlightNew?: boolean
 }
 
 function shortAddr(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
 
-export default function MarketItem({ index, chainId, address, label, positionLabel, siloConfigId, capLabel }: Props) {
+export default function MarketItem({
+  index,
+  chainId,
+  address,
+  label,
+  positionLabel,
+  siloConfigId,
+  capLabel,
+  reorder,
+  highlightNew,
+}: Props) {
   const explorerUrl = getExplorerAddressUrl(chainId, address)
 
   return (
-    <div className="flex flex-wrap items-center gap-2 py-2 border-b border-[var(--silo-border)] last:border-b-0">
-      <span
-        className="w-9 shrink-0 text-right text-xs font-mono tabular-nums silo-text-soft select-none"
-        title={`Index ${index}`}
-      >
-        {index}
-      </span>
+    <div
+      className={`flex flex-wrap items-center gap-2 py-2 border-b border-[var(--silo-border)] last:border-b-0 ${
+        highlightNew ? 'silo-market-row--new' : ''
+      }`}
+    >
+      {reorder ? (
+        <div className="w-9 shrink-0 flex flex-col items-center gap-0.5 select-none" title={`Position ${index + 1}`}>
+          <button
+            type="button"
+            aria-label="Move up"
+            disabled={reorder.disableUp}
+            onClick={reorder.onUp}
+            className="silo-btn-icon leading-none text-[10px] font-semibold"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            aria-label="Move down"
+            disabled={reorder.disableDown}
+            onClick={reorder.onDown}
+            className="silo-btn-icon leading-none text-[10px] font-semibold"
+          >
+            ↓
+          </button>
+        </div>
+      ) : (
+        <span
+          className="w-9 shrink-0 text-right text-xs font-mono tabular-nums silo-text-soft select-none"
+          title={`Index ${index}`}
+        >
+          {index}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
           <p className="text-sm font-semibold silo-text-main truncate shrink-0">{label}</p>

@@ -71,8 +71,12 @@ type Props = {
   chainId: number
   vaultAddress: string
   ownerAddress: string
+  curatorAddress: string
+  guardianAddress: string
   timelockSeconds: bigint
   ownerKind: OwnerKind
+  /** Label for the connected wallet’s vault roles (Owner, Curator, …). */
+  yourRoleLabel: string
   actions?: ReactNode
 }
 
@@ -80,8 +84,11 @@ export default function VaultSummaryPanel({
   chainId,
   vaultAddress,
   ownerAddress,
+  curatorAddress,
+  guardianAddress,
   timelockSeconds,
   ownerKind,
+  yourRoleLabel,
   actions,
 }: Props) {
   const { daysText, rawSeconds } = formatTimelockSeconds(timelockSeconds)
@@ -94,6 +101,8 @@ export default function VaultSummaryPanel({
           <div className="divide-y divide-[var(--silo-border)]">
             <AddressLine label="Vault" chainId={chainId} address={vaultAddress} />
             <AddressLine label="Owner" chainId={chainId} address={ownerAddress} />
+            <AddressLine label="Curator" chainId={chainId} address={curatorAddress} />
+            <AddressLine label="Guardian" chainId={chainId} address={guardianAddress} />
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2">
               <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Owner type</span>
               <span className="text-sm silo-text-main">{ownerKindLabel(ownerKind)}</span>
@@ -103,6 +112,10 @@ export default function VaultSummaryPanel({
               <span className="text-sm silo-text-main">
                 {daysText} <span className="silo-text-soft">({rawSeconds} s)</span>
               </span>
+            </div>
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2">
+              <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Your role</span>
+              <span className="text-sm silo-text-main">{yourRoleLabel}</span>
             </div>
           </div>
         </div>
