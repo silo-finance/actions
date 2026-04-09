@@ -1,6 +1,6 @@
 import { getAddress } from 'ethers'
 
-/** Address array for `setSupplyQueue` — paste into multisig / contract UI. */
+/** Address array for `setSupplyQueue` — paste into a contract UI. */
 export function formatSetSupplyQueueArgsCopy(addresses: string[]): string {
   const parts = addresses.map((raw) => {
     try {

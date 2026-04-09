@@ -2,18 +2,18 @@
 
 import { formatUnits, getAddress } from 'ethers'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import ActionPermissionHint from '@/components/ActionPermissionHint'
 import CopyButton from '@/components/CopyButton'
 import MarketItem from '@/components/MarketItem'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
+import { useVaultPermissions } from '@/contexts/VaultPermissionsContext'
 import { useWeb3 } from '@/contexts/Web3Context'
 import type { Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import { normalizeAddress } from '@/utils/addressValidation'
 import { readErc4626Asset } from '@/utils/readErc4626Asset'
 import { resolveMarketLabel, type ResolvedMarket } from '@/utils/resolveVaultMarket'
-import {
-  canConnectedAccountCallSetSupplyQueue,
-  SET_SUPPLY_QUEUE_ROLES_DESCRIPTION,
-} from '@/utils/connectedVaultRole'
+import { SET_SUPPLY_QUEUE_ROLES_DESCRIPTION } from '@/utils/connectedVaultRole'
+import { ONLY_FOR_ALLOCATOR_ACTIONS } from '@/utils/vaultActionRoleCopy'
 import { formatAcceptCapArgsCopy, formatSetSupplyQueueArgsCopy } from '@/utils/formatVaultActionCopyArgs'
 import { setSupplyQueueForOwner } from '@/utils/setVaultSupplyQueue'
 import type { OwnerKind } from '@/utils/ownerKind'
@@ -37,6 +37,7 @@ type Props = {
   ownerAddress: string
   curatorAddress: string
   ownerKind: OwnerKind
+  curatorKind: OwnerKind
 }
 
 function shortAddr(addr: string) {
@@ -114,8 +115,10 @@ export default function SupplyQueueColumn({
   ownerAddress,
   curatorAddress,
   ownerKind,
+  curatorKind,
 }: Props) {
   const { provider, account, isConnected } = useWeb3()
+  const perm = useVaultPermissions()
   const [editOrder, setEditOrder] = useState<string[]>([])
   const [baselineOrder, setBaselineOrder] = useState<string[]>([])
   const [reorderUnlocked, setReorderUnlocked] = useState(false)
@@ -141,8 +144,6 @@ export default function SupplyQueueColumn({
     linkLabel: string
     outcome: TxSubmitOutcome
   } | null>(null)
-  const [mutationAllowed, setMutationAllowed] = useState<boolean | null>(null)
-  const [permissionGateLoading, setPermissionGateLoading] = useState(false)
   const [permissionError, setPermissionError] = useState('')
   /** Lowercased checksum keys — rows stay in `editOrder` but are excluded from the submitted queue until restored. */
   const [removedKeys, setRemovedKeys] = useState<string[]>([])
@@ -172,30 +173,21 @@ export default function SupplyQueueColumn({
     setExtraResolved(new Map())
     setLocalError('')
     setTxSuccess(null)
-    setMutationAllowed(null)
     setPermissionError('')
     setRemovedKeys([])
   }, [vaultAddress, items])
 
-  useEffect(() => {
-    if (!hasLoaded || !provider || !account || !vaultAddress) {
-      setMutationAllowed(null)
-      return
-    }
-    let cancelled = false
-    void canConnectedAccountCallSetSupplyQueue(
-      provider,
-      vaultAddress,
-      account,
-      { owner: ownerAddress, curator: curatorAddress },
-      ownerKind
-    ).then((ok) => {
-      if (!cancelled) setMutationAllowed(ok)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [hasLoaded, provider, account, vaultAddress, ownerAddress, curatorAddress, ownerKind])
+  const permissionGateLoading =
+    hasLoaded && Boolean(vaultAddress) && Boolean(account) && perm.active && perm.loading
+
+  const mutationAllowed: boolean | null =
+    !hasLoaded || !vaultAddress
+      ? null
+      : !isConnected || !account
+        ? false
+        : perm.loading
+          ? null
+          : perm.canAllocator
 
   const editOrderKey = useMemo(
     () =>
@@ -349,65 +341,38 @@ export default function SupplyQueueColumn({
     window.ethereum != null &&
     (ownerKind === 'eoa' || ownerKind === 'safe' || ownerKind === 'contract')
 
-  const verifyCanMutateSupplyQueue = useCallback(async (): Promise<boolean> => {
-    if (!provider || !account || !vaultAddress) return false
-    return canConnectedAccountCallSetSupplyQueue(
-      provider,
-      vaultAddress,
-      account,
-      { owner: ownerAddress, curator: curatorAddress },
-      ownerKind
-    )
-  }, [provider, account, vaultAddress, ownerAddress, curatorAddress, ownerKind])
-
-  const handleAddMarketClick = useCallback(async () => {
+  const handleAddMarketClick = useCallback(() => {
     setPermissionError('')
     if (!isConnected || !account) {
       setPermissionError('Connect a wallet first.')
       return
     }
     if (!provider || !vaultAddress) return
-    setPermissionGateLoading(true)
-    try {
-      const ok = await verifyCanMutateSupplyQueue()
-      if (!ok) {
-        setPermissionError(
-          `You do not have permission to add or change the supply queue. Only ${SET_SUPPLY_QUEUE_ROLES_DESCRIPTION}`
-        )
-        setMutationAllowed(false)
-        return
-      }
-      setMutationAllowed(true)
-      setAddRowOpen(true)
-    } finally {
-      setPermissionGateLoading(false)
+    if (perm.loading) return
+    if (!perm.canAllocator) {
+      setPermissionError(
+        `You do not have permission to add or change the supply queue. Only ${SET_SUPPLY_QUEUE_ROLES_DESCRIPTION}`
+      )
+      return
     }
-  }, [isConnected, account, provider, vaultAddress, verifyCanMutateSupplyQueue])
+    setAddRowOpen(true)
+  }, [isConnected, account, provider, vaultAddress, perm.loading, perm.canAllocator])
 
-  const handleChangeOrderClick = useCallback(async () => {
+  const handleChangeOrderClick = useCallback(() => {
     setPermissionError('')
     if (!isConnected || !account) {
       setPermissionError('Connect a wallet first.')
       return
     }
     if (!provider || !vaultAddress) return
-    setPermissionGateLoading(true)
-    try {
-      const ok = await verifyCanMutateSupplyQueue()
-      if (!ok) {
-        setPermissionError(
-          `You do not have permission to reorder the supply queue. Only ${SET_SUPPLY_QUEUE_ROLES_DESCRIPTION}`
-        )
-        setMutationAllowed(false)
-        return
-      }
-      setMutationAllowed(true)
-      setTxSuccess(null)
-      setReorderUnlocked(true)
-    } finally {
-      setPermissionGateLoading(false)
+    if (perm.loading) return
+    if (!perm.canAllocator) {
+      setPermissionError('You do not have permission to change the supply queue order.')
+      return
     }
-  }, [isConnected, account, provider, vaultAddress, verifyCanMutateSupplyQueue])
+    setTxSuccess(null)
+    setReorderUnlocked(true)
+  }, [isConnected, account, provider, vaultAddress, perm.loading, perm.canAllocator])
 
   const showReorder = reorderUnlocked && editOrder.length >= 2
 
@@ -461,7 +426,6 @@ export default function SupplyQueueColumn({
             const next = [...prev]
             next.splice(insertAt, 0, norm)
             queueMicrotask(() => {
-              setReorderUnlocked(true)
               setAddInput('')
               setAddStatus('success')
               window.setTimeout(() => setAddStatus('idle'), 2200)
@@ -686,6 +650,7 @@ export default function SupplyQueueColumn({
         ownerAddress,
         curatorAddress,
         ownerKind,
+        curatorKind,
         connectedAccount: account,
         newSupplyQueue: submitted,
         marketsToAcceptCapFirst,
@@ -709,6 +674,7 @@ export default function SupplyQueueColumn({
     ownerAddress,
     curatorAddress,
     ownerKind,
+    curatorKind,
     effectiveOrder,
     stateByAddr,
     capsOk,
@@ -722,7 +688,7 @@ export default function SupplyQueueColumn({
   const showSubmitSection = reorderUnlocked && isDirty && hasLoaded
 
   const submitButtonDisabled =
-    !canAttempt || busy || mutationAllowed === false || !capsOk || capTimelockBlocksSubmit
+    !canAttempt || busy || mutationAllowed !== true || !capsOk || capTimelockBlocksSubmit
 
   const supplyQueueActionPreview = useMemo(() => {
     if (!showSubmitSection) return null
@@ -807,8 +773,8 @@ export default function SupplyQueueColumn({
           <button
             type="button"
             className="text-xs font-medium silo-text-soft hover:silo-text-main underline shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled={mutationAllowed === false || permissionGateLoading}
-            onClick={() => void handleChangeOrderClick()}
+            disabled={mutationAllowed !== true || permissionGateLoading}
+            onClick={() => handleChangeOrderClick()}
           >
             {permissionGateLoading ? 'Checking access…' : editOrder.length >= 2 ? 'Change order' : 'Edit queue'}
           </button>
@@ -904,18 +870,24 @@ export default function SupplyQueueColumn({
           ) : null}
           <div className="w-full">
           {!addRowOpen ? (
-            <button
-              type="button"
-              onClick={() => void handleAddMarketClick()}
-              disabled={mutationAllowed === false || permissionGateLoading}
-              className="silo-btn-secondary inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Add market"
-            >
-              <span className="text-base leading-none" aria-hidden>
-                +
-              </span>
-              {permissionGateLoading ? 'Checking access…' : 'Add market'}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => handleAddMarketClick()}
+                disabled={mutationAllowed !== true || permissionGateLoading}
+                className="silo-btn-secondary inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Add market"
+              >
+                <span className="text-base leading-none" aria-hidden>
+                  +
+                </span>
+                {permissionGateLoading ? 'Checking access…' : 'Add market'}
+              </button>
+              <ActionPermissionHint
+                allowed={mutationAllowed !== false || addRowOpen}
+                onlyForLabel={ONLY_FOR_ALLOCATOR_ACTIONS}
+              />
+            </>
           ) : (
             <div className="space-y-2 w-full">
               <div className="relative w-full">
@@ -983,16 +955,17 @@ export default function SupplyQueueColumn({
               >
                 {busy ? 'Waiting for wallet…' : 'Set supply queue'}
               </button>
+              <ActionPermissionHint allowed={mutationAllowed !== false} onlyForLabel={ONLY_FOR_ALLOCATOR_ACTIONS} />
               {busy ? (
                 <p className="text-xs silo-text-soft m-0">
                   {ownerKind === 'safe'
-                    ? 'Approve the signature in your wallet to submit the multisig proposal.'
+                    ? 'Approve in your wallet to submit the proposed transaction as owner or curator.'
                     : 'Confirm in your wallet to send the vault update on-chain.'}
                 </p>
               ) : null}
               {supplyQueueActionPreview ? (
                 <div className="rounded-xl border border-[var(--silo-border)] bg-[var(--silo-surface)] px-3 py-3 space-y-2">
-                  <p className="text-sm font-medium silo-text-main">What the Safe will propose</p>
+                  <p className="text-sm font-medium silo-text-main">Proposed transaction (owner or curator)</p>
                   <ol className="list-decimal list-outside space-y-4 text-sm silo-text-main m-0 pl-5 sm:pl-6">
                     {supplyQueueActionPreview.map((s) => (
                       <li key={s.id} className="min-w-0 pl-1 space-y-1.5">
@@ -1029,7 +1002,7 @@ export default function SupplyQueueColumn({
           {reorderUnlocked && isDirty && hasLoaded && effectiveOrder.length > 0 && capTimelockBlocksSubmit ? (
             <p className="text-xs silo-alert silo-alert-error">
               A pending supply cap is still in timelock. Wait until it can be accepted; then submit — acceptCap for each
-              such market runs first in the Safe batch, followed by set supply queue.
+              such market runs first in the same proposed batch, followed by set supply queue.
             </p>
           ) : null}
           {reorderUnlocked &&

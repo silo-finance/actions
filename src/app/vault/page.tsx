@@ -6,6 +6,7 @@ import QueueColumn from '@/components/QueueColumn'
 import SupplyQueueColumn from '@/components/SupplyQueueColumn'
 import VaultActionsColumn from '@/components/VaultActionsColumn'
 import VaultSummaryPanel from '@/components/VaultSummaryPanel'
+import { VaultPermissionsProvider } from '@/contexts/VaultPermissionsContext'
 import { useWeb3 } from '@/contexts/Web3Context'
 import { extractHexAddressLike } from '@/utils/addressFromInput'
 import { normalizeAddress } from '@/utils/addressValidation'
@@ -38,6 +39,8 @@ export default function VaultPage() {
     guardian: string
     timelockSeconds: bigint
     ownerKind: OwnerKind
+    curatorKind: OwnerKind
+    guardianKind: OwnerKind
   } | null>(null)
   const [yourRoleLabel, setYourRoleLabel] = useState('')
 
@@ -99,8 +102,10 @@ export default function VaultPage() {
       setSupplyQueueSize(overview.supply.length)
       setWithdrawQueueSize(overview.withdraw.length)
 
-      const [ownerKind, resolvedQueues] = await Promise.all([
+      const [ownerKind, curatorKind, guardianKind, resolvedQueues] = await Promise.all([
         analyzeOwnerKind(provider, overview.owner),
+        analyzeOwnerKind(provider, overview.curator),
+        analyzeOwnerKind(provider, overview.guardian),
         resolveMarketsForQueues(provider, vault, overview.supply, overview.withdraw),
       ])
       setSupply(resolvedQueues.supply)
@@ -114,6 +119,8 @@ export default function VaultPage() {
         guardian: normalizeAddress(overview.guardian) ?? overview.guardian,
         timelockSeconds: overview.timelockSeconds,
         ownerKind,
+        curatorKind,
+        guardianKind,
       })
       setHasLoaded(true)
     } catch (e) {
@@ -148,7 +155,9 @@ export default function VaultPage() {
             curator: summary.curator,
             guardian: summary.guardian,
           },
-          summary.ownerKind
+          summary.ownerKind,
+          summary.curatorKind,
+          summary.guardianKind
         )
         if (!cancelled) setYourRoleLabel(label)
       } catch {
@@ -213,60 +222,80 @@ export default function VaultPage() {
         {error && <p className="mt-3 text-sm silo-alert silo-alert-error">{error}</p>}
       </div>
 
-      {chainId != null && hasLoaded && summary != null && (
-        <VaultSummaryPanel
-          chainId={chainId}
-          vaultAddress={summary.vault}
-          ownerAddress={summary.owner}
-          curatorAddress={summary.curator}
-          guardianAddress={summary.guardian}
-          timelockSeconds={summary.timelockSeconds}
-          ownerKind={summary.ownerKind}
-          yourRoleLabel={yourRoleLabel}
-          actions={
-            <VaultActionsColumn
+      {chainId != null && (
+        <VaultPermissionsProvider
+          enabled={Boolean(isConnected && account && hasLoaded && summary)}
+          summary={
+            summary != null
+              ? {
+                  vault: summary.vault,
+                  owner: summary.owner,
+                  curator: summary.curator,
+                  ownerKind: summary.ownerKind,
+                  curatorKind: summary.curatorKind,
+                }
+              : null
+          }
+        >
+          {hasLoaded && summary != null && (
+            <VaultSummaryPanel
               chainId={chainId}
               vaultAddress={summary.vault}
               ownerAddress={summary.owner}
+              curatorAddress={summary.curator}
+              guardianAddress={summary.guardian}
+              timelockSeconds={summary.timelockSeconds}
               ownerKind={summary.ownerKind}
-              supplyQueueMarkets={supply}
-              withdrawQueueMarkets={withdraw}
-              withdrawQueueStates={withdrawMarketStates}
-              vaultUnderlyingMeta={vaultUnderlyingMeta}
+              curatorKind={summary.curatorKind}
+              guardianKind={summary.guardianKind}
+              yourRoleLabel={yourRoleLabel}
+              actions={
+                <VaultActionsColumn
+                  chainId={chainId}
+                  vaultAddress={summary.vault}
+                  ownerAddress={summary.owner}
+                  curatorAddress={summary.curator}
+                  ownerKind={summary.ownerKind}
+                  curatorKind={summary.curatorKind}
+                  supplyQueueMarkets={supply}
+                  withdrawQueueMarkets={withdraw}
+                  withdrawQueueStates={withdrawMarketStates}
+                  vaultUnderlyingMeta={vaultUnderlyingMeta}
+                />
+              }
             />
-          }
-        />
-      )}
+          )}
 
-      {chainId != null && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SupplyQueueColumn
-            title="Supply Queue"
-            count={supplyQueueSize}
-            chainId={chainId}
-            items={supply}
-            loading={loading}
-            hasLoaded={hasLoaded}
-            emptyMessage={
-              loading ? '…' : hasLoaded ? 'Queue is empty' : 'Run Check to load the queue'
-            }
-            vaultAddress={summary?.vault ?? ''}
-            vaultUnderlyingMeta={vaultUnderlyingMeta}
-            ownerAddress={summary?.owner ?? ''}
-            curatorAddress={summary?.curator ?? ''}
-            ownerKind={summary?.ownerKind ?? 'eoa'}
-          />
-          <QueueColumn
-            title="Withdraw Queue"
-            count={withdrawQueueSize}
-            chainId={chainId}
-            items={withdraw}
-            loading={loading}
-            emptyMessage={
-              loading ? '…' : hasLoaded ? 'Queue is empty' : 'Run Check to load the queue'
-            }
-          />
-        </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <SupplyQueueColumn
+              title="Supply Queue"
+              count={supplyQueueSize}
+              chainId={chainId}
+              items={supply}
+              loading={loading}
+              hasLoaded={hasLoaded}
+              emptyMessage={
+                loading ? '…' : hasLoaded ? 'Queue is empty' : 'Run Check to load the queue'
+              }
+              vaultAddress={summary?.vault ?? ''}
+              vaultUnderlyingMeta={vaultUnderlyingMeta}
+              ownerAddress={summary?.owner ?? ''}
+              curatorAddress={summary?.curator ?? ''}
+              ownerKind={summary?.ownerKind ?? 'eoa'}
+              curatorKind={summary?.curatorKind ?? 'eoa'}
+            />
+            <QueueColumn
+              title="Withdraw Queue"
+              count={withdrawQueueSize}
+              chainId={chainId}
+              items={withdraw}
+              loading={loading}
+              emptyMessage={
+                loading ? '…' : hasLoaded ? 'Queue is empty' : 'Run Check to load the queue'
+              }
+            />
+          </div>
+        </VaultPermissionsProvider>
       )}
     </div>
   )

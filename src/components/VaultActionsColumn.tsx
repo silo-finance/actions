@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { getAddress } from 'ethers'
+import ActionPermissionHint from '@/components/ActionPermissionHint'
 import CopyButton from '@/components/CopyButton'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
 import WithdrawQueueRemoveWizard from '@/components/WithdrawQueueRemoveWizard'
+import { useVaultPermissions } from '@/contexts/VaultPermissionsContext'
 import { useWeb3 } from '@/contexts/Web3Context'
 import { clearSupplyQueueForOwner, type Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import type { OwnerKind } from '@/utils/ownerKind'
@@ -12,6 +14,10 @@ import type { ResolvedMarket } from '@/utils/resolveVaultMarket'
 import type { VaultUnderlyingMeta } from '@/utils/vaultReader'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import type { WithdrawMarketOnchainState } from '@/utils/withdrawMarketStates'
+import {
+  ONLY_FOR_ALLOCATOR_ACTIONS,
+  ONLY_FOR_WITHDRAW_REMOVAL,
+} from '@/utils/vaultActionRoleCopy'
 
 function normalizeAddressList(markets: ResolvedMarket[]): string[] {
   return markets.map((m) => {
@@ -31,11 +37,11 @@ type Props = {
   chainId: number
   vaultAddress: string
   ownerAddress: string
+  curatorAddress: string
   ownerKind: OwnerKind
-  /** Current supply queue as already loaded in the UI (order preserved). Used to show revert data after a successful clear. */
+  curatorKind: OwnerKind
   supplyQueueMarkets: ResolvedMarket[]
   withdrawQueueMarkets: ResolvedMarket[]
-  /** From the last vault Check — same length/order as `withdrawQueueMarkets`. */
   withdrawQueueStates: WithdrawMarketOnchainState[]
   vaultUnderlyingMeta: VaultUnderlyingMeta | null
 }
@@ -44,13 +50,16 @@ export default function VaultActionsColumn({
   chainId,
   vaultAddress,
   ownerAddress,
+  curatorAddress,
   ownerKind,
+  curatorKind,
   supplyQueueMarkets,
   withdrawQueueMarkets,
   withdrawQueueStates,
   vaultUnderlyingMeta,
 }: Props) {
   const { provider, account, isConnected } = useWeb3()
+  const perm = useVaultPermissions()
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState('')
   const [txSuccess, setTxSuccess] = useState<{
@@ -66,14 +75,23 @@ export default function VaultActionsColumn({
     setRevertSupplyAddresses(null)
     setLocalError('')
     setActiveAction('none')
-  }, [vaultAddress, ownerAddress, ownerKind, chainId])
+  }, [vaultAddress, ownerAddress, curatorAddress, ownerKind, curatorKind, chainId])
 
-  const canAttempt =
+  const walletReady =
     isConnected &&
     provider != null &&
     typeof window !== 'undefined' &&
-    window.ethereum != null &&
-    (ownerKind === 'eoa' || ownerKind === 'safe')
+    window.ethereum != null
+
+  const permissionResolved = perm.active && !perm.loading
+  const clearAllowed = permissionResolved && perm.canAllocator
+  const withdrawAllowed = permissionResolved && (perm.canAllocator || perm.canOwnerOrCurator)
+
+  const clearDeniedByRole = walletReady && permissionResolved && !perm.canAllocator
+  const withdrawDeniedByRole = walletReady && permissionResolved && !withdrawAllowed
+
+  const clearCanAttempt = walletReady && clearAllowed
+  const withdrawCanAttempt = walletReady && withdrawAllowed
 
   const handleClearSupplyQueue = useCallback(async () => {
     setLocalError('')
@@ -94,7 +112,9 @@ export default function VaultActionsColumn({
         chainId,
         vaultAddress,
         ownerAddress,
+        curatorAddress,
         ownerKind,
+        curatorKind,
         connectedAccount: account,
       })
       setTxSuccess({ url: transactionUrl, linkLabel: label, outcome })
@@ -111,7 +131,9 @@ export default function VaultActionsColumn({
     chainId,
     vaultAddress,
     ownerAddress,
+    curatorAddress,
     ownerKind,
+    curatorKind,
     supplyQueueMarkets,
   ])
 
@@ -124,7 +146,9 @@ export default function VaultActionsColumn({
         chainId={chainId}
         vaultAddress={vaultAddress}
         ownerAddress={ownerAddress}
+        curatorAddress={curatorAddress}
         ownerKind={ownerKind}
+        curatorKind={curatorKind}
         supplyQueueMarkets={supplyQueueMarkets}
         withdrawMarkets={withdrawQueueMarkets}
         withdrawMarketStates={withdrawQueueStates}
@@ -138,22 +162,31 @@ export default function VaultActionsColumn({
     <div className="flex flex-col gap-4">
       {activeAction === 'none' ? (
         <>
-          <button
-            type="button"
-            disabled={!canAttempt || busy}
-            onClick={() => setActiveAction('clear')}
-            className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Clear supply queue
-          </button>
-          <button
-            type="button"
-            disabled={withdrawQueueMarkets.length === 0}
-            onClick={() => setActiveAction('withdraw')}
-            className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Reallocate & remove from withdraw queue
-          </button>
+          <div>
+            <button
+              type="button"
+              disabled={!clearCanAttempt || busy}
+              onClick={() => setActiveAction('clear')}
+              className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed w-full"
+            >
+              Clear supply queue
+            </button>
+            <ActionPermissionHint allowed={!clearDeniedByRole} onlyForLabel={ONLY_FOR_ALLOCATOR_ACTIONS} />
+          </div>
+          <div>
+            <button
+              type="button"
+              disabled={!withdrawCanAttempt || withdrawQueueMarkets.length === 0}
+              onClick={() => setActiveAction('withdraw')}
+              className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed w-full"
+            >
+              Reallocate & remove from withdraw queue
+            </button>
+            <ActionPermissionHint
+              allowed={!withdrawDeniedByRole || withdrawQueueMarkets.length === 0}
+              onlyForLabel={ONLY_FOR_WITHDRAW_REMOVAL}
+            />
+          </div>
         </>
       ) : null}
 
@@ -176,14 +209,17 @@ export default function VaultActionsColumn({
               </button>
             </div>
 
-            <button
-              type="button"
-              disabled={!canAttempt || busy}
-              onClick={() => void handleClearSupplyQueue()}
-              className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {busy ? 'Waiting for wallet…' : 'Execute clear supply queue'}
-            </button>
+            <div>
+              <button
+                type="button"
+                disabled={!clearCanAttempt || busy}
+                onClick={() => void handleClearSupplyQueue()}
+                className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed w-full"
+              >
+                {busy ? 'Waiting for wallet…' : 'Execute clear supply queue'}
+              </button>
+              <ActionPermissionHint allowed={!clearDeniedByRole} onlyForLabel={ONLY_FOR_ALLOCATOR_ACTIONS} />
+            </div>
 
             {localError ? <p className="text-sm silo-alert silo-alert-error">{localError}</p> : null}
             {txSuccess ? (

@@ -1,15 +1,21 @@
 import SafeApiKit from '@safe-global/api-kit'
 import Safe from '@safe-global/protocol-kit'
 import { OperationType } from '@safe-global/types-kit'
-import { Interface, getAddress, MaxUint256, type Provider } from 'ethers'
+import { Interface, getAddress, MaxUint256, type Provider, type Signer } from 'ethers'
 import siloVaultArtifact from '@/abis/SiloVault.json'
 import { getLegacySafeTransactionServiceBaseUrl } from '@/utils/safeTransactionServiceUrl'
 import { loadAbi } from '@/utils/loadAbi'
 import type { OwnerKind } from '@/utils/ownerKind'
+import { getExplorerTxUrl } from '@/utils/networks'
 import { getSafeWalletQueueUrl } from '@/utils/safeAppLinks'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
-import { isAddressSafeOwner } from '@/utils/safeOwnerList'
 import type { Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
+import {
+  classifyAllocatorVaultAction,
+  classifyOwnerOrCuratorVaultAction,
+  WITHDRAW_REMOVAL_DENIED_MESSAGE,
+} from '@/utils/vaultActionAuthority'
+import { executeVaultCallsFromSigner } from '@/utils/vaultMulticall'
 
 const siloVaultAbi = loadAbi(siloVaultArtifact)
 const vaultIface = new Interface(siloVaultAbi)
@@ -254,58 +260,99 @@ export async function proposeReallocateRemoveWithdrawQueueViaSafe(params: {
   })
 }
 
-export type ReallocateRemoveWithdrawParams = {
-  ethereum: Eip1193Provider
-  provider: Provider
-  chainId: number
-  vaultAddress: string
-  ownerAddress: string
-  ownerKind: OwnerKind
-  connectedAccount: string
-  /** Direct vault call data in execution order (no `vault.multicall`). */
-  vaultCallDatas: `0x${string}`[]
-}
-
-const ERR_NOT_OWNER_NOR_SAFE_SIGNER =
-  'The connected wallet is not listed as an owner of this Safe.'
-
 export type ReallocateRemoveWithdrawSuccess = {
   transactionUrl: string
   successLinkLabel: string
   outcome: TxSubmitOutcome
 }
 
+export type ExecuteReallocateRemoveWithdrawQueueParams = {
+  ethereum: Eip1193Provider
+  provider: Provider
+  signer: Signer
+  chainId: number
+  vaultAddress: string
+  ownerAddress: string
+  curatorAddress: string
+  ownerKind: OwnerKind
+  curatorKind: OwnerKind
+  connectedAccount: string
+  /**
+   * When true, every call in the batch must be allowed for `onlyCuratorRole` ∩ `onlyAllocatorRole`,
+   * i.e. the connected wallet acts as vault **owner** or **curator** (SiloVault). Set when the batch
+   * includes `submitCap`.
+   */
+  requiresOwnerOrCuratorCapabilities: boolean
+  vaultCallDatas: `0x${string}`[]
+}
+
 /**
- * Proposes a vault transaction via the Transaction Service.
- * This guided flow is only supported when the vault owner is a Gnosis Safe.
+ * Runs the withdraw-removal batch: direct `vault.multicall` (or a single tx) from the wallet, or one
+ * Proposed transaction executed as the vault **owner** or **curator** (when that role is a contract wallet).
  */
-export async function proposeReallocateRemoveWithdrawQueueMultisigOnly(
-  params: ReallocateRemoveWithdrawParams
+export async function executeReallocateRemoveWithdrawQueue(
+  params: ExecuteReallocateRemoveWithdrawQueueParams
 ): Promise<ReallocateRemoveWithdrawSuccess> {
-  const { ownerKind, ownerAddress, connectedAccount, vaultAddress, ethereum, chainId, provider, vaultCallDatas } =
-    params
-
-  if (ownerKind !== 'safe') {
-    throw new Error('This action is only available when the vault owner is a Gnosis Safe (multisig).')
-  }
-
-  const isSigner = await isAddressSafeOwner(provider, ownerAddress, connectedAccount)
-  if (!isSigner) {
-    throw new Error(ERR_NOT_OWNER_NOR_SAFE_SIGNER)
-  }
-
-  await proposeReallocateRemoveWithdrawQueueViaSafe({
+  const {
     ethereum,
+    provider,
+    signer,
     chainId,
-    safeAddress: ownerAddress,
     vaultAddress,
-    proposerAccount: connectedAccount,
+    ownerAddress,
+    curatorAddress,
+    ownerKind,
+    curatorKind,
+    connectedAccount,
+    requiresOwnerOrCuratorCapabilities,
     vaultCallDatas,
-  })
+  } = params
 
-  const transactionUrl = getSafeWalletQueueUrl(chainId, ownerAddress)
-  if (!transactionUrl) {
-    throw new Error('Could not build a Safe{Wallet} link for this network.')
+  if (vaultCallDatas.length === 0) {
+    throw new Error('No vault calls to execute.')
   }
-  return { transactionUrl, successLinkLabel: 'Open queue', outcome: 'safe_queue' }
+
+  const overview = { owner: ownerAddress, curator: curatorAddress }
+  const auth = requiresOwnerOrCuratorCapabilities
+    ? await classifyOwnerOrCuratorVaultAction(provider, connectedAccount, overview, ownerKind, curatorKind)
+    : await classifyAllocatorVaultAction(
+        provider,
+        vaultAddress,
+        connectedAccount,
+        overview,
+        ownerKind,
+        curatorKind
+      )
+
+  if (auth.mode === 'denied') {
+    throw new Error(WITHDRAW_REMOVAL_DENIED_MESSAGE)
+  }
+
+  if (auth.mode === 'direct') {
+    const txHash = await executeVaultCallsFromSigner(signer, vaultAddress, vaultCallDatas)
+    const transactionUrl = getExplorerTxUrl(chainId, txHash)
+    if (!transactionUrl) {
+      throw new Error('Could not build a block explorer link for this network.')
+    }
+    return { transactionUrl, successLinkLabel: 'View on explorer', outcome: 'explorer' }
+  }
+
+  if (auth.mode === 'safe_propose' && auth.executingSafeAddress != null) {
+    const safeAddress = getAddress(auth.executingSafeAddress)
+    await proposeReallocateRemoveWithdrawQueueViaSafe({
+      ethereum,
+      chainId,
+      safeAddress,
+      vaultAddress,
+      proposerAccount: connectedAccount,
+      vaultCallDatas,
+    })
+    const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
+    if (!transactionUrl) {
+      throw new Error('Could not build a Safe{Wallet} link for this network.')
+    }
+    return { transactionUrl, successLinkLabel: 'Open queue', outcome: 'safe_queue' }
+  }
+
+  throw new Error(WITHDRAW_REMOVAL_DENIED_MESSAGE)
 }
