@@ -153,19 +153,6 @@ export default function SupplyQueueColumn({
   extraResolvedForInsertRef.current = extraResolved
 
   const vaultAsset = vaultUnderlyingMeta?.address ?? null
-  const itemsKey = useMemo(
-    () =>
-      items
-        .map((m) => {
-          try {
-            return getAddress(m.address).toLowerCase()
-          } catch {
-            return m.address.toLowerCase()
-          }
-        })
-        .join(','),
-    [items]
-  )
 
   useEffect(() => {
     resolvingRef.current.clear()
@@ -188,7 +175,7 @@ export default function SupplyQueueColumn({
     setMutationAllowed(null)
     setPermissionError('')
     setRemovedKeys([])
-  }, [vaultAddress, itemsKey])
+  }, [vaultAddress, items])
 
   useEffect(() => {
     if (!hasLoaded || !provider || !account || !vaultAddress) {
@@ -241,7 +228,7 @@ export default function SupplyQueueColumn({
     return () => {
       cancelled = true
     }
-  }, [provider, vaultAddress, hasLoaded, editOrderKey])
+  }, [provider, vaultAddress, hasLoaded, editOrder])
 
   useEffect(() => {
     if (!provider) return
@@ -285,7 +272,7 @@ export default function SupplyQueueColumn({
         })
       })
     }
-  }, [provider, vaultAddress, hasLoaded, vaultAsset, vaultUnderlyingMeta, editOrderKey, items])
+  }, [provider, vaultAddress, hasLoaded, vaultAsset, vaultUnderlyingMeta, editOrder, items])
 
   const stateByAddr = useMemo(() => {
     const m = new Map<string, WithdrawMarketOnchainState>()
@@ -726,7 +713,6 @@ export default function SupplyQueueColumn({
     stateByAddr,
     capsOk,
     isDirty,
-    queueStates,
   ])
 
   const displayCount =
