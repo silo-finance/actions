@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { formatUnits, getAddress } from 'ethers'
 import CopyButton from '@/components/CopyButton'
-import ShareLinkCopyButton from '@/components/ShareLinkCopyButton'
+import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
 import { useWeb3 } from '@/contexts/Web3Context'
 import type { Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import type { OwnerKind } from '@/utils/ownerKind'
@@ -20,7 +20,9 @@ import {
   vaultMarketSupplyHeadroom,
   type MarketAllocationTuple,
 } from '@/utils/reallocateRemoveWithdrawMarket'
+import { formatSetSupplyQueueArgsCopy } from '@/utils/formatVaultActionCopyArgs'
 import { formatVaultAmountWholeTokens, type VaultUnderlyingMeta } from '@/utils/vaultReader'
+import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import type { WithdrawMarketOnchainState } from '@/utils/withdrawMarketStates'
 
 type Props = {
@@ -71,17 +73,6 @@ function formatUpdateWithdrawQueueArgsCopy(indexes: bigint[]): string {
   return `[${indexes.map((i) => i.toString()).join(', ')}]`
 }
 
-function formatSetSupplyQueueArgsCopy(addresses: string[]): string {
-  const parts = addresses.map((raw) => {
-    try {
-      return getAddress(raw)
-    } catch {
-      return raw
-    }
-  })
-  return `[${parts.join(', ')}]`
-}
-
 export default function WithdrawQueueRemoveWizard({
   chainId,
   vaultAddress,
@@ -96,7 +87,11 @@ export default function WithdrawQueueRemoveWizard({
   const { provider, account, isConnected } = useWeb3()
   const [busy, setBusy] = useState(false)
   const [execErr, setExecErr] = useState('')
-  const [successUrl, setSuccessUrl] = useState<string | null>(null)
+  const [txSuccess, setTxSuccess] = useState<{
+    url: string
+    linkLabel: string
+    outcome: TxSubmitOutcome
+  } | null>(null)
   const [removeIndex, setRemoveIndex] = useState<number | null>(null)
   /** Destination markets in the order funds are routed (reallocate supply order). */
   const [destinations, setDestinations] = useState<string[]>([])
@@ -231,7 +226,7 @@ export default function WithdrawQueueRemoveWizard({
 
   const handleExecute = useCallback(async () => {
     setExecErr('')
-    setSuccessUrl(null)
+    setTxSuccess(null)
     if (!provider || !account || !window.ethereum || removeIndex == null || !statesAligned) {
       setExecErr('Wallet or data not ready.')
       return
@@ -273,7 +268,7 @@ export default function WithdrawQueueRemoveWizard({
 
     setBusy(true)
     try {
-      const { transactionUrl } = await proposeReallocateRemoveWithdrawQueueMultisigOnly({
+      const { transactionUrl, successLinkLabel, outcome } = await proposeReallocateRemoveWithdrawQueueMultisigOnly({
         ethereum: window.ethereum as Eip1193Provider,
         provider,
         chainId,
@@ -283,7 +278,7 @@ export default function WithdrawQueueRemoveWizard({
         connectedAccount: account,
         vaultCallDatas,
       })
-      setSuccessUrl(transactionUrl)
+      setTxSuccess({ url: transactionUrl, linkLabel: successLinkLabel, outcome })
     } catch (e) {
       setExecErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -400,7 +395,7 @@ export default function WithdrawQueueRemoveWizard({
     <div className="flex flex-col gap-4 min-w-0">
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button type="button" onClick={onCancel} className="text-sm font-medium silo-text-soft hover:silo-text-main">
-          {successUrl ? 'Close' : 'Cancel'}
+          {txSuccess ? 'Close' : 'Cancel'}
         </button>
       </div>
 
@@ -451,7 +446,10 @@ export default function WithdrawQueueRemoveWizard({
                               #{m.siloConfigId.toString()}
                             </span>
                           ) : null}
-                          <span className="text-xs font-mono tabular-nums silo-text-soft">{formatBal(st.supplyAssets)}</span>
+                          <span className="text-xs shrink-0">
+                            <span className="silo-text-soft">balance </span>
+                            <span className="font-mono tabular-nums silo-text-main">{formatBal(st.supplyAssets)}</span>
+                          </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 mt-1 min-w-0">
                           <span className="text-xs font-mono silo-text-soft break-all min-w-0" title={m.address}>
@@ -480,8 +478,11 @@ export default function WithdrawQueueRemoveWizard({
                       </span>
                     ) : null}
                     {removedState ? (
-                      <span className="text-xs font-mono tabular-nums silo-text-soft">
-                        {formatBal(removedState.supplyAssets)}
+                      <span className="text-xs shrink-0">
+                        <span className="silo-text-soft">balance </span>
+                        <span className="font-mono tabular-nums silo-text-main">
+                          {formatBal(removedState.supplyAssets)}
+                        </span>
                       </span>
                     ) : null}
                   </div>
@@ -565,21 +566,23 @@ export default function WithdrawQueueRemoveWizard({
                         >
                           <span className="text-xs font-mono silo-text-soft w-6 shrink-0">{i}</span>
                           <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
                               <span className="text-sm font-semibold silo-text-main">{m.label}</span>
                               {m.siloConfigId !== undefined ? (
                                 <span className="text-sm font-mono tabular-nums silo-text-soft">
                                   #{m.siloConfigId.toString()}
                                 </span>
                               ) : null}
-                              <span className="text-xs font-mono tabular-nums silo-text-soft">
-                                {formatBal(st.supplyAssets)}
+                              <span className="text-xs shrink-0">
+                                <span className="silo-text-soft">balance </span>
+                                <span className="font-mono tabular-nums silo-text-main">{formatBal(st.supplyAssets)}</span>
+                              </span>
+                              <span className="text-xs shrink-0">
+                                <span className="silo-text-soft">(cap </span>
+                                <span className="font-mono tabular-nums silo-text-main">{formatCapWhole(st.cap)}</span>
+                                <span className="silo-text-soft">)</span>
                               </span>
                             </div>
-                            <p className="text-xs silo-text-main mt-0.5">
-                              <span className="silo-text-soft">cap </span>
-                              <span className="font-mono tabular-nums">{formatCapWhole(st.cap)}</span>
-                            </p>
                           </div>
                           {!canPick ? (
                             <span className="text-xs silo-text-soft shrink-0 self-center">Not available</span>
@@ -650,17 +653,13 @@ export default function WithdrawQueueRemoveWizard({
               </button>
               {execErr ? <p className="text-sm silo-alert silo-alert-error">{execErr}</p> : null}
 
-              {successUrl ? (
-                <div className="pt-2 border-t border-[var(--silo-border)] flex flex-wrap items-center gap-2">
-                  <a
-                    href={successUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium silo-text-main hover:underline break-all"
-                  >
-                    Open Safe queue
-                  </a>
-                  <ShareLinkCopyButton url={successUrl} />
+              {txSuccess ? (
+                <div className="pt-2 border-t border-[var(--silo-border)]">
+                  <TransactionSuccessSummary
+                    url={txSuccess.url}
+                    linkLabel={txSuccess.linkLabel}
+                    outcome={txSuccess.outcome}
+                  />
                 </div>
               ) : null}
             </div>

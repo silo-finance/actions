@@ -208,6 +208,29 @@ body {
   color: color-mix(in srgb, var(--silo-danger) 68%, var(--silo-text));
 }
 
+/** Newly added supply-queue row (draft until Check refreshes). */
+.silo-market-row--new {
+  background: color-mix(in srgb, var(--silo-mint-accent) 58%, var(--silo-surface));
+  border-radius: 0.5rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  margin-left: -0.5rem;
+  margin-right: -0.5rem;
+  border: 1px solid color-mix(in srgb, var(--silo-signal-green) 45%, var(--silo-border));
+}
+
+.silo-market-row--removed {
+  background: color-mix(in srgb, var(--silo-surface-2) 88%, var(--silo-surface));
+  border-radius: 0.5rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  margin-left: -0.5rem;
+  margin-right: -0.5rem;
+  border: 1px dashed color-mix(in srgb, var(--silo-text-soft) 35%, var(--silo-border));
+  opacity: 0.55;
+  filter: grayscale(0.2);
+}
+
 .header-shell { background-color: var(--header-bg); border-color: var(--header-border); }
 .header-text { color: var(--header-text); }
 .header-text-soft { color: var(--header-text-soft); }
@@ -266,6 +289,15 @@ body {
   line-height: 1.25rem;
 }
 
+.silo-input--sm {
+  width: 100%;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  border-width: 1px;
+}
+
 .silo-input.border-red-500:focus,
 .silo-input:focus.border-red-500 {
   border-color: var(--silo-danger) !important;
@@ -317,4 +349,71 @@ body {
   opacity: 0.65;
   cursor: not-allowed;
   border-color: var(--silo-border);
+}
+
+.silo-btn-secondary {
+  font-weight: 600;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  background: var(--silo-surface);
+  color: var(--silo-text);
+  border: 1px solid var(--silo-border);
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+.silo-btn-secondary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--silo-accent) 45%, var(--silo-border));
+  background: color-mix(in srgb, var(--silo-soft-purple) 26%, var(--silo-surface));
+}
+
+.silo-btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.silo-btn-icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.4rem;
+  border: 1px solid var(--silo-border);
+  background: var(--silo-surface-2);
+  color: var(--silo-text-soft);
+  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+}
+
+.silo-btn-icon:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--silo-accent) 45%, var(--silo-border));
+  background: var(--silo-surface);
+  color: var(--silo-text);
+}
+
+.silo-btn-icon:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.silo-inline-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  color: var(--silo-danger);
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 700;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.silo-inline-dismiss:hover {
+  background: color-mix(in srgb, var(--silo-danger) 12%, transparent);
+  color: color-mix(in srgb, var(--silo-danger) 82%, #7f1d1d);
 }

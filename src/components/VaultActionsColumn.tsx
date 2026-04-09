@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getAddress } from 'ethers'
 import CopyButton from '@/components/CopyButton'
-import ShareLinkCopyButton from '@/components/ShareLinkCopyButton'
+import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
 import WithdrawQueueRemoveWizard from '@/components/WithdrawQueueRemoveWizard'
 import { useWeb3 } from '@/contexts/Web3Context'
 import { clearSupplyQueueForOwner, type Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import type { OwnerKind } from '@/utils/ownerKind'
 import type { ResolvedMarket } from '@/utils/resolveVaultMarket'
 import type { VaultUnderlyingMeta } from '@/utils/vaultReader'
+import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import type { WithdrawMarketOnchainState } from '@/utils/withdrawMarketStates'
 
 function normalizeAddressList(markets: ResolvedMarket[]): string[] {
@@ -52,14 +53,16 @@ export default function VaultActionsColumn({
   const { provider, account, isConnected } = useWeb3()
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState('')
-  const [successTransactionUrl, setSuccessTransactionUrl] = useState<string | null>(null)
-  const [successLinkLabel, setSuccessLinkLabel] = useState<string>('Open queue')
+  const [txSuccess, setTxSuccess] = useState<{
+    url: string
+    linkLabel: string
+    outcome: TxSubmitOutcome
+  } | null>(null)
   const [revertSupplyAddresses, setRevertSupplyAddresses] = useState<string[] | null>(null)
   const [activeAction, setActiveAction] = useState<'none' | 'clear' | 'withdraw'>('none')
 
   useEffect(() => {
-    setSuccessTransactionUrl(null)
-    setSuccessLinkLabel('Open queue')
+    setTxSuccess(null)
     setRevertSupplyAddresses(null)
     setLocalError('')
     setActiveAction('none')
@@ -74,8 +77,7 @@ export default function VaultActionsColumn({
 
   const handleClearSupplyQueue = useCallback(async () => {
     setLocalError('')
-    setSuccessTransactionUrl(null)
-    setSuccessLinkLabel('Open queue')
+    setTxSuccess(null)
     setRevertSupplyAddresses(null)
     if (!provider || !account || !window.ethereum) {
       setLocalError('Wallet not available.')
@@ -85,7 +87,7 @@ export default function VaultActionsColumn({
     setBusy(true)
     try {
       const signer = await provider.getSigner()
-      const { transactionUrl, successLinkLabel: label } = await clearSupplyQueueForOwner({
+      const { transactionUrl, successLinkLabel: label, outcome } = await clearSupplyQueueForOwner({
         ethereum: window.ethereum as Eip1193Provider,
         provider,
         signer,
@@ -95,8 +97,7 @@ export default function VaultActionsColumn({
         ownerKind,
         connectedAccount: account,
       })
-      setSuccessTransactionUrl(transactionUrl)
-      setSuccessLinkLabel(label)
+      setTxSuccess({ url: transactionUrl, linkLabel: label, outcome })
       setRevertSupplyAddresses(snapshot)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -166,7 +167,7 @@ export default function VaultActionsColumn({
                 onClick={() => {
                   setActiveAction('none')
                   setLocalError('')
-                  setSuccessTransactionUrl(null)
+                  setTxSuccess(null)
                   setRevertSupplyAddresses(null)
                 }}
                 className="text-xs font-medium silo-text-soft hover:silo-text-main underline"
@@ -185,19 +186,13 @@ export default function VaultActionsColumn({
             </button>
 
             {localError ? <p className="text-sm silo-alert silo-alert-error">{localError}</p> : null}
-            {successTransactionUrl ? (
+            {txSuccess ? (
               <div className="flex flex-col gap-3 pt-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <a
-                    href={successTransactionUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium silo-text-main hover:underline break-all min-w-0"
-                  >
-                    {successLinkLabel}
-                  </a>
-                  <ShareLinkCopyButton url={successTransactionUrl} />
-                </div>
+                <TransactionSuccessSummary
+                  url={txSuccess.url}
+                  linkLabel={txSuccess.linkLabel}
+                  outcome={txSuccess.outcome}
+                />
                 {revertArgumentText != null ? (
                   <div className="silo-choice-option" data-selected="true">
                     <div className="w-full space-y-2">

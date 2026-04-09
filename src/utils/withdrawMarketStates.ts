@@ -14,15 +14,17 @@ export type WithdrawMarketOnchainState = {
   supplyAssets: bigint
   cap: bigint
   enabled: boolean
+  /** Pending cap value from `pendingCap(market).value` (not yet applied until `acceptCap`). */
+  pendingCapValue: bigint
   pendingCapValidAt: bigint
   /** Non-zero while a forced removal timelock is pending (`submitMarketRemoval`). */
   removableAt: bigint
 }
 
 /**
- * Per-withdraw-queue market: vault ERC-4626 position and SiloVault config.
+ * Per market: vault ERC-4626 position and SiloVault `config` / `pendingCap` (same RPC shape for any queued market).
  */
-export async function fetchWithdrawMarketStates(
+export async function fetchVaultMarketStates(
   provider: Provider,
   vaultAddress: string,
   marketAddresses: string[]
@@ -42,9 +44,18 @@ export async function fetchWithdrawMarketStates(
       const supplyAssets = BigInt(await m.convertToAssets(shares))
       const cap = BigInt(cfg.cap)
       const enabled = Boolean(cfg.enabled)
+      const pendingCapValue = BigInt(pending.value)
       const pendingCapValidAt = BigInt(pending.validAt)
       const removableAt = BigInt(cfg.removableAt)
-      return { address: addr, supplyAssets, cap, enabled, pendingCapValidAt, removableAt }
+      return {
+        address: addr,
+        supplyAssets,
+        cap,
+        enabled,
+        pendingCapValue,
+        pendingCapValidAt,
+        removableAt,
+      }
     })
   )
 }

@@ -10,6 +10,7 @@ import type { OwnerKind } from '@/utils/ownerKind'
 import { getExplorerTxUrl } from '@/utils/networks'
 import { getSafeWalletQueueUrl } from '@/utils/safeAppLinks'
 import { isAddressSafeOwner } from '@/utils/safeOwnerList'
+import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 
 const siloVaultAbi = loadAbi(siloVaultArtifact)
 
@@ -113,6 +114,7 @@ export type ClearSupplyQueueSuccess = {
   transactionUrl: string
   /** Anchor text for the success link (explorer vs Safe queue). */
   successLinkLabel: string
+  outcome: TxSubmitOutcome
 }
 
 export async function clearSupplyQueueForOwner(
@@ -142,7 +144,7 @@ export async function clearSupplyQueueForOwner(
       if (!transactionUrl) {
         throw new Error('Could not build a block explorer link for this network.')
       }
-      return { transactionUrl, successLinkLabel: 'View on explorer' }
+      return { transactionUrl, successLinkLabel: 'View on explorer', outcome: 'explorer' }
     }
     throw new Error(ERR_NOT_VAULT_OWNER)
   }
@@ -161,7 +163,7 @@ export async function clearSupplyQueueForOwner(
       if (!transactionUrl) {
         throw new Error('Could not build a Safe{Wallet} link for this network.')
       }
-      return { transactionUrl, successLinkLabel: 'Open queue' }
+      return { transactionUrl, successLinkLabel: 'Open queue', outcome: 'safe_queue' }
     }
     throw new Error(ERR_NOT_OWNER_NOR_SAFE_SIGNER)
   }

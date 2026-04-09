@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import QueueColumn from '@/components/QueueColumn'
+import SupplyQueueColumn from '@/components/SupplyQueueColumn'
 import VaultActionsColumn from '@/components/VaultActionsColumn'
 import VaultSummaryPanel from '@/components/VaultSummaryPanel'
 import { useWeb3 } from '@/contexts/Web3Context'
@@ -11,6 +12,7 @@ import { normalizeAddress } from '@/utils/addressValidation'
 import { classifyVaultInput } from '@/utils/explorerInput'
 import { isChainSupported } from '@/utils/networks'
 import { analyzeOwnerKind, type OwnerKind } from '@/utils/ownerKind'
+import { fetchConnectedVaultRoleLabel } from '@/utils/connectedVaultRole'
 import { fetchVaultOverview } from '@/utils/vaultReader'
 import { resolveMarketsForQueues } from '@/utils/resolveVaultMarketsBatch'
 import type { ResolvedMarket } from '@/utils/resolveVaultMarket'
@@ -18,7 +20,7 @@ import type { VaultUnderlyingMeta } from '@/utils/vaultReader'
 import type { WithdrawMarketOnchainState } from '@/utils/withdrawMarketStates'
 
 export default function VaultPage() {
-  const { provider, chainId, isConnected, connect, switchNetwork } = useWeb3()
+  const { provider, chainId, isConnected, connect, switchNetwork, account } = useWeb3()
   const [input, setInput] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -32,9 +34,12 @@ export default function VaultPage() {
   const [summary, setSummary] = useState<{
     vault: string
     owner: string
+    curator: string
+    guardian: string
     timelockSeconds: bigint
     ownerKind: OwnerKind
   } | null>(null)
+  const [yourRoleLabel, setYourRoleLabel] = useState('')
 
   const handleCheck = useCallback(async () => {
     setError('')
@@ -46,6 +51,7 @@ export default function VaultPage() {
     setSupplyQueueSize(undefined)
     setWithdrawQueueSize(undefined)
     setSummary(null)
+    setYourRoleLabel('')
 
     if (!isConnected || !provider || chainId == null) {
       setError('Connect MetaMask to load vault queues.')
@@ -104,6 +110,8 @@ export default function VaultPage() {
       setSummary({
         vault,
         owner: normalizeAddress(overview.owner) ?? overview.owner,
+        curator: normalizeAddress(overview.curator) ?? overview.curator,
+        guardian: normalizeAddress(overview.guardian) ?? overview.guardian,
         timelockSeconds: overview.timelockSeconds,
         ownerKind,
       })
@@ -118,6 +126,39 @@ export default function VaultPage() {
       setLoading(false)
     }
   }, [input, provider, chainId, isConnected, switchNetwork])
+
+  useEffect(() => {
+    if (!hasLoaded || summary == null) {
+      return
+    }
+    if (!account || !provider) {
+      setYourRoleLabel('Connect wallet to see your role')
+      return
+    }
+    setYourRoleLabel('…')
+    let cancelled = false
+    void (async () => {
+      try {
+        const label = await fetchConnectedVaultRoleLabel(
+          provider,
+          summary.vault,
+          account,
+          {
+            owner: summary.owner,
+            curator: summary.curator,
+            guardian: summary.guardian,
+          },
+          summary.ownerKind
+        )
+        if (!cancelled) setYourRoleLabel(label)
+      } catch {
+        if (!cancelled) setYourRoleLabel('—')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [hasLoaded, summary, provider, account])
 
   return (
     <div className="silo-page px-4 py-8 sm:px-6 max-w-6xl mx-auto">
@@ -177,8 +218,11 @@ export default function VaultPage() {
           chainId={chainId}
           vaultAddress={summary.vault}
           ownerAddress={summary.owner}
+          curatorAddress={summary.curator}
+          guardianAddress={summary.guardian}
           timelockSeconds={summary.timelockSeconds}
           ownerKind={summary.ownerKind}
+          yourRoleLabel={yourRoleLabel}
           actions={
             <VaultActionsColumn
               chainId={chainId}
@@ -196,15 +240,21 @@ export default function VaultPage() {
 
       {chainId != null && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <QueueColumn
+          <SupplyQueueColumn
             title="Supply Queue"
             count={supplyQueueSize}
             chainId={chainId}
             items={supply}
             loading={loading}
+            hasLoaded={hasLoaded}
             emptyMessage={
               loading ? '…' : hasLoaded ? 'Queue is empty' : 'Run Check to load the queue'
             }
+            vaultAddress={summary?.vault ?? ''}
+            vaultUnderlyingMeta={vaultUnderlyingMeta}
+            ownerAddress={summary?.owner ?? ''}
+            curatorAddress={summary?.curator ?? ''}
+            ownerKind={summary?.ownerKind ?? 'eoa'}
           />
           <QueueColumn
             title="Withdraw Queue"
