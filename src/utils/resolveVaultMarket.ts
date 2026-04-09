@@ -19,6 +19,8 @@ export type ResolvedMarket = {
   positionLabel?: string
   /** From `SiloConfig.SILO_ID()` when this market is a Silo vault. */
   siloConfigId?: bigint
+  /** Supply cap as whole vault-underlying tokens, set when queues are loaded with `resolveMarketsForQueues`. */
+  capLabel?: string
 }
 
 async function readSymbol(provider: Provider, tokenAddress: string): Promise<string | undefined> {

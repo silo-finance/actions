@@ -20,9 +20,9 @@ export type WithdrawMarketOnchainState = {
 }
 
 /**
- * Per-withdraw-queue market: vault ERC-4626 position and SiloVault config.
+ * Per market: vault ERC-4626 position and SiloVault `config` / `pendingCap` (same RPC shape for any queued market).
  */
-export async function fetchWithdrawMarketStates(
+export async function fetchVaultMarketStates(
   provider: Provider,
   vaultAddress: string,
   marketAddresses: string[]

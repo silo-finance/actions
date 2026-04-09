@@ -13,13 +13,15 @@ type Props = {
   positionLabel?: string
   /** `SiloConfig.SILO_ID()` for Silo markets. */
   siloConfigId?: bigint
+  /** Vault supply cap (whole underlying tokens), from queue load. */
+  capLabel?: string
 }
 
 function shortAddr(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
 
-export default function MarketItem({ index, chainId, address, label, positionLabel, siloConfigId }: Props) {
+export default function MarketItem({ index, chainId, address, label, positionLabel, siloConfigId, capLabel }: Props) {
   const explorerUrl = getExplorerAddressUrl(chainId, address)
 
   return (
@@ -42,8 +44,16 @@ export default function MarketItem({ index, chainId, address, label, positionLab
             </span>
           ) : null}
           {positionLabel ? (
-            <p className="text-xs font-mono tabular-nums silo-text-soft shrink-0 min-w-0" title="Vault position (underlying)">
-              {positionLabel}
+            <p className="text-xs shrink-0 min-w-0" title="Vault position (underlying)">
+              <span className="silo-text-soft">balance </span>
+              <span className="font-mono tabular-nums silo-text-main">{positionLabel}</span>
+            </p>
+          ) : null}
+          {capLabel ? (
+            <p className="text-xs shrink-0 min-w-0" title="Vault supply cap (whole underlying tokens)">
+              <span className="silo-text-soft">(cap </span>
+              <span className="font-mono tabular-nums silo-text-main">{capLabel}</span>
+              <span className="silo-text-soft">)</span>
             </p>
           ) : null}
         </div>

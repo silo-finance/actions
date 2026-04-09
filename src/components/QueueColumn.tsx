@@ -41,6 +41,7 @@ export default function QueueColumn({
               label={m.label}
               positionLabel={m.positionLabel}
               siloConfigId={m.siloConfigId}
+              capLabel={m.capLabel}
             />
           ))}
         </div>

@@ -451,7 +451,10 @@ export default function WithdrawQueueRemoveWizard({
                               #{m.siloConfigId.toString()}
                             </span>
                           ) : null}
-                          <span className="text-xs font-mono tabular-nums silo-text-soft">{formatBal(st.supplyAssets)}</span>
+                          <span className="text-xs shrink-0">
+                            <span className="silo-text-soft">balance </span>
+                            <span className="font-mono tabular-nums silo-text-main">{formatBal(st.supplyAssets)}</span>
+                          </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 mt-1 min-w-0">
                           <span className="text-xs font-mono silo-text-soft break-all min-w-0" title={m.address}>
@@ -480,8 +483,11 @@ export default function WithdrawQueueRemoveWizard({
                       </span>
                     ) : null}
                     {removedState ? (
-                      <span className="text-xs font-mono tabular-nums silo-text-soft">
-                        {formatBal(removedState.supplyAssets)}
+                      <span className="text-xs shrink-0">
+                        <span className="silo-text-soft">balance </span>
+                        <span className="font-mono tabular-nums silo-text-main">
+                          {formatBal(removedState.supplyAssets)}
+                        </span>
                       </span>
                     ) : null}
                   </div>
@@ -565,21 +571,23 @@ export default function WithdrawQueueRemoveWizard({
                         >
                           <span className="text-xs font-mono silo-text-soft w-6 shrink-0">{i}</span>
                           <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
                               <span className="text-sm font-semibold silo-text-main">{m.label}</span>
                               {m.siloConfigId !== undefined ? (
                                 <span className="text-sm font-mono tabular-nums silo-text-soft">
                                   #{m.siloConfigId.toString()}
                                 </span>
                               ) : null}
-                              <span className="text-xs font-mono tabular-nums silo-text-soft">
-                                {formatBal(st.supplyAssets)}
+                              <span className="text-xs shrink-0">
+                                <span className="silo-text-soft">balance </span>
+                                <span className="font-mono tabular-nums silo-text-main">{formatBal(st.supplyAssets)}</span>
+                              </span>
+                              <span className="text-xs shrink-0">
+                                <span className="silo-text-soft">(cap </span>
+                                <span className="font-mono tabular-nums silo-text-main">{formatCapWhole(st.cap)}</span>
+                                <span className="silo-text-soft">)</span>
                               </span>
                             </div>
-                            <p className="text-xs silo-text-main mt-0.5">
-                              <span className="silo-text-soft">cap </span>
-                              <span className="font-mono tabular-nums">{formatCapWhole(st.cap)}</span>
-                            </p>
                           </div>
                           {!canPick ? (
                             <span className="text-xs silo-text-soft shrink-0 self-center">Not available</span>
