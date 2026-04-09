@@ -3,7 +3,9 @@
 import { useCallback, useMemo, useState } from 'react'
 import { formatUnits, getAddress } from 'ethers'
 import CopyButton from '@/components/CopyButton'
+import ActionPermissionHint from '@/components/ActionPermissionHint'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
+import { useVaultPermissions } from '@/contexts/VaultPermissionsContext'
 import { useWeb3 } from '@/contexts/Web3Context'
 import type { Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import type { OwnerKind } from '@/utils/ownerKind'
@@ -14,12 +16,13 @@ import {
   destinationsHaveEnoughHeadroom,
   buildWithdrawMarketRemovalVaultCallDatas,
   encodeUpdateWithdrawQueueOnly,
+  executeReallocateRemoveWithdrawQueue,
   newSupplyQueueHasPositiveCaps,
-  proposeReallocateRemoveWithdrawQueueMultisigOnly,
   supplyQueueAfterRemovingMarket,
   vaultMarketSupplyHeadroom,
   type MarketAllocationTuple,
 } from '@/utils/reallocateRemoveWithdrawMarket'
+import { ONLY_FOR_OWNER_OR_CURATOR, ONLY_FOR_WITHDRAW_REMOVAL } from '@/utils/vaultActionRoleCopy'
 import { formatSetSupplyQueueArgsCopy } from '@/utils/formatVaultActionCopyArgs'
 import { formatVaultAmountWholeTokens, type VaultUnderlyingMeta } from '@/utils/vaultReader'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
@@ -29,7 +32,9 @@ type Props = {
   chainId: number
   vaultAddress: string
   ownerAddress: string
+  curatorAddress: string
   ownerKind: OwnerKind
+  curatorKind: OwnerKind
   /** Current supply queue (same snapshot as the main vault UI). */
   supplyQueueMarkets: ResolvedMarket[]
   withdrawMarkets: ResolvedMarket[]
@@ -50,7 +55,7 @@ function addrKey(a: string): string {
 }
 
 /**
- * Valid JSON: each tuple is `["0x…","uint256"]` (both quoted). Many multisig UIs parse the argument as JSON.
+ * Valid JSON: each tuple is `["0x…","uint256"]` (both quoted). Many contract UIs parse the argument as JSON.
  */
 function formatReallocateArgsCopy(allocations: MarketAllocationTuple[]): string {
   const rows: [string, string][] = allocations.map((a) => {
@@ -77,7 +82,9 @@ export default function WithdrawQueueRemoveWizard({
   chainId,
   vaultAddress,
   ownerAddress,
+  curatorAddress,
   ownerKind,
+  curatorKind,
   supplyQueueMarkets,
   withdrawMarkets,
   withdrawMarketStates,
@@ -85,6 +92,7 @@ export default function WithdrawQueueRemoveWizard({
   onCancel,
 }: Props) {
   const { provider, account, isConnected } = useWeb3()
+  const perm = useVaultPermissions()
   const [busy, setBusy] = useState(false)
   const [execErr, setExecErr] = useState('')
   const [txSuccess, setTxSuccess] = useState<{
@@ -178,8 +186,17 @@ export default function WithdrawQueueRemoveWizard({
         return vaultMarketSupplyHeadroom(st.supplyAssets, st.cap) > Z
       }))
 
+  const removedForAuth = removeIndex != null && statesAligned ? withdrawMarketStates[removeIndex] : null
+  const needsOwnerOrCuratorForCap = removedForAuth != null && removedForAuth.cap > Z
+  const execAuthorityLoading = perm.active && perm.loading
+  const effectiveAuth = needsOwnerOrCuratorForCap ? perm.ownerCuratorAuth : perm.allocatorAuth
+  const deniedByRoleForCurrentStep =
+    perm.active &&
+    !perm.loading &&
+    effectiveAuth != null &&
+    effectiveAuth.mode === 'denied'
+
   const canExecute =
-    ownerKind === 'safe' &&
     isConnected &&
     provider != null &&
     account != null &&
@@ -191,7 +208,10 @@ export default function WithdrawQueueRemoveWizard({
     destinationsValid &&
     !busy &&
     statesAligned &&
-    supplyQueueRemovalCapsOk
+    supplyQueueRemovalCapsOk &&
+    !execAuthorityLoading &&
+    effectiveAuth != null &&
+    effectiveAuth.mode !== 'denied'
 
   const formatBal = useCallback(
     (assets: bigint): string => {
@@ -268,14 +288,19 @@ export default function WithdrawQueueRemoveWizard({
 
     setBusy(true)
     try {
-      const { transactionUrl, successLinkLabel, outcome } = await proposeReallocateRemoveWithdrawQueueMultisigOnly({
+      const signer = await provider.getSigner()
+      const { transactionUrl, successLinkLabel, outcome } = await executeReallocateRemoveWithdrawQueue({
         ethereum: window.ethereum as Eip1193Provider,
         provider,
+        signer,
         chainId,
         vaultAddress,
         ownerAddress,
+        curatorAddress,
         ownerKind,
+        curatorKind,
         connectedAccount: account,
+        requiresOwnerOrCuratorCapabilities: needSubmitCap,
         vaultCallDatas,
       })
       setTxSuccess({ url: transactionUrl, linkLabel: successLinkLabel, outcome })
@@ -290,7 +315,9 @@ export default function WithdrawQueueRemoveWizard({
     chainId,
     vaultAddress,
     ownerAddress,
+    curatorAddress,
     ownerKind,
+    curatorKind,
     removeIndex,
     withdrawMarketStates,
     statesAligned,
@@ -398,12 +425,6 @@ export default function WithdrawQueueRemoveWizard({
           {txSuccess ? 'Close' : 'Cancel'}
         </button>
       </div>
-
-      {ownerKind !== 'safe' ? (
-        <p className="text-sm silo-alert silo-alert-error">
-          This flow proposes transactions through a Safe. The vault owner must be a Gnosis Safe.
-        </p>
-      ) : null}
 
       {!statesAligned && withdrawMarkets.length > 0 ? (
         <p className="text-sm silo-alert silo-alert-error">
@@ -622,7 +643,7 @@ export default function WithdrawQueueRemoveWizard({
 
               {vaultActionPreview ? (
                 <div className="rounded-xl border border-[var(--silo-border)] bg-[var(--silo-surface)] px-3 py-3 space-y-2">
-                  <p className="text-sm font-medium silo-text-main">What the Safe will propose</p>
+                  <p className="text-sm font-medium silo-text-main">Planned vault calls</p>
                   <ol className="list-decimal list-outside space-y-4 text-sm silo-text-main m-0 pl-5 sm:pl-6">
                     {vaultActionPreview.map((s) => (
                       <li key={s.id} className="min-w-0 pl-1 space-y-1.5">
@@ -651,6 +672,14 @@ export default function WithdrawQueueRemoveWizard({
               >
                 {busy ? 'Signing proposal…' : 'Execute'}
               </button>
+              {removeIndex != null ? (
+                <ActionPermissionHint
+                  allowed={!deniedByRoleForCurrentStep || execAuthorityLoading}
+                  onlyForLabel={
+                    needsOwnerOrCuratorForCap ? ONLY_FOR_OWNER_OR_CURATOR : ONLY_FOR_WITHDRAW_REMOVAL
+                  }
+                />
+              ) : null}
               {execErr ? <p className="text-sm silo-alert silo-alert-error">{execErr}</p> : null}
 
               {txSuccess ? (

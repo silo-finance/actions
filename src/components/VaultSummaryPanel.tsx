@@ -15,7 +15,7 @@ function ownerKindLabel(kind: OwnerKind): string {
     case 'eoa':
       return 'EOA (wallet)'
     case 'safe':
-      return 'Gnosis Safe (multi-sig)'
+      return 'Gnosis Safe'
     case 'contract':
       return 'Contract (not detected as Safe)'
   }
@@ -25,10 +25,13 @@ function AddressLine({
   label,
   chainId,
   address,
+  addressKind,
 }: {
   label: string
   chainId: number
   address: string
+  /** When set, appends the detected address kind (EOA / Safe / contract) on the same line. */
+  addressKind?: OwnerKind
 }) {
   const explorerUrl = getExplorerAddressUrl(chainId, address)
   return (
@@ -63,6 +66,9 @@ function AddressLine({
         </a>
         <CopyButton value={address} />
       </div>
+      {addressKind != null ? (
+        <span className="text-sm silo-text-main shrink-0">{ownerKindLabel(addressKind)}</span>
+      ) : null}
     </div>
   )
 }
@@ -75,6 +81,8 @@ type Props = {
   guardianAddress: string
   timelockSeconds: bigint
   ownerKind: OwnerKind
+  curatorKind: OwnerKind
+  guardianKind: OwnerKind
   /** Label for the connected wallet’s vault roles (Owner, Curator, …). */
   yourRoleLabel: string
   actions?: ReactNode
@@ -88,6 +96,8 @@ export default function VaultSummaryPanel({
   guardianAddress,
   timelockSeconds,
   ownerKind,
+  curatorKind,
+  guardianKind,
   yourRoleLabel,
   actions,
 }: Props) {
@@ -100,13 +110,9 @@ export default function VaultSummaryPanel({
           <h2 className="text-lg font-semibold silo-text-main mb-2">Vault details</h2>
           <div className="divide-y divide-[var(--silo-border)]">
             <AddressLine label="Vault" chainId={chainId} address={vaultAddress} />
-            <AddressLine label="Owner" chainId={chainId} address={ownerAddress} />
-            <AddressLine label="Curator" chainId={chainId} address={curatorAddress} />
-            <AddressLine label="Guardian" chainId={chainId} address={guardianAddress} />
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2">
-              <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Owner type</span>
-              <span className="text-sm silo-text-main">{ownerKindLabel(ownerKind)}</span>
-            </div>
+            <AddressLine label="Owner" chainId={chainId} address={ownerAddress} addressKind={ownerKind} />
+            <AddressLine label="Curator" chainId={chainId} address={curatorAddress} addressKind={curatorKind} />
+            <AddressLine label="Guardian" chainId={chainId} address={guardianAddress} addressKind={guardianKind} />
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2">
               <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Timelock</span>
               <span className="text-sm silo-text-main">

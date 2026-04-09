@@ -12,7 +12,7 @@ type Props = {
 export default function TransactionSuccessSummary({ url, linkLabel, outcome }: Props) {
   const summary =
     outcome === 'safe_queue'
-      ? 'Signature sent — the proposal is in your Safe queue.'
+      ? 'Signature sent — the proposal is in the queue.'
       : 'On-chain update sent from your wallet.'
 
   return (
