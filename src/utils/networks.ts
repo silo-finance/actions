@@ -8,6 +8,7 @@ export interface NetworkConfig {
   chainName: string
   explorerBaseUrl: string
   nativeTokenSymbol: string
+  iconPath: string
 }
 
 export const NETWORK_CONFIGS: NetworkConfig[] = [
@@ -17,6 +18,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     chainName: 'mainnet',
     explorerBaseUrl: 'https://etherscan.io',
     nativeTokenSymbol: 'ETH',
+    iconPath: '/network-icons/ethereum.svg',
   },
   {
     chainId: 10,
@@ -24,6 +26,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     chainName: 'optimism',
     explorerBaseUrl: 'https://optimistic.etherscan.io',
     nativeTokenSymbol: 'ETH',
+    iconPath: '/network-icons/optimism.svg',
   },
   {
     chainId: 50,
@@ -31,6 +34,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     chainName: 'xdc',
     explorerBaseUrl: 'https://xdcscan.com',
     nativeTokenSymbol: 'XDC',
+    iconPath: '/network-icons/xdc.svg',
   },
   {
     chainId: 56,
@@ -38,6 +42,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     chainName: 'bnb',
     explorerBaseUrl: 'https://bscscan.com',
     nativeTokenSymbol: 'BNB',
+    iconPath: '/network-icons/bnb.svg',
   },
   {
     chainId: 42161,
@@ -45,6 +50,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     chainName: 'arbitrum_one',
     explorerBaseUrl: 'https://arbiscan.io',
     nativeTokenSymbol: 'ETH',
+    iconPath: '/network-icons/arbitrum.svg',
   },
   {
     chainId: 43114,
@@ -52,6 +58,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     chainName: 'avalanche',
     explorerBaseUrl: 'https://snowtrace.io',
     nativeTokenSymbol: 'AVAX',
+    iconPath: '/network-icons/avalanche.svg',
   },
   {
     chainId: 146,
@@ -59,6 +66,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     chainName: 'sonic',
     explorerBaseUrl: 'https://sonicscan.org',
     nativeTokenSymbol: 'S',
+    iconPath: '/network-icons/sonic.svg',
   },
   {
     chainId: 196,
@@ -66,6 +74,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     chainName: 'okx',
     explorerBaseUrl: 'https://www.okx.com/web3/explorer/xlayer',
     nativeTokenSymbol: 'OKB',
+    iconPath: '/network-icons/okx.svg',
   },
   {
     chainId: 1776,
@@ -73,6 +82,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     chainName: 'injective',
     explorerBaseUrl: 'https://blockscout.injective.network',
     nativeTokenSymbol: 'INJ',
+    iconPath: '/network-icons/injective.svg',
   },
 ]
 
@@ -90,6 +100,11 @@ export function getNetworkDisplayName(chainId: number | string): string {
   if (config) return config.displayName
   const id = typeof chainId === 'string' ? parseInt(chainId, 10) : chainId
   return `Network ${id}`
+}
+
+export function getNetworkIconPath(chainId: number | string): string | null {
+  const config = getNetworkConfig(chainId)
+  return config?.iconPath ?? null
 }
 
 export function getExplorerBaseUrl(chainId: number | string): string {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import QueueColumn from '@/components/QueueColumn'
 import SupplyQueueColumn from '@/components/SupplyQueueColumn'
 import VaultActionsColumn from '@/components/VaultActionsColumn'
@@ -11,7 +12,7 @@ import { useWeb3 } from '@/contexts/Web3Context'
 import { extractHexAddressLike } from '@/utils/addressFromInput'
 import { normalizeAddress } from '@/utils/addressValidation'
 import { classifyVaultInput } from '@/utils/explorerInput'
-import { isChainSupported } from '@/utils/networks'
+import { getNetworkDisplayName, getNetworkIconPath, isChainSupported } from '@/utils/networks'
 import { analyzeOwnerKind, type OwnerKind } from '@/utils/ownerKind'
 import { fetchConnectedVaultRoleLabel } from '@/utils/connectedVaultRole'
 import { fetchVaultOverview } from '@/utils/vaultReader'
@@ -53,6 +54,8 @@ export default function VaultPage() {
   const [showMyVaultsPicker, setShowMyVaultsPicker] = useState(false)
   const myVaultsRef = useRef<SiloV3VaultListItem[]>([])
   myVaultsRef.current = myVaults
+  const networkName = chainId != null ? getNetworkDisplayName(chainId) : null
+  const networkIconPath = chainId != null ? getNetworkIconPath(chainId) : null
 
   const performCheck = useCallback(
     async (rawInput: string, reopenMyVaultsPickerOnError = false) => {
@@ -242,7 +245,17 @@ export default function VaultPage() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <h1 className="text-3xl font-bold silo-text-main m-0">Vault</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-bold silo-text-main m-0">Vault</h1>
+          {networkName ? (
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--silo-border)] bg-[var(--silo-surface)] px-3 py-1.5">
+              {networkIconPath ? (
+                <Image src={networkIconPath} alt={networkName} width={16} height={16} className="rounded-full" />
+              ) : null}
+              <span className="text-sm font-semibold silo-text-main">Blockchain: {networkName}</span>
+            </div>
+          ) : null}
+        </div>
         {isConnected && myVaults.length > 0 ? (
           <button
             type="button"
