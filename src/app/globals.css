@@ -417,3 +417,20 @@ body {
   background: color-mix(in srgb, var(--silo-danger) 12%, transparent);
   color: color-mix(in srgb, var(--silo-danger) 82%, #7f1d1d);
 }
+
+/* Global typography bump for body-scale text (titles stay unchanged). */
+.text-xs {
+  font-size: 0.8125rem !important; /* +1px from Tailwind default 12px */
+}
+
+.text-sm {
+  font-size: 0.9375rem !important; /* +1px from Tailwind default 14px */
+}
+
+.text-base {
+  font-size: 1.0625rem !important; /* +1px from Tailwind default 16px */
+}
+
+.text-lg {
+  font-size: 1.1875rem !important; /* +1px from Tailwind default 18px */
+}
