@@ -74,13 +74,13 @@ export async function fetchConnectedVaultRoleLabel(
 
     const labels: string[] = []
     if (isOwnerAddr) labels.push('owner')
-    else if (ownerSigner) labels.push('owner')
+    else if (ownerSigner) labels.push('signer in owner multisig')
 
     if (isCuratorAddr) labels.push('curator')
-    else if (curatorSigner) labels.push('curator')
+    else if (curatorSigner) labels.push('signer in curator multisig')
 
     if (isGuardianAddr) labels.push('guardian')
-    else if (guardianSigner) labels.push('guardian')
+    else if (guardianSigner) labels.push('signer in guardian multisig')
 
     if (isAlloc) labels.push('allocator')
 
