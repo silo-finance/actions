@@ -426,6 +426,7 @@ export default function SupplyQueueColumn({
             const next = [...prev]
             next.splice(insertAt, 0, norm)
             queueMicrotask(() => {
+              setReorderUnlocked(true)
               setAddInput('')
               setAddStatus('success')
               window.setTimeout(() => setAddStatus('idle'), 2200)
