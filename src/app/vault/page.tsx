@@ -56,6 +56,8 @@ export default function VaultPage() {
   myVaultsRef.current = myVaults
   const networkName = chainId != null ? getNetworkDisplayName(chainId) : null
   const networkIconPath = chainId != null ? getNetworkIconPath(chainId) : null
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
+  const networkIconSrc = networkIconPath ? `${basePath}${networkIconPath}` : null
 
   const performCheck = useCallback(
     async (rawInput: string, reopenMyVaultsPickerOnError = false) => {
@@ -249,8 +251,8 @@ export default function VaultPage() {
           <h1 className="text-3xl font-bold silo-text-main m-0">Vault</h1>
           {networkName ? (
             <div className="inline-flex items-center gap-2 rounded-full border border-[var(--silo-border)] bg-[var(--silo-surface)] px-3 py-1.5">
-              {networkIconPath ? (
-                <Image src={networkIconPath} alt={networkName} width={16} height={16} className="rounded-full" />
+              {networkIconSrc ? (
+                <Image src={networkIconSrc} alt={networkName} width={16} height={16} className="rounded-full" />
               ) : null}
               <span className="text-sm font-semibold silo-text-main">Blockchain: {networkName}</span>
             </div>

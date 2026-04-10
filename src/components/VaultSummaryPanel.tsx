@@ -83,7 +83,7 @@ type Props = {
   ownerKind: OwnerKind
   curatorKind: OwnerKind
   guardianKind: OwnerKind
-  /** Label for the connected wallet’s vault roles (Owner, Curator, …). */
+  /** Label for the connected wallet’s vault roles (e.g. owner, signer in owner multisig, allocator). */
   yourRoleLabel: string
   actions?: ReactNode
 }
