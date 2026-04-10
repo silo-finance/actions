@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import QueueColumn from '@/components/QueueColumn'
 import SupplyQueueColumn from '@/components/SupplyQueueColumn'
 import VaultActionsColumn from '@/components/VaultActionsColumn'
@@ -11,7 +12,7 @@ import { useWeb3 } from '@/contexts/Web3Context'
 import { extractHexAddressLike } from '@/utils/addressFromInput'
 import { normalizeAddress } from '@/utils/addressValidation'
 import { classifyVaultInput } from '@/utils/explorerInput'
-import { isChainSupported } from '@/utils/networks'
+import { getNetworkDisplayName, getNetworkIconPath, isChainSupported } from '@/utils/networks'
 import { analyzeOwnerKind, type OwnerKind } from '@/utils/ownerKind'
 import { fetchConnectedVaultRoleLabel } from '@/utils/connectedVaultRole'
 import { fetchVaultOverview } from '@/utils/vaultReader'
@@ -19,6 +20,10 @@ import { resolveMarketsForQueues } from '@/utils/resolveVaultMarketsBatch'
 import type { ResolvedMarket } from '@/utils/resolveVaultMarket'
 import type { VaultUnderlyingMeta } from '@/utils/vaultReader'
 import type { WithdrawMarketOnchainState } from '@/utils/withdrawMarketStates'
+import {
+  fetchVaultsManagedByAccount,
+  type SiloV3VaultListItem,
+} from '@/utils/siloV3VaultsApi'
 
 export default function VaultPage() {
   const { provider, chainId, isConnected, connect, switchNetwork, account } = useWeb3()
@@ -43,96 +48,158 @@ export default function VaultPage() {
     guardianKind: OwnerKind
   } | null>(null)
   const [yourRoleLabel, setYourRoleLabel] = useState('')
+  const [myVaults, setMyVaults] = useState<SiloV3VaultListItem[]>([])
+  const [myVaultsLoading, setMyVaultsLoading] = useState(false)
+  const [myVaultsError, setMyVaultsError] = useState('')
+  const [showMyVaultsPicker, setShowMyVaultsPicker] = useState(false)
+  const myVaultsRef = useRef<SiloV3VaultListItem[]>([])
+  myVaultsRef.current = myVaults
+  const networkName = chainId != null ? getNetworkDisplayName(chainId) : null
+  const networkIconPath = chainId != null ? getNetworkIconPath(chainId) : null
 
-  const handleCheck = useCallback(async () => {
-    setError('')
-    setSupply([])
-    setWithdraw([])
-    setWithdrawMarketStates([])
-    setVaultUnderlyingMeta(null)
-    setHasLoaded(false)
-    setSupplyQueueSize(undefined)
-    setWithdrawQueueSize(undefined)
-    setSummary(null)
-    setYourRoleLabel('')
-
-    if (!isConnected || !provider || chainId == null) {
-      setError('Connect MetaMask to load vault queues.')
-      return
-    }
-
-    const classified = classifyVaultInput(input)
-
-    if (classified.kind === 'unknown_url') {
-      setError(
-        'This URL is not a known block explorer for a supported chain. Use a link from one of those explorers (see networks in the header) or paste a plain vault address on your current network.'
-      )
-      return
-    }
-
-    if (classified.kind === 'explorer') {
-      if (!isChainSupported(classified.chainId)) {
-        setError('The explorer in this URL points to a chain that is not supported here.')
-        return
-      }
-      if (classified.chainId !== chainId) {
-        await switchNetwork(classified.chainId)
-      }
-      const net = await provider.getNetwork()
-      const effectiveChainId = Number(net.chainId)
-      if (effectiveChainId !== classified.chainId) {
-        setError('Switch to the network from the explorer URL in your wallet, then press Check again.')
-        return
-      }
-    } else if (!isChainSupported(chainId)) {
-      setError('This network is not in the supported list. Switch network in the header.')
-      return
-    }
-
-    const raw = extractHexAddressLike(input)
-    const vault = normalizeAddress(raw)
-    if (!vault) {
-      setError('Enter a valid vault address or a block explorer URL containing the contract address.')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const overview = await fetchVaultOverview(provider, vault)
-      setSupplyQueueSize(overview.supply.length)
-      setWithdrawQueueSize(overview.withdraw.length)
-
-      const [ownerKind, curatorKind, guardianKind, resolvedQueues] = await Promise.all([
-        analyzeOwnerKind(provider, overview.owner),
-        analyzeOwnerKind(provider, overview.curator),
-        analyzeOwnerKind(provider, overview.guardian),
-        resolveMarketsForQueues(provider, vault, overview.supply, overview.withdraw),
-      ])
-      setSupply(resolvedQueues.supply)
-      setWithdraw(resolvedQueues.withdraw)
-      setWithdrawMarketStates(resolvedQueues.withdrawMarketStates)
-      setVaultUnderlyingMeta(resolvedQueues.underlyingMeta)
-      setSummary({
-        vault,
-        owner: normalizeAddress(overview.owner) ?? overview.owner,
-        curator: normalizeAddress(overview.curator) ?? overview.curator,
-        guardian: normalizeAddress(overview.guardian) ?? overview.guardian,
-        timelockSeconds: overview.timelockSeconds,
-        ownerKind,
-        curatorKind,
-        guardianKind,
-      })
-      setHasLoaded(true)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError(msg || 'Failed to read vault. Check address and network.')
+  const performCheck = useCallback(
+    async (rawInput: string, reopenMyVaultsPickerOnError = false) => {
+      setShowMyVaultsPicker(false)
+      setError('')
+      setSupply([])
+      setWithdraw([])
+      setWithdrawMarketStates([])
+      setVaultUnderlyingMeta(null)
+      setHasLoaded(false)
       setSupplyQueueSize(undefined)
       setWithdrawQueueSize(undefined)
       setSummary(null)
-    } finally {
-      setLoading(false)
+      setYourRoleLabel('')
+
+      if (!isConnected || !provider || chainId == null) {
+        setError('Connect MetaMask to load vault queues.')
+        return
+      }
+
+      const classified = classifyVaultInput(rawInput)
+
+      if (classified.kind === 'unknown_url') {
+        setError(
+          'This URL is not a known block explorer for a supported chain. Use a link from one of those explorers (see networks in the header) or paste a plain vault address on your current network.'
+        )
+        return
+      }
+
+      if (classified.kind === 'explorer') {
+        if (!isChainSupported(classified.chainId)) {
+          setError('The explorer in this URL points to a chain that is not supported here.')
+          return
+        }
+        if (classified.chainId !== chainId) {
+          await switchNetwork(classified.chainId)
+        }
+        const net = await provider.getNetwork()
+        const effectiveChainId = Number(net.chainId)
+        if (effectiveChainId !== classified.chainId) {
+          setError('Switch to the network from the explorer URL in your wallet, then press Check again.')
+          return
+        }
+      } else if (!isChainSupported(chainId)) {
+        setError('This network is not in the supported list. Switch network in the header.')
+        return
+      }
+
+      const raw = extractHexAddressLike(rawInput)
+      const vault = normalizeAddress(raw)
+      if (!vault) {
+        setError('Enter a valid vault address or a block explorer URL containing the contract address.')
+        return
+      }
+
+      setLoading(true)
+      try {
+        const overview = await fetchVaultOverview(provider, vault)
+        setSupplyQueueSize(overview.supply.length)
+        setWithdrawQueueSize(overview.withdraw.length)
+
+        const [ownerKind, curatorKind, guardianKind, resolvedQueues] = await Promise.all([
+          analyzeOwnerKind(provider, overview.owner),
+          analyzeOwnerKind(provider, overview.curator),
+          analyzeOwnerKind(provider, overview.guardian),
+          resolveMarketsForQueues(provider, vault, overview.supply, overview.withdraw),
+        ])
+        setSupply(resolvedQueues.supply)
+        setWithdraw(resolvedQueues.withdraw)
+        setWithdrawMarketStates(resolvedQueues.withdrawMarketStates)
+        setVaultUnderlyingMeta(resolvedQueues.underlyingMeta)
+        setSummary({
+          vault,
+          owner: normalizeAddress(overview.owner) ?? overview.owner,
+          curator: normalizeAddress(overview.curator) ?? overview.curator,
+          guardian: normalizeAddress(overview.guardian) ?? overview.guardian,
+          timelockSeconds: overview.timelockSeconds,
+          ownerKind,
+          curatorKind,
+          guardianKind,
+        })
+        setHasLoaded(true)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        setError(msg || 'Failed to read vault. Check address and network.')
+        setSupplyQueueSize(undefined)
+        setWithdrawQueueSize(undefined)
+        setSummary(null)
+        if (reopenMyVaultsPickerOnError && myVaultsRef.current.length > 0) {
+          setShowMyVaultsPicker(true)
+        }
+      } finally {
+        setLoading(false)
+      }
+    },
+    [provider, chainId, isConnected, switchNetwork]
+  )
+
+  const handleCheck = useCallback(() => {
+    void performCheck(input, false)
+  }, [performCheck, input])
+
+  useEffect(() => {
+    if (!isConnected || !account || chainId == null || !isChainSupported(chainId)) {
+      setMyVaults([])
+      setMyVaultsError('')
+      setMyVaultsLoading(false)
+      setShowMyVaultsPicker(false)
+      return
     }
-  }, [input, provider, chainId, isConnected, switchNetwork])
+
+    let cancelled = false
+    setMyVaultsLoading(true)
+    setMyVaultsError('')
+    void (async () => {
+      try {
+        const items = await fetchVaultsManagedByAccount(account, chainId)
+        if (!cancelled) {
+          setMyVaults(items)
+          setShowMyVaultsPicker(items.length > 0)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          const msg = e instanceof Error ? e.message : String(e)
+          setMyVaultsError(msg || 'Could not load vault list from Silo API.')
+          setMyVaults([])
+        }
+      } finally {
+        if (!cancelled) setMyVaultsLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isConnected, account, chainId])
+
+  const selectVaultFromApi = useCallback(
+    (vaultId: string) => {
+      setInput(vaultId)
+      void performCheck(vaultId, true)
+    },
+    [performCheck]
+  )
 
   useEffect(() => {
     if (!hasLoaded || summary == null) {
@@ -177,7 +244,28 @@ export default function VaultPage() {
         </Link>
       </div>
 
-      <h1 className="text-3xl font-bold silo-text-main mb-6">Vault</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-bold silo-text-main m-0">Vault</h1>
+          {networkName ? (
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--silo-border)] bg-[var(--silo-surface)] px-3 py-1.5">
+              {networkIconPath ? (
+                <Image src={networkIconPath} alt={networkName} width={16} height={16} className="rounded-full" />
+              ) : null}
+              <span className="text-sm font-semibold silo-text-main">Blockchain: {networkName}</span>
+            </div>
+          ) : null}
+        </div>
+        {isConnected && myVaults.length > 0 ? (
+          <button
+            type="button"
+            className="silo-btn-secondary text-sm shrink-0"
+            onClick={() => setShowMyVaultsPicker((open) => !open)}
+          >
+            {showMyVaultsPicker ? 'Hide my vaults' : 'My vaults'}
+          </button>
+        ) : null}
+      </div>
 
       {!isConnected && (
         <div className="silo-panel-soft p-4 mb-6 flex flex-wrap items-center gap-3">
@@ -220,6 +308,41 @@ export default function VaultPage() {
           </button>
         </div>
         {error && <p className="mt-3 text-sm silo-alert silo-alert-error">{error}</p>}
+        {isConnected && chainId != null && isChainSupported(chainId) ? (
+          <div className="mt-4">
+            {myVaultsLoading ? (
+              <p className="text-xs silo-text-soft m-0">Loading vaults you manage (Silo API)…</p>
+            ) : null}
+            {myVaultsError && !myVaultsLoading ? (
+              <p className="text-xs silo-alert silo-alert-error m-0">{myVaultsError}</p>
+            ) : null}
+            {showMyVaultsPicker && myVaults.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft m-0">Your vaults</p>
+                <ul className="space-y-2 m-0 p-0 list-none">
+                  {myVaults.map((v) => (
+                    <li key={v.id.toLowerCase()}>
+                      <button
+                        type="button"
+                        className="silo-choice-option text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                        data-selected="false"
+                        disabled={loading}
+                        onClick={() => selectVaultFromApi(v.id)}
+                      >
+                        <span className="block min-w-0 flex-1">
+                          <span className="block text-sm font-semibold silo-text-main">
+                            {v.name?.trim() ? v.name.trim() : 'Unnamed vault'}
+                          </span>
+                          <span className="block text-xs font-mono silo-text-soft mt-0.5 break-all">{v.id}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {chainId != null && (
