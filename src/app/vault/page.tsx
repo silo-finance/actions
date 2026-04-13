@@ -28,6 +28,16 @@ import {
   type SiloV3VaultListItem,
 } from '@/utils/siloV3VaultsApi'
 
+/** `chain` query: decimal chain id, must be in our supported list. */
+function parseChainFromSearchParam(raw: string | null): number | null {
+  if (raw == null || !raw.trim()) return null
+  const t = raw.trim()
+  if (!/^\d+$/.test(t)) return null
+  const n = parseInt(t, 10)
+  if (!Number.isFinite(n) || n < 0) return null
+  return isChainSupported(n) ? n : null
+}
+
 function VaultPageInner() {
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -65,16 +75,25 @@ function VaultPageInner() {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
   const networkIconSrc = networkIconPath ? `${basePath}${networkIconPath}` : null
 
+  const chainFromUrl = useMemo(
+    () => parseChainFromSearchParam(searchParams.get('chain')),
+    [searchParams]
+  )
+
   /** Canonical link to this vault page (not the raw browser URL). */
   const vaultShareUrl = useMemo(() => {
-    if (!hasLoaded || !summary?.vault || typeof window === 'undefined') return ''
+    if (!hasLoaded || !summary?.vault || chainId == null || typeof window === 'undefined') return ''
+    if (!isChainSupported(chainId)) return ''
     try {
       const v = getAddress(summary.vault)
-      return `${window.location.origin}${basePath}/vault/?vault=${encodeURIComponent(v)}`
+      const q = new URLSearchParams()
+      q.set('address', v)
+      q.set('chain', String(chainId))
+      return `${window.location.origin}${basePath}/vault/?${q.toString()}`
     } catch {
       return ''
     }
-  }, [hasLoaded, summary?.vault, basePath])
+  }, [hasLoaded, summary?.vault, basePath, chainId])
 
   const vaultFromUrl = useMemo(() => {
     const raw = searchParams.get('vault') ?? searchParams.get('address')
@@ -130,9 +149,25 @@ function VaultPageInner() {
           setError('Switch to the network from the explorer URL in your wallet, then press Check again.')
           return
         }
-      } else if (!isChainSupported(chainId)) {
-        setError('This network is not in the supported list. Switch network in the header.')
-        return
+      } else {
+        if (chainFromUrl != null) {
+          if (!isChainSupported(chainFromUrl)) {
+            setError('The chain in the link is not supported here. Switch network in the header or use a supported chain id.')
+            return
+          }
+          if (chainId !== chainFromUrl) {
+            await switchNetwork(chainFromUrl)
+          }
+          const netAfter = await provider.getNetwork()
+          const effective = Number(netAfter.chainId)
+          if (effective !== chainFromUrl) {
+            setError('Switch to the network from the link (chain=…) in your wallet, then press Check again.')
+            return
+          }
+        } else if (chainId == null || !isChainSupported(chainId)) {
+          setError('This network is not in the supported list. Switch network in the header.')
+          return
+        }
       }
 
       const raw = extractHexAddressLike(rawInput)
@@ -182,7 +217,7 @@ function VaultPageInner() {
         setLoading(false)
       }
     },
-    [provider, chainId, isConnected, switchNetwork]
+    [provider, chainId, isConnected, switchNetwork, chainFromUrl]
   )
 
   const handleCheck = useCallback(() => {
@@ -232,18 +267,20 @@ function VaultPageInner() {
     [performCheck]
   )
 
-  const prevVaultUrlKey = useRef<string>('')
+  const prevUrlBundleKey = useRef<string>('')
   const lastUrlAutoAttemptKey = useRef<string | null>(null)
 
   useEffect(() => {
-    const vKey = vaultFromUrl?.toLowerCase() ?? ''
-    if (vKey !== prevVaultUrlKey.current) {
+    const bundle = `${vaultFromUrl?.toLowerCase() ?? ''}:${chainFromUrl ?? ''}`
+    if (bundle !== prevUrlBundleKey.current) {
       lastUrlAutoAttemptKey.current = null
-      prevVaultUrlKey.current = vKey
+      prevUrlBundleKey.current = bundle
     }
 
     if (!vaultFromUrl) return
-    if (!isConnected || !provider || chainId == null || !isChainSupported(chainId)) return
+    if (!isConnected || !provider || chainId == null) return
+    if (chainFromUrl != null && !isChainSupported(chainFromUrl)) return
+    if (chainFromUrl == null && !isChainSupported(chainId)) return
     if (loading) return
 
     const attemptKey = `${chainId}:${vaultFromUrl.toLowerCase()}`
@@ -257,6 +294,7 @@ function VaultPageInner() {
     void performCheck(vaultFromUrl, false)
   }, [
     vaultFromUrl,
+    chainFromUrl,
     isConnected,
     provider,
     chainId,
@@ -266,15 +304,18 @@ function VaultPageInner() {
   ])
 
   useEffect(() => {
-    if (!hasLoaded || !summary?.vault || !pathname) return
+    if (!hasLoaded || !summary?.vault || !pathname || chainId == null) return
+    if (!isChainSupported(chainId)) return
     const p = new URLSearchParams(searchParams.toString())
-    const cur = (p.get('vault') ?? p.get('address'))?.toLowerCase()
-    if (cur === summary.vault.toLowerCase()) return
-    p.delete('address')
-    p.set('vault', summary.vault)
+    const curAddr = (p.get('vault') ?? p.get('address'))?.toLowerCase()
+    const curChain = p.get('chain')
+    if (curAddr === summary.vault.toLowerCase() && curChain === String(chainId)) return
+    p.delete('vault')
+    p.set('address', summary.vault)
+    p.set('chain', String(chainId))
     const qs = p.toString()
     void router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [hasLoaded, summary?.vault, pathname, router, searchParams])
+  }, [hasLoaded, summary?.vault, chainId, pathname, router, searchParams])
 
   useEffect(() => {
     if (!hasLoaded || summary == null) {
