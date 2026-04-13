@@ -56,14 +56,41 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
 
     recreateBrowserProvider()
 
+    /** Restore session without a popup — MetaMask already granted this origin. */
+    void (async () => {
+      try {
+        const accounts = (await eth.request({ method: 'eth_accounts' })) as string[]
+        if (accounts.length > 0) {
+          setAccount(accounts[0])
+          await refreshChainId()
+        }
+      } catch {
+        // ignore
+      }
+    })()
+
     const onChainChanged = () => {
       void refreshChainId()
       recreateBrowserProvider()
     }
 
+    const onAccountsChanged = (accs: unknown) => {
+      const accounts = accs as string[]
+      if (!Array.isArray(accounts) || accounts.length === 0) {
+        setAccount('')
+        setChainId(null)
+        return
+      }
+      setAccount(accounts[0])
+      void refreshChainId()
+      recreateBrowserProvider()
+    }
+
     eth.on?.('chainChanged', onChainChanged)
+    eth.on?.('accountsChanged', onAccountsChanged)
     return () => {
       eth.removeListener?.('chainChanged', onChainChanged)
+      eth.removeListener?.('accountsChanged', onAccountsChanged)
     }
   }, [recreateBrowserProvider, refreshChainId])
 
