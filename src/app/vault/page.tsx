@@ -1,9 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { getAddress } from 'ethers'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import QueueColumn from '@/components/QueueColumn'
+import ShareLinkCopyButton from '@/components/ShareLinkCopyButton'
 import SupplyQueueColumn from '@/components/SupplyQueueColumn'
 import VaultActionsColumn from '@/components/VaultActionsColumn'
 import VaultSummaryPanel from '@/components/VaultSummaryPanel'
@@ -25,7 +28,10 @@ import {
   type SiloV3VaultListItem,
 } from '@/utils/siloV3VaultsApi'
 
-export default function VaultPage() {
+function VaultPageInner() {
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
   const { provider, chainId, isConnected, connect, switchNetwork, account } = useWeb3()
   const [input, setInput] = useState('')
   const [error, setError] = useState('')
@@ -58,6 +64,29 @@ export default function VaultPage() {
   const networkIconPath = chainId != null ? getNetworkIconPath(chainId) : null
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
   const networkIconSrc = networkIconPath ? `${basePath}${networkIconPath}` : null
+
+  /** Canonical link to this vault page (not the raw browser URL). */
+  const vaultShareUrl = useMemo(() => {
+    if (!hasLoaded || !summary?.vault || typeof window === 'undefined') return ''
+    try {
+      const v = getAddress(summary.vault)
+      return `${window.location.origin}${basePath}/vault/?vault=${encodeURIComponent(v)}`
+    } catch {
+      return ''
+    }
+  }, [hasLoaded, summary?.vault, basePath])
+
+  const vaultFromUrl = useMemo(() => {
+    const raw = searchParams.get('vault') ?? searchParams.get('address')
+    if (!raw?.trim()) return null
+    return normalizeAddress(extractHexAddressLike(raw.trim()))
+  }, [searchParams])
+
+  useEffect(() => {
+    if (vaultFromUrl) {
+      setInput(vaultFromUrl)
+    }
+  }, [vaultFromUrl])
 
   const performCheck = useCallback(
     async (rawInput: string, reopenMyVaultsPickerOnError = false) => {
@@ -203,6 +232,50 @@ export default function VaultPage() {
     [performCheck]
   )
 
+  const prevVaultUrlKey = useRef<string>('')
+  const lastUrlAutoAttemptKey = useRef<string | null>(null)
+
+  useEffect(() => {
+    const vKey = vaultFromUrl?.toLowerCase() ?? ''
+    if (vKey !== prevVaultUrlKey.current) {
+      lastUrlAutoAttemptKey.current = null
+      prevVaultUrlKey.current = vKey
+    }
+
+    if (!vaultFromUrl) return
+    if (!isConnected || !provider || chainId == null || !isChainSupported(chainId)) return
+    if (loading) return
+
+    const attemptKey = `${chainId}:${vaultFromUrl.toLowerCase()}`
+    if (summary?.vault && summary.vault.toLowerCase() === vaultFromUrl.toLowerCase()) {
+      lastUrlAutoAttemptKey.current = attemptKey
+      return
+    }
+    if (lastUrlAutoAttemptKey.current === attemptKey) return
+
+    lastUrlAutoAttemptKey.current = attemptKey
+    void performCheck(vaultFromUrl, false)
+  }, [
+    vaultFromUrl,
+    isConnected,
+    provider,
+    chainId,
+    summary?.vault,
+    loading,
+    performCheck,
+  ])
+
+  useEffect(() => {
+    if (!hasLoaded || !summary?.vault || !pathname) return
+    const p = new URLSearchParams(searchParams.toString())
+    const cur = (p.get('vault') ?? p.get('address'))?.toLowerCase()
+    if (cur === summary.vault.toLowerCase()) return
+    p.delete('address')
+    p.set('vault', summary.vault)
+    const qs = p.toString()
+    void router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [hasLoaded, summary?.vault, pathname, router, searchParams])
+
   useEffect(() => {
     if (!hasLoaded || summary == null) {
       return
@@ -247,14 +320,21 @@ export default function VaultPage() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold silo-text-main m-0">Vault</h1>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <h1 className="text-3xl font-bold silo-text-main m-0 leading-none">Vault</h1>
+          {vaultShareUrl ? (
+            <ShareLinkCopyButton
+              url={vaultShareUrl}
+              className="self-center shrink-0 -mt-0.5"
+              iconClassName="w-4 h-4"
+            />
+          ) : null}
           {networkName ? (
             <div className="inline-flex items-center gap-2 rounded-full border border-[var(--silo-border)] bg-[var(--silo-surface)] px-3 py-1.5">
               {networkIconSrc ? (
                 <Image src={networkIconSrc} alt={networkName} width={16} height={16} className="rounded-full" />
               ) : null}
-              <span className="text-sm font-semibold silo-text-main">Blockchain: {networkName}</span>
+              <span className="text-sm font-semibold silo-text-main"> {networkName}</span>
             </div>
           ) : null}
         </div>
@@ -284,7 +364,7 @@ export default function VaultPage() {
 
       <div className="silo-panel silo-top-card p-6 mb-8">
         <label htmlFor="vault-input" className="block text-sm font-medium silo-text-main mb-2">
-          Vault address or URL
+          Vault address or blockchain explorer URL
         </label>
         <div className="flex flex-col sm:flex-row gap-3">
           <input
@@ -297,7 +377,7 @@ export default function VaultPage() {
               if (loading) return
               void handleCheck()
             }}
-            placeholder="0x… or https://…/address/0x…"
+            placeholder="0x… or supported explorer link to the vault contract"
             className="flex-1 min-w-0 silo-input silo-input--md font-mono focus:outline-none focus:ring-0"
           />
           <button
@@ -423,5 +503,19 @@ export default function VaultPage() {
         </VaultPermissionsProvider>
       )}
     </div>
+  )
+}
+
+export default function VaultPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="silo-page px-4 py-8 sm:px-6 max-w-6xl mx-auto">
+          <p className="text-sm silo-text-soft m-0">Loading…</p>
+        </div>
+      }
+    >
+      <VaultPageInner />
+    </Suspense>
   )
 }
