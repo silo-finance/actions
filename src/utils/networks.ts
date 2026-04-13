@@ -9,6 +9,8 @@ export interface NetworkConfig {
   explorerBaseUrl: string
   nativeTokenSymbol: string
   iconPath: string
+  /** Public HTTPS RPC(s) for `wallet_addEthereumChain` when the wallet does not know this chain yet. */
+  walletRpcUrls: string[]
 }
 
 export const NETWORK_CONFIGS: NetworkConfig[] = [
@@ -19,6 +21,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     explorerBaseUrl: 'https://etherscan.io',
     nativeTokenSymbol: 'ETH',
     iconPath: '/network-icons/ethereum.svg',
+    walletRpcUrls: ['https://ethereum.publicnode.com'],
   },
   {
     chainId: 10,
@@ -27,6 +30,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     explorerBaseUrl: 'https://optimistic.etherscan.io',
     nativeTokenSymbol: 'ETH',
     iconPath: '/network-icons/optimism.svg',
+    walletRpcUrls: ['https://mainnet.optimism.io'],
   },
   {
     chainId: 50,
@@ -35,6 +39,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     explorerBaseUrl: 'https://xdcscan.com',
     nativeTokenSymbol: 'XDC',
     iconPath: '/network-icons/xdc.svg',
+    walletRpcUrls: ['https://rpc.xdcrpc.com'],
   },
   {
     chainId: 56,
@@ -43,6 +48,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     explorerBaseUrl: 'https://bscscan.com',
     nativeTokenSymbol: 'BNB',
     iconPath: '/network-icons/bnb.svg',
+    walletRpcUrls: ['https://bsc-dataseed1.binance.org'],
   },
   {
     chainId: 42161,
@@ -51,6 +57,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     explorerBaseUrl: 'https://arbiscan.io',
     nativeTokenSymbol: 'ETH',
     iconPath: '/network-icons/arbitrum.svg',
+    walletRpcUrls: ['https://arb1.arbitrum.io/rpc'],
   },
   {
     chainId: 43114,
@@ -59,6 +66,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     explorerBaseUrl: 'https://snowtrace.io',
     nativeTokenSymbol: 'AVAX',
     iconPath: '/network-icons/avalanche.svg',
+    walletRpcUrls: ['https://api.avax.network/ext/bc/C/rpc'],
   },
   {
     chainId: 146,
@@ -67,6 +75,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     explorerBaseUrl: 'https://sonicscan.org',
     nativeTokenSymbol: 'S',
     iconPath: '/network-icons/sonic.svg',
+    walletRpcUrls: ['https://rpc.soniclabs.com'],
   },
   {
     chainId: 196,
@@ -75,6 +84,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     explorerBaseUrl: 'https://www.okx.com/web3/explorer/xlayer',
     nativeTokenSymbol: 'OKB',
     iconPath: '/network-icons/okx.svg',
+    walletRpcUrls: ['https://rpc.xlayer.tech'],
   },
   {
     chainId: 1776,
@@ -83,6 +93,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     explorerBaseUrl: 'https://blockscout.injective.network',
     nativeTokenSymbol: 'INJ',
     iconPath: '/network-icons/injective.svg',
+    walletRpcUrls: ['https://sentry.evm-rpc.injective.network'],
   },
 ]
 
@@ -129,4 +140,32 @@ export function getExplorerTxUrl(chainId: number | string, txHash: string): stri
 export function isChainSupported(chainId: number | string): boolean {
   const id = typeof chainId === 'string' ? parseInt(chainId, 10) : chainId
   return NETWORK_CONFIG_MAP.has(id)
+}
+
+/** EIP-3082 / `wallet_addEthereumChain` param shape (snake_case keys per spec). */
+export type WalletAddEthereumChainParameter = {
+  chainId: string
+  chainName: string
+  nativeCurrency: { name: string; symbol: string; decimals: number }
+  rpcUrls: string[]
+  blockExplorerUrls: string[]
+}
+
+/**
+ * Build `wallet_addEthereumChain` params for a supported chain (when `wallet_switchEthereumChain` fails because the chain is unknown to the wallet).
+ */
+export function getWalletAddEthereumChainParameter(chainId: number): WalletAddEthereumChainParameter | null {
+  const c = getNetworkConfig(chainId)
+  if (!c?.walletRpcUrls?.length) return null
+  return {
+    chainId: `0x${chainId.toString(16)}`,
+    chainName: c.displayName,
+    nativeCurrency: {
+      name: c.nativeTokenSymbol,
+      symbol: c.nativeTokenSymbol,
+      decimals: 18,
+    },
+    rpcUrls: [...c.walletRpcUrls],
+    blockExplorerUrls: [c.explorerBaseUrl.replace(/\/$/, '')],
+  }
 }

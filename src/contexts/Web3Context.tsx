@@ -2,6 +2,24 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { BrowserProvider } from 'ethers'
+import { getWalletAddEthereumChainParameter } from '@/utils/networks'
+
+function switchFailedBecauseChainNotInWallet(err: unknown): boolean {
+  const e = err as { code?: number; message?: string }
+  if (e.code === 4902) return true
+  const msg = (e.message ?? '').toLowerCase()
+  return (
+    msg.includes('unrecognized chain') ||
+    msg.includes('recognize chain') ||
+    msg.includes('not been added') ||
+    msg.includes('has not been added') ||
+    msg.includes('try adding') ||
+    msg.includes('wallet_addethereumchain') ||
+    msg.includes('no such chain') ||
+    (msg.includes('fail to switch') && msg.includes('chain')) ||
+    (msg.includes('could not switch') && msg.includes('chain'))
+  )
+}
 
 declare global {
   interface Window {
@@ -118,10 +136,11 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
   const switchNetwork = useCallback(
     async (targetChainId: number) => {
       if (!window.ethereum) return
+      const chainIdHex = `0x${targetChainId.toString(16)}`
       try {
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: `0x${targetChainId.toString(16)}` }],
+          params: [{ chainId: chainIdHex }],
         })
         await refreshChainId()
         recreateBrowserProvider()
@@ -132,6 +151,40 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
           alert('Network switch request is already pending in wallet.')
           return
         }
+
+        const shouldTryAdd =
+          walletError.code === 4902 || switchFailedBecauseChainNotInWallet(error)
+
+        if (shouldTryAdd) {
+          const addParams = getWalletAddEthereumChainParameter(targetChainId)
+          if (addParams) {
+            try {
+              await window.ethereum.request({
+                method: 'wallet_addEthereumChain',
+                params: [addParams],
+              })
+              try {
+                await window.ethereum.request({
+                  method: 'wallet_switchEthereumChain',
+                  params: [{ chainId: chainIdHex }],
+                })
+              } catch {
+                /* Some wallets already activate the chain after add. */
+              }
+              await refreshChainId()
+              recreateBrowserProvider()
+              return
+            } catch (addErr) {
+              const ae = addErr as { code?: number; message?: string }
+              if (ae.code === 4001) return
+              alert(
+                `Could not add this network in your wallet.${ae.message ? ` ${ae.message}` : ''} Add chain ${targetChainId} manually, then try again.`
+              )
+              return
+            }
+          }
+        }
+
         alert(`Failed to switch network.${walletError.message ? ` ${walletError.message}` : ''}`)
       }
     },
