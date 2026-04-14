@@ -27,6 +27,7 @@ const patternCirclesUrl = `${basePath}/pattern-circles.svg`
 export const metadata: Metadata = {
   title: 'Silo Actions',
   description: 'UI for quick actions',
+  manifest: `${basePath || ''}/manifest.json`,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
