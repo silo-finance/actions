@@ -9,6 +9,18 @@ npm install
 npm run dev
 ```
 
+### Wallet connection
+
+The app uses [wagmi](https://wagmi.sh/) with an **injected** connector (browser extension wallets) and optional **WalletConnect**.
+
+To enable WalletConnect (mobile / QR), create a project at [WalletConnect Cloud](https://cloud.walletconnect.com/) and set:
+
+```bash
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
+```
+
+Without this variable, **Browser extension** still works; the WalletConnect option will prompt you to configure the project id.
+
 ## Production build
 
 ```bash

@@ -159,7 +159,7 @@ function VaultPageInner() {
       setYourRoleLabel('')
 
       if (!isConnected || !provider || chainId == null) {
-        setError('Connect MetaMask to load vault queues.')
+        setError('Connect a wallet to load vault queues.')
         return
       }
 
@@ -392,13 +392,13 @@ function VaultPageInner() {
 
       {!isConnected && (
         <div className="silo-panel-soft p-4 mb-6 flex flex-wrap items-center gap-3">
-          <p className="text-sm silo-text-main">Connect MetaMask to read on-chain data.</p>
+          <p className="text-sm silo-text-main">Connect a wallet (browser extension or WalletConnect) to read on-chain data.</p>
           <button
             type="button"
-            onClick={() => void connect()}
+            onClick={() => void connect('auto')}
             className="header-connect-button font-semibold py-2 px-4 rounded-full text-xs"
           >
-            Connect MetaMask
+            Connect wallet
           </button>
         </div>
       )}

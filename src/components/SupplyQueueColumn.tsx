@@ -8,7 +8,6 @@ import MarketItem from '@/components/MarketItem'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
 import { useVaultPermissions } from '@/contexts/VaultPermissionsContext'
 import { useWeb3 } from '@/contexts/Web3Context'
-import type { Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import { normalizeAddress } from '@/utils/addressValidation'
 import { readErc4626Asset } from '@/utils/readErc4626Asset'
 import { resolveMarketLabel, type ResolvedMarket } from '@/utils/resolveVaultMarket'
@@ -117,7 +116,7 @@ export default function SupplyQueueColumn({
   ownerKind,
   curatorKind,
 }: Props) {
-  const { provider, account, isConnected } = useWeb3()
+  const { provider, eip1193Provider, account, isConnected } = useWeb3()
   const perm = useVaultPermissions()
   const [editOrder, setEditOrder] = useState<string[]>([])
   const [baselineOrder, setBaselineOrder] = useState<string[]>([])
@@ -337,8 +336,7 @@ export default function SupplyQueueColumn({
   const canAttempt =
     isConnected &&
     provider != null &&
-    typeof window !== 'undefined' &&
-    window.ethereum != null &&
+    eip1193Provider != null &&
     (ownerKind === 'eoa' || ownerKind === 'safe' || ownerKind === 'contract')
 
   const handleAddMarketClick = useCallback(() => {
@@ -607,7 +605,7 @@ export default function SupplyQueueColumn({
   const handleSetSupplyQueue = useCallback(async () => {
     setLocalError('')
     setTxSuccess(null)
-    if (!provider || !account || !window.ethereum) {
+    if (!provider || !account || !eip1193Provider) {
       setLocalError('Wallet not available.')
       return
     }
@@ -643,7 +641,7 @@ export default function SupplyQueueColumn({
       const submitted = effectiveOrder.map((a) => getAddress(a))
 
       const { transactionUrl, successLinkLabel: label, outcome } = await setSupplyQueueForOwner({
-        ethereum: window.ethereum as Eip1193Provider,
+        ethereum: eip1193Provider,
         provider,
         signer,
         chainId,
@@ -669,6 +667,7 @@ export default function SupplyQueueColumn({
     }
   }, [
     provider,
+    eip1193Provider,
     account,
     chainId,
     vaultAddress,

@@ -41,6 +41,14 @@ export async function classifyAllocatorVaultAction(
     const owner = n(overview.owner)
     const curator = n(overview.curator)
 
+    /** When the vault role is a Safe, never use `direct` with `connected ===` that role: WC / smart wallets may report the Safe as the connected account. */
+    if (ownerKind === 'safe' && c === owner) {
+      return { mode: 'safe_propose', executingSafeAddress: owner }
+    }
+    if (curatorKind === 'safe' && c === curator) {
+      return { mode: 'safe_propose', executingSafeAddress: curator }
+    }
+
     if (c === owner || c === curator) {
       return { mode: 'direct', executingSafeAddress: null }
     }
@@ -79,6 +87,13 @@ export async function classifyOwnerOrCuratorVaultAction(
     const c = n(connectedAccount)
     const owner = n(overview.owner)
     const curator = n(overview.curator)
+
+    if (ownerKind === 'safe' && c === owner) {
+      return { mode: 'safe_propose', executingSafeAddress: owner }
+    }
+    if (curatorKind === 'safe' && c === curator) {
+      return { mode: 'safe_propose', executingSafeAddress: curator }
+    }
 
     if (c === owner || c === curator) {
       return { mode: 'direct', executingSafeAddress: null }

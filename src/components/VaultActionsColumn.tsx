@@ -8,7 +8,7 @@ import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
 import WithdrawQueueRemoveWizard from '@/components/WithdrawQueueRemoveWizard'
 import { useVaultPermissions } from '@/contexts/VaultPermissionsContext'
 import { useWeb3 } from '@/contexts/Web3Context'
-import { clearSupplyQueueForOwner, type Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
+import { clearSupplyQueueForOwner } from '@/utils/clearVaultSupplyQueue'
 import type { OwnerKind } from '@/utils/ownerKind'
 import type { ResolvedMarket } from '@/utils/resolveVaultMarket'
 import type { VaultUnderlyingMeta } from '@/utils/vaultReader'
@@ -61,7 +61,7 @@ export default function VaultActionsColumn({
   const clearSupplyQueueNote = 'This action pauses new deposits into the Vault.'
   const reallocateAndRemoveNote = 'This action reallocates funds and removes the market from the vault.'
 
-  const { provider, account, isConnected } = useWeb3()
+  const { provider, eip1193Provider, account, isConnected } = useWeb3()
   const perm = useVaultPermissions()
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState('')
@@ -80,11 +80,7 @@ export default function VaultActionsColumn({
     setActiveAction('none')
   }, [vaultAddress, ownerAddress, curatorAddress, ownerKind, curatorKind, chainId])
 
-  const walletReady =
-    isConnected &&
-    provider != null &&
-    typeof window !== 'undefined' &&
-    window.ethereum != null
+  const walletReady = isConnected && provider != null && eip1193Provider != null
 
   const permissionResolved = perm.active && !perm.loading
   const clearAllowed = permissionResolved && perm.canAllocator
@@ -100,7 +96,7 @@ export default function VaultActionsColumn({
     setLocalError('')
     setTxSuccess(null)
     setRevertSupplyAddresses(null)
-    if (!provider || !account || !window.ethereum) {
+    if (!provider || !account || !eip1193Provider) {
       setLocalError('Wallet not available.')
       return
     }
@@ -109,7 +105,7 @@ export default function VaultActionsColumn({
     try {
       const signer = await provider.getSigner()
       const { transactionUrl, successLinkLabel: label, outcome } = await clearSupplyQueueForOwner({
-        ethereum: window.ethereum as Eip1193Provider,
+        ethereum: eip1193Provider,
         provider,
         signer,
         chainId,
@@ -130,6 +126,7 @@ export default function VaultActionsColumn({
     }
   }, [
     provider,
+    eip1193Provider,
     account,
     chainId,
     vaultAddress,
