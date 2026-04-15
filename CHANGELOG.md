@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.0] - 2026-04-15
+
+### Fixed
+- fix linter errors
+- Improved automation for changelog
+- automate changelog
+- handle dust on reallocation
+- by default reallocate funds to idle vault
+- minimum gnosis compatible changes (#14)
+
 ## [0.7.2] - 2026-04-15
 
 ### Fixed

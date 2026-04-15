@@ -697,7 +697,6 @@ export default function WithdrawQueueRemoveWizard({
     underlyingMeta,
     vaultAddress,
     dustPreviewAllowance,
-    removedHasDustOnly,
   ])
 
   if (withdrawMarkets.length === 0) {
