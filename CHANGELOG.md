@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.1] - 2026-04-15
+
+### Fixed
+- improve visual styling by removing circles from cards bg
+
 ## [0.8.0] - 2026-04-15
 
 ### Fixed
