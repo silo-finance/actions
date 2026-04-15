@@ -8,7 +8,6 @@ import ActionPermissionHint from '@/components/ActionPermissionHint'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
 import { useVaultPermissions } from '@/contexts/VaultPermissionsContext'
 import { useWeb3 } from '@/contexts/Web3Context'
-import type { Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import type { OwnerKind } from '@/utils/ownerKind'
 import type { ResolvedMarket } from '@/utils/resolveVaultMarket'
 import {
@@ -156,7 +155,7 @@ export default function WithdrawQueueRemoveWizard({
   underlyingMeta,
   onCancel,
 }: Props) {
-  const { provider, account, isConnected } = useWeb3()
+  const { provider, eip1193Provider, account, isConnected } = useWeb3()
   const perm = useVaultPermissions()
   const [busy, setBusy] = useState(false)
   const [execErr, setExecErr] = useState('')
@@ -356,9 +355,8 @@ export default function WithdrawQueueRemoveWizard({
   const canExecute =
     isConnected &&
     provider != null &&
+    eip1193Provider != null &&
     account != null &&
-    typeof window !== 'undefined' &&
-    window.ethereum != null &&
     removeIndex != null &&
     removalPreconditionsOk &&
     headroomOk &&
@@ -471,7 +469,7 @@ export default function WithdrawQueueRemoveWizard({
   const handleExecute = useCallback(async () => {
     setExecErr('')
     setTxSuccess(null)
-    if (!provider || !account || !window.ethereum || removeIndex == null || !statesAligned) {
+    if (!provider || !account || !eip1193Provider || removeIndex == null || !statesAligned) {
       setExecErr('Wallet or data not ready.')
       return
     }
@@ -557,7 +555,7 @@ export default function WithdrawQueueRemoveWizard({
     try {
       const signer = await provider.getSigner()
       const { transactionUrl, successLinkLabel, outcome } = await executeReallocateRemoveWithdrawQueue({
-        ethereum: window.ethereum as Eip1193Provider,
+        ethereum: eip1193Provider,
         provider,
         signer,
         chainId,
@@ -578,6 +576,7 @@ export default function WithdrawQueueRemoveWizard({
     }
   }, [
     provider,
+    eip1193Provider,
     account,
     chainId,
     vaultAddress,

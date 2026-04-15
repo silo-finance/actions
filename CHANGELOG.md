@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.2] - 2026-04-15
+
+### Added
+- Wallet connection via wagmi: browser extension (injected) and optional WalletConnect (`NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`)
+- Vitest coverage for vault action authority (EOA vs Safe owner / signer)
+
+### Fixed
+- When the vault `owner` (or `curator`) is a Safe, treat a connected account equal to that Safe as multisig proposal mode instead of direct transactions (WalletConnect / smart-wallet edge case)
+
+- wallet connect
 ## [0.8.1] - 2026-04-15
 
 ### Fixed
