@@ -1,0 +1,55 @@
+name: Changelog Sync
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+
+jobs:
+  update-changelog:
+    if: startsWith(github.head_ref, 'release/') || startsWith(github.head_ref, 'hotfix/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Fetch base branch
+        run: git fetch origin "${{ github.base_ref }}"
+
+      - name: Update changelog and package version
+        env:
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: node scripts/update-changelog-from-pr.mjs
+
+      - name: Commit and push changes
+        run: |
+          if git diff --quiet CHANGELOG.md package.json; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          version="${GITHUB_HEAD_REF#*/}"
+          prefix="${GITHUB_HEAD_REF%%/*}"
+
+          if [ "$prefix" = "release" ]; then
+            message="release ${version}"
+          else
+            message="hotfix ${version}"
+          fi
+
+          git add CHANGELOG.md package.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "$message"
+          git push origin HEAD

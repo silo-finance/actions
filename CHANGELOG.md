@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.7.2] - 2026-04-15
+
+### Fixed
+- fix how we manage url and network switch
+- labels
+- add network does not exist in the wallet
+
+## [0.7.1] - 2026-04-13
+
+### Fixed
+- keep connection alive for MetaMask
+- add chain to url params
+- accept address from url
+
+## [0.7.0] - 2026-04-10
+
+### Fixed
+- release 0.7.0
+- fix role labels
+- fix icon path
+
+## [0.6.0] - 2026-04-10
+
+### Fixed
+- release 0.6.0
+- fix submit supply queue
+- better way of font size
+- icons
+- increase fonts
+- list of my vaults
+
+## [0.5.0] - 2026-04-09
+
+### Fixed
+- 0.5.0
+- support for curator and guardian
+
+## [0.4.0] - 2026-04-09
+
+### Fixed
+- fix linter errors
+- 0.4.0
+- set supply queue
+- display cap
+
+## [0.3.0] - 2026-04-08
+
+### Fixed
+- favicon
+
 ## [0.2.0] - 2026-04-08
 
 ### Added
