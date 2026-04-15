@@ -25,9 +25,9 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
 const patternCirclesUrl = `${basePath}/pattern-circles.svg`
 
 export const metadata: Metadata = {
-  title: 'Silo Actions',
-  description: 'UI for quick actions',
-  manifest: `${basePath || ''}/manifest.json`,
+  title: 'Control Panel',
+  description: 'Execute actions across markets and vaults',
+  manifest: `${basePath || ''}/manifest.json`
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

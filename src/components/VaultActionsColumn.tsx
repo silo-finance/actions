@@ -58,6 +58,9 @@ export default function VaultActionsColumn({
   withdrawQueueStates,
   vaultUnderlyingMeta,
 }: Props) {
+  const clearSupplyQueueNote = 'This action pauses new deposits into the Vault.'
+  const reallocateAndRemoveNote = 'This action reallocates funds and removes the market from the vault.'
+
   const { provider, account, isConnected } = useWeb3()
   const perm = useVaultPermissions()
   const [busy, setBusy] = useState(false)
@@ -169,8 +172,9 @@ export default function VaultActionsColumn({
               onClick={() => setActiveAction('clear')}
               className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed w-full"
             >
-              Clear supply queue
+              Clear Supply Queue
             </button>
+            <p className="mt-2 text-sm silo-text-main">{clearSupplyQueueNote}</p>
             <ActionPermissionHint allowed={!clearDeniedByRole} onlyForLabel={ONLY_FOR_ALLOCATOR_ACTIONS} />
           </div>
           <div>
@@ -180,8 +184,9 @@ export default function VaultActionsColumn({
               onClick={() => setActiveAction('withdraw')}
               className="silo-btn-primary text-left justify-center disabled:opacity-50 disabled:cursor-not-allowed w-full"
             >
-              Reallocate & remove from withdraw queue
+              Reallocate and Remove
             </button>
+            <p className="mt-2 text-sm silo-text-main">{reallocateAndRemoveNote}</p>
             <ActionPermissionHint
               allowed={!withdrawDeniedByRole || withdrawQueueMarkets.length === 0}
               onlyForLabel={ONLY_FOR_WITHDRAW_REMOVAL}
@@ -194,7 +199,7 @@ export default function VaultActionsColumn({
         <div className="silo-choice-option" data-selected="true">
           <div className="w-full space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold silo-text-main">Clear supply queue</p>
+              <p className="text-sm font-semibold silo-text-main">Clear Supply Queue</p>
               <button
                 type="button"
                 onClick={() => {
@@ -218,6 +223,7 @@ export default function VaultActionsColumn({
               >
                 {busy ? 'Waiting for wallet…' : 'Execute clear supply queue'}
               </button>
+              <p className="mt-2 text-sm silo-text-main">{clearSupplyQueueNote}</p>
               <ActionPermissionHint allowed={!clearDeniedByRole} onlyForLabel={ONLY_FOR_ALLOCATOR_ACTIONS} />
             </div>
 
