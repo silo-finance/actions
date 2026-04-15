@@ -101,11 +101,48 @@ function VaultPageInner() {
     return normalizeAddress(extractHexAddressLike(raw.trim()))
   }, [searchParams])
 
+  /** Stable “deep link” identity so we only auto-apply URL `chain` once per navigation, not on every replace(). */
+  const linkIdentityKey = useMemo(
+    () => `${vaultFromUrl?.toLowerCase() ?? ''}|${chainFromUrl ?? ''}`,
+    [vaultFromUrl, chainFromUrl]
+  )
+
+  const prevLinkIdentityKey = useRef<string | null>(null)
+  const [deepLinkChainApplied, setDeepLinkChainApplied] = useState(() => chainFromUrl == null)
+
+  useEffect(() => {
+    if (prevLinkIdentityKey.current === null) {
+      prevLinkIdentityKey.current = linkIdentityKey
+      return
+    }
+    if (prevLinkIdentityKey.current !== linkIdentityKey) {
+      prevLinkIdentityKey.current = linkIdentityKey
+      setDeepLinkChainApplied(chainFromUrl == null)
+    }
+  }, [linkIdentityKey, chainFromUrl])
+
   useEffect(() => {
     if (vaultFromUrl) {
       setInput(vaultFromUrl)
     }
   }, [vaultFromUrl])
+
+  /** Once per deep link: if URL contains `chain`, switch wallet to it. After that, header / wallet is source of truth. */
+  useEffect(() => {
+    if (!isConnected || chainId == null) return
+    if (deepLinkChainApplied) return
+    if (chainFromUrl == null || !isChainSupported(chainFromUrl)) {
+      setDeepLinkChainApplied(true)
+      return
+    }
+    if (chainId === chainFromUrl) {
+      setDeepLinkChainApplied(true)
+      return
+    }
+    void switchNetwork(chainFromUrl).finally(() => {
+      setDeepLinkChainApplied(true)
+    })
+  }, [isConnected, chainId, chainFromUrl, switchNetwork, deepLinkChainApplied])
 
   const performCheck = useCallback(
     async (rawInput: string, reopenMyVaultsPickerOnError = false) => {
@@ -149,25 +186,9 @@ function VaultPageInner() {
           setError('Switch to the network from the explorer URL in your wallet, then press Check again.')
           return
         }
-      } else {
-        if (chainFromUrl != null) {
-          if (!isChainSupported(chainFromUrl)) {
-            setError('The chain in the link is not supported here. Switch network in the header or use a supported chain id.')
-            return
-          }
-          if (chainId !== chainFromUrl) {
-            await switchNetwork(chainFromUrl)
-          }
-          const netAfter = await provider.getNetwork()
-          const effective = Number(netAfter.chainId)
-          if (effective !== chainFromUrl) {
-            setError('Switch to the network from the link (chain=…) in your wallet, then press Check again.')
-            return
-          }
-        } else if (chainId == null || !isChainSupported(chainId)) {
-          setError('This network is not in the supported list. Switch network in the header.')
-          return
-        }
+      } else if (chainId == null || !isChainSupported(chainId)) {
+        setError('This network is not in the supported list. Switch network in the header.')
+        return
       }
 
       const raw = extractHexAddressLike(rawInput)
@@ -217,7 +238,7 @@ function VaultPageInner() {
         setLoading(false)
       }
     },
-    [provider, chainId, isConnected, switchNetwork, chainFromUrl]
+    [provider, chainId, isConnected, switchNetwork]
   )
 
   const handleCheck = useCallback(() => {
@@ -267,43 +288,9 @@ function VaultPageInner() {
     [performCheck]
   )
 
-  const prevUrlBundleKey = useRef<string>('')
-  const lastUrlAutoAttemptKey = useRef<string | null>(null)
-
+  /** After Check: normalize `address` + `chain` in the URL to the loaded vault (only when deep link bootstrap finished). */
   useEffect(() => {
-    const bundle = `${vaultFromUrl?.toLowerCase() ?? ''}:${chainFromUrl ?? ''}`
-    if (bundle !== prevUrlBundleKey.current) {
-      lastUrlAutoAttemptKey.current = null
-      prevUrlBundleKey.current = bundle
-    }
-
-    if (!vaultFromUrl) return
-    if (!isConnected || !provider || chainId == null) return
-    if (chainFromUrl != null && !isChainSupported(chainFromUrl)) return
-    if (chainFromUrl == null && !isChainSupported(chainId)) return
-    if (loading) return
-
-    const attemptKey = `${chainId}:${vaultFromUrl.toLowerCase()}`
-    if (summary?.vault && summary.vault.toLowerCase() === vaultFromUrl.toLowerCase()) {
-      lastUrlAutoAttemptKey.current = attemptKey
-      return
-    }
-    if (lastUrlAutoAttemptKey.current === attemptKey) return
-
-    lastUrlAutoAttemptKey.current = attemptKey
-    void performCheck(vaultFromUrl, false)
-  }, [
-    vaultFromUrl,
-    chainFromUrl,
-    isConnected,
-    provider,
-    chainId,
-    summary?.vault,
-    loading,
-    performCheck,
-  ])
-
-  useEffect(() => {
+    if (!deepLinkChainApplied) return
     if (!hasLoaded || !summary?.vault || !pathname || chainId == null) return
     if (!isChainSupported(chainId)) return
     const p = new URLSearchParams(searchParams.toString())
@@ -315,7 +302,20 @@ function VaultPageInner() {
     p.set('chain', String(chainId))
     const qs = p.toString()
     void router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [hasLoaded, summary?.vault, chainId, pathname, router, searchParams])
+  }, [deepLinkChainApplied, hasLoaded, summary?.vault, chainId, pathname, router, searchParams])
+
+  /** Before / without Check: keep `chain` query aligned with the wallet when the user changes network in the header. */
+  useEffect(() => {
+    if (!deepLinkChainApplied) return
+    if (!pathname || chainId == null || !isChainSupported(chainId)) return
+    if (hasLoaded && summary) return
+
+    const p = new URLSearchParams(searchParams.toString())
+    if (p.get('chain') === String(chainId)) return
+    p.set('chain', String(chainId))
+    const qs = p.toString()
+    void router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [deepLinkChainApplied, pathname, chainId, router, searchParams, hasLoaded, summary])
 
   useEffect(() => {
     if (!hasLoaded || summary == null) {
@@ -405,7 +405,7 @@ function VaultPageInner() {
 
       <div className="silo-panel silo-top-card p-6 mb-8">
         <label htmlFor="vault-input" className="block text-sm font-medium silo-text-main mb-2">
-          Vault address or blockchain explorer URL
+          Enter the vault address or blockchain explorer URL
         </label>
         <div className="flex flex-col sm:flex-row gap-3">
           <input

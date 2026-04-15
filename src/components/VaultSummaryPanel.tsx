@@ -26,49 +26,54 @@ function AddressLine({
   chainId,
   address,
   addressKind,
+  note,
 }: {
   label: string
   chainId: number
   address: string
   /** When set, appends the detected address kind (EOA / Safe / contract) on the same line. */
   addressKind?: OwnerKind
+  note?: string
 }) {
   const explorerUrl = getExplorerAddressUrl(chainId, address)
   return (
-    <div className="flex flex-wrap items-center gap-2 sm:gap-3 py-2">
-      <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">{label}</span>
-      <a
-        href={explorerUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-sm font-mono font-semibold silo-text-main hover:underline min-w-0 truncate"
-        title={address}
-      >
-        {shortAddr(address)}
-      </a>
-      <div className="flex items-center gap-1 shrink-0">
+    <div className="py-2">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">{label}</span>
         <a
           href={explorerUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center p-1.5 rounded-md hover:bg-[var(--silo-surface-2)]"
-          title="Open in block explorer"
-          aria-label="Open in block explorer"
+          className="text-sm font-mono font-semibold silo-text-main hover:underline min-w-0 truncate"
+          title={address}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-            />
-          </svg>
+          {shortAddr(address)}
         </a>
-        <CopyButton value={address} />
+        <div className="flex items-center gap-1 shrink-0">
+          <a
+            href={explorerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center p-1.5 rounded-md hover:bg-[var(--silo-surface-2)]"
+            title="Open in block explorer"
+            aria-label="Open in block explorer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </a>
+          <CopyButton value={address} />
+        </div>
+        {addressKind != null ? (
+          <span className="text-sm silo-text-main shrink-0">{ownerKindLabel(addressKind)}</span>
+        ) : null}
       </div>
-      {addressKind != null ? (
-        <span className="text-sm silo-text-main shrink-0">{ownerKindLabel(addressKind)}</span>
-      ) : null}
+      {note ? <p className="mt-1 pl-28 text-xs silo-text-soft">{note}</p> : null}
     </div>
   )
 }
@@ -110,8 +115,20 @@ export default function VaultSummaryPanel({
           <h2 className="text-lg font-semibold silo-text-main mb-2">Vault details</h2>
           <div className="divide-y divide-[var(--silo-border)]">
             <AddressLine label="Vault" chainId={chainId} address={vaultAddress} />
-            <AddressLine label="Owner" chainId={chainId} address={ownerAddress} addressKind={ownerKind} />
-            <AddressLine label="Curator" chainId={chainId} address={curatorAddress} addressKind={curatorKind} />
+            <AddressLine
+              label="Owner"
+              chainId={chainId}
+              address={ownerAddress}
+              addressKind={ownerKind}
+              note="can perform all actions,"
+            />
+            <AddressLine
+              label="Curator"
+              chainId={chainId}
+              address={curatorAddress}
+              addressKind={curatorKind}
+              note="can perform all actions except removing markets."
+            />
             <AddressLine label="Guardian" chainId={chainId} address={guardianAddress} addressKind={guardianKind} />
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2">
               <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Timelock</span>
