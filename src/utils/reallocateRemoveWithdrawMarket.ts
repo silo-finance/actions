@@ -15,12 +15,20 @@ import {
   classifyOwnerOrCuratorVaultAction,
   WITHDRAW_REMOVAL_DENIED_MESSAGE,
 } from '@/utils/vaultActionAuthority'
-import { executeVaultCallsFromSigner } from '@/utils/vaultMulticall'
+import {
+  executeTargetedBatchFromSigner,
+  type TargetedCall,
+} from '@/utils/vaultMulticall'
 
 const siloVaultAbi = loadAbi(siloVaultArtifact)
 const vaultIface = new Interface(siloVaultAbi)
 
 export type MarketAllocationTuple = { market: string; assets: bigint }
+
+export function vaultCalldatasToTargetedCalls(vaultAddress: string, datas: `0x${string}`[]): TargetedCall[] {
+  const v = getAddress(vaultAddress)
+  return datas.map((data) => ({ to: v, data }))
+}
 
 const SAFE_TX_ORIGIN =
   'Silo Actions: withdraw-queue removal (separate vault calls via Safe batch / MultiSend)'
@@ -207,8 +215,8 @@ export async function proposeReallocateRemoveWithdrawQueueViaSafe(params: {
   safeAddress: string
   vaultAddress: string
   proposerAccount: string
-  /** One or more direct vault calls; Safe SDK batches into a single proposed tx (MultiSend when &gt;1). */
-  vaultCallDatas: `0x${string}`[]
+  /** Ordered calls; each `to` may be the vault or another contract (e.g. ERC-20 + ERC-4626 dust top-up). */
+  batchCalls: TargetedCall[]
   /** Defaults to withdraw-queue removal origin. */
   origin?: string
 }): Promise<void> {
@@ -220,10 +228,9 @@ export async function proposeReallocateRemoveWithdrawQueueViaSafe(params: {
   }
 
   const safeAddress = getAddress(params.safeAddress)
-  const vaultAddress = getAddress(params.vaultAddress)
   const sender = getAddress(params.proposerAccount)
 
-  if (params.vaultCallDatas.length === 0) {
+  if (params.batchCalls.length === 0) {
     throw new Error('No vault calls to propose.')
   }
 
@@ -239,10 +246,10 @@ export async function proposeReallocateRemoveWithdrawQueueViaSafe(params: {
   })
 
   const safeTransaction = await protocolKit.createTransaction({
-    transactions: params.vaultCallDatas.map((data) => ({
-      to: vaultAddress,
+    transactions: params.batchCalls.map((c) => ({
+      to: getAddress(c.to),
       value: '0',
-      data,
+      data: c.data,
       operation: OperationType.Call,
     })),
   })
@@ -283,7 +290,7 @@ export type ExecuteReallocateRemoveWithdrawQueueParams = {
    * includes `submitCap`.
    */
   requiresOwnerOrCuratorCapabilities: boolean
-  vaultCallDatas: `0x${string}`[]
+  batchCalls: TargetedCall[]
 }
 
 /**
@@ -305,10 +312,10 @@ export async function executeReallocateRemoveWithdrawQueue(
     curatorKind,
     connectedAccount,
     requiresOwnerOrCuratorCapabilities,
-    vaultCallDatas,
+    batchCalls,
   } = params
 
-  if (vaultCallDatas.length === 0) {
+  if (batchCalls.length === 0) {
     throw new Error('No vault calls to execute.')
   }
 
@@ -329,7 +336,7 @@ export async function executeReallocateRemoveWithdrawQueue(
   }
 
   if (auth.mode === 'direct') {
-    const txHash = await executeVaultCallsFromSigner(signer, vaultAddress, vaultCallDatas)
+    const txHash = await executeTargetedBatchFromSigner(signer, vaultAddress, batchCalls)
     const transactionUrl = getExplorerTxUrl(chainId, txHash)
     if (!transactionUrl) {
       throw new Error('Could not build a block explorer link for this network.')
@@ -345,7 +352,7 @@ export async function executeReallocateRemoveWithdrawQueue(
       safeAddress,
       vaultAddress,
       proposerAccount: connectedAccount,
-      vaultCallDatas,
+      batchCalls,
     })
     const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
     if (!transactionUrl) {
@@ -356,3 +363,5 @@ export async function executeReallocateRemoveWithdrawQueue(
 
   throw new Error(WITHDRAW_REMOVAL_DENIED_MESSAGE)
 }
+
+export type { TargetedCall } from '@/utils/vaultMulticall'

@@ -11,6 +11,10 @@ type Props = {
   label: string
   /** Vault position in this market (principal asset amount + symbol). */
   positionLabel?: string
+  /** Shares &gt; 0 but underlying rounds to zero — show DUST instead of amount. */
+  positionIsDust?: boolean
+  /** Tooltip for the dust info icon (native `title`). */
+  dustHelpText?: string
   /** `SiloConfig.SILO_ID()` for Silo markets. */
   siloConfigId?: bigint
   /** Vault supply cap (whole underlying tokens), from queue load. */
@@ -31,6 +35,8 @@ export default function MarketItem({
   address,
   label,
   positionLabel,
+  positionIsDust,
+  dustHelpText,
   siloConfigId,
   capLabel,
   reorder,
@@ -84,9 +90,33 @@ export default function MarketItem({
               #{siloConfigId.toString()}
             </span>
           ) : null}
-          {positionLabel ? (
+          {positionIsDust ? (
+            <p className="text-xs shrink-0 min-w-0 inline-flex items-center gap-1" title="Non-transferable dust">
+              <span className="silo-text-soft">assets </span>
+              <span className="inline-flex items-center gap-1 font-semibold text-[var(--silo-danger)]">
+                <span className="font-mono uppercase tracking-wide">DUST</span>
+                <span className="group relative inline-flex items-center">
+                  <span
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--silo-danger)_45%,var(--silo-border))] bg-[color-mix(in_srgb,var(--silo-danger)_10%,transparent)] text-[10px] font-bold leading-none text-[var(--silo-danger)] cursor-pointer"
+                    aria-label="Dust details"
+                    tabIndex={0}
+                  >
+                    i
+                  </span>
+                  <span
+                    role="tooltip"
+                    className={`pointer-events-none absolute left-1/2 top-full z-20 mt-1 w-64 max-w-[80vw] -translate-x-1/2 rounded-md border border-[var(--silo-border)] bg-[var(--silo-surface)] px-2 py-1 text-xs font-medium leading-snug text-[var(--silo-text)] shadow-sm opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100 ${
+                      dustHelpText ? '' : 'hidden'
+                    }`}
+                  >
+                    {dustHelpText}
+                  </span>
+                </span>
+              </span>
+            </p>
+          ) : positionLabel ? (
             <p className="text-xs shrink-0 min-w-0" title="Vault position (underlying)">
-              <span className="silo-text-soft">balance </span>
+              <span className="silo-text-soft">assets </span>
               <span className="font-mono tabular-nums silo-text-main">{positionLabel}</span>
             </p>
           ) : null}

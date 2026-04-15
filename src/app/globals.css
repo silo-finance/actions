@@ -317,6 +317,12 @@ body {
   color: color-mix(in srgb, var(--silo-danger) 70%, var(--silo-text));
 }
 
+.silo-alert-warning {
+  background: color-mix(in srgb, var(--silo-warning) 14%, var(--silo-surface));
+  border-color: color-mix(in srgb, var(--silo-warning) 50%, var(--silo-border));
+  color: color-mix(in srgb, var(--silo-warning) 55%, var(--silo-text));
+}
+
 /* Primary action button (e.g. Vault Check) — matches Market Crafter Button primary */
 .silo-btn-primary {
   font-weight: 600;
