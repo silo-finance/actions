@@ -9,6 +9,7 @@
 ### Fixed
 - When the vault `owner` (or `curator`) is a Safe, treat a connected account equal to that Safe as multisig proposal mode instead of direct transactions (WalletConnect / smart-wallet edge case)
 
+- wallet connect
 ## [0.8.1] - 2026-04-15
 
 ### Fixed
