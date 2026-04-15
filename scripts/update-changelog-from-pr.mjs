@@ -4,7 +4,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 const CHANGELOG_PATH = "CHANGELOG.md";
 const PACKAGE_JSON_PATH = "package.json";
 const BRANCH_PATTERN = /^(release|hotfix)\/(\d+\.\d+\.\d+)$/;
-const IGNORED_COMMIT_PATTERNS = [/^Merge pull request #\d+\b/i, /^Merge (branch|tag)\b/i];
+const IGNORED_COMMIT_PATTERNS = [
+  /^Merge pull request #\d+\b/i,
+  /^Merge (branch|tag)\b/i,
+  /\bv?\d+\.\d+\.\d+\b/i,
+];
 
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
