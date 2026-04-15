@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
-import { formatUnits, getAddress } from 'ethers'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Contract, formatUnits, getAddress } from 'ethers'
+import erc20Artifact from '@/abis/ERC20.json'
 import CopyButton from '@/components/CopyButton'
 import ActionPermissionHint from '@/components/ActionPermissionHint'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
@@ -19,14 +20,29 @@ import {
   executeReallocateRemoveWithdrawQueue,
   newSupplyQueueHasPositiveCaps,
   supplyQueueAfterRemovingMarket,
+  vaultCalldatasToTargetedCalls,
   vaultMarketSupplyHeadroom,
   type MarketAllocationTuple,
 } from '@/utils/reallocateRemoveWithdrawMarket'
+import {
+  classifyAllocatorVaultAction,
+  classifyOwnerOrCuratorVaultAction,
+  type VaultActionAuthority,
+} from '@/utils/vaultActionAuthority'
+import { getExplorerAddressUrl } from '@/utils/networks'
+import { loadAbi } from '@/utils/loadAbi'
+import {
+  buildDustMitigationBatch,
+  DUST_TOP_UP_WEI,
+  DUST_HELP_TOOLTIP,
+  isWithdrawMarketDustPosition,
+} from '@/utils/withdrawMarketDust'
 import { ONLY_FOR_OWNER_OR_CURATOR, ONLY_FOR_WITHDRAW_REMOVAL } from '@/utils/vaultActionRoleCopy'
 import { formatSetSupplyQueueArgsCopy } from '@/utils/formatVaultActionCopyArgs'
 import { formatVaultAmountWholeTokens, type VaultUnderlyingMeta } from '@/utils/vaultReader'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import type { WithdrawMarketOnchainState } from '@/utils/withdrawMarketStates'
+import type { TargetedCall } from '@/utils/vaultMulticall'
 
 type Props = {
   chainId: number
@@ -45,6 +61,7 @@ type Props = {
 }
 
 const Z = BigInt(0)
+const erc20Abi = loadAbi(erc20Artifact)
 
 function addrKey(a: string): string {
   try {
@@ -52,6 +69,31 @@ function addrKey(a: string): string {
   } catch {
     return a.toLowerCase()
   }
+}
+
+function shortAddr(addr: string): string {
+  return addr.length > 10 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr
+}
+
+/** EOA or Safe that will `approve` / pay `deposit` for dust mitigation (same as allowance owner). */
+function dustUnderlyingExecutorAddress(params: {
+  removeIndex: number | null
+  withdrawMarketStates: WithdrawMarketOnchainState[]
+  permLoading: boolean
+  allocatorAuth: VaultActionAuthority | null
+  ownerCuratorAuth: VaultActionAuthority | null
+  account: string | null
+}): string | null {
+  const { removeIndex, withdrawMarketStates, permLoading, allocatorAuth, ownerCuratorAuth, account } = params
+  if (removeIndex == null || !account) return null
+  const st = withdrawMarketStates[removeIndex]
+  if (!st || !isWithdrawMarketDustPosition(st)) return null
+  const capAuth = st.cap > Z ? ownerCuratorAuth : allocatorAuth
+  if (permLoading || !capAuth || capAuth.mode === 'denied') return null
+  if (capAuth.mode === 'safe_propose' && capAuth.executingSafeAddress != null) {
+    return getAddress(capAuth.executingSafeAddress)
+  }
+  return getAddress(account)
 }
 
 /**
@@ -76,6 +118,29 @@ function formatSubmitCapArgsCopy(market: string): string {
 
 function formatUpdateWithdrawQueueArgsCopy(indexes: bigint[]): string {
   return `[${indexes.map((i) => i.toString()).join(', ')}]`
+}
+
+function DustPositionBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 font-semibold text-[var(--silo-danger)]">
+      <span className="font-mono uppercase tracking-wide">DUST</span>
+      <span className="group relative inline-flex items-center">
+        <span
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--silo-danger)_45%,var(--silo-border))] bg-[color-mix(in_srgb,var(--silo-danger)_10%,transparent)] text-[10px] font-bold leading-none text-[var(--silo-danger)] cursor-pointer"
+          aria-label="Dust details"
+          tabIndex={0}
+        >
+          i
+        </span>
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 w-64 max-w-[80vw] -translate-x-1/2 rounded-md border border-[var(--silo-border)] bg-[var(--silo-surface)] px-2 py-1 text-xs font-medium leading-snug text-[var(--silo-text)] shadow-sm opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100"
+        >
+          {DUST_HELP_TOOLTIP}
+        </span>
+      </span>
+    </span>
+  )
 }
 
 export default function WithdrawQueueRemoveWizard({
@@ -103,7 +168,13 @@ export default function WithdrawQueueRemoveWizard({
   const [removeIndex, setRemoveIndex] = useState<number | null>(null)
   /** Destination markets in the order funds are routed (reallocate supply order). */
   const [destinations, setDestinations] = useState<string[]>([])
-  const [alsoRemoveFromSupplyQueue, setAlsoRemoveFromSupplyQueue] = useState(false)
+  /** When an Idle Vault exists in the withdraw queue (other than the removed row), route the full move there. */
+  const [useIdleVaultForReallocate, setUseIdleVaultForReallocate] = useState(true)
+  const [alsoRemoveFromSupplyQueue, setAlsoRemoveFromSupplyQueue] = useState(true)
+  /** `underlying.allowance(executor, market)` for dust preview; null when not dust or loading. */
+  const [dustPreviewAllowance, setDustPreviewAllowance] = useState<bigint | null>(null)
+  /** `underlying.balanceOf(executor)` for dust deposit funding check. */
+  const [dustExecutorBalance, setDustExecutorBalance] = useState<bigint | null>(null)
 
   const supplyQueueAddresses = useMemo(
     () =>
@@ -129,7 +200,84 @@ export default function WithdrawQueueRemoveWizard({
   }, [withdrawMarketStates])
 
   const removedState = removeIndex != null ? withdrawMarketStates[removeIndex] : null
-  const amountToMove = removedState?.supplyAssets ?? Z
+  const removedVaultAssets = removedState?.supplyAssets ?? Z
+  const removedHasDustOnly =
+    removedState != null && removedState.supplyShares > Z && removedVaultAssets === Z
+  const routingAmount =
+    removedState == null
+      ? Z
+      : removedState.supplyShares > Z && removedVaultAssets === Z
+        ? DUST_TOP_UP_WEI
+        : removedVaultAssets
+
+  /** Another row in the withdraw queue that is our Idle Vault (local resolution from Check). */
+  const idleDestinationInfo = useMemo(() => {
+    if (removeIndex == null) return null
+    for (let i = 0; i < withdrawMarkets.length; i++) {
+      if (i === removeIndex) continue
+      const m = withdrawMarkets[i]!
+      if (m.kind === 'IdleVault') {
+        return { index: i, address: m.address, label: m.label }
+      }
+    }
+    return null
+  }, [withdrawMarkets, removeIndex])
+
+  const idleDestinationAddressNorm = useMemo(() => {
+    if (!idleDestinationInfo) return null
+    try {
+      return getAddress(idleDestinationInfo.address)
+    } catch {
+      return null
+    }
+  }, [idleDestinationInfo])
+
+  const removingIdleVault =
+    removeIndex != null && withdrawMarkets[removeIndex]?.kind === 'IdleVault'
+
+  const applyRemoveIndex = useCallback(
+    (i: number) => {
+      setRemoveIndex(i)
+      if (withdrawMarkets[i]!.kind === 'IdleVault') {
+        setUseIdleVaultForReallocate(false)
+        setDestinations([])
+        return
+      }
+      let hasOtherIdle = false
+      for (let j = 0; j < withdrawMarkets.length; j++) {
+        if (j === i) continue
+        if (withdrawMarkets[j]!.kind === 'IdleVault') {
+          hasOtherIdle = true
+          break
+        }
+      }
+      if (hasOtherIdle) {
+        setUseIdleVaultForReallocate(true)
+        setDestinations([])
+      } else {
+        setUseIdleVaultForReallocate(false)
+      }
+    },
+    [withdrawMarkets]
+  )
+
+  const effectiveDestinationMarkets = useMemo(() => {
+    if (routingAmount <= Z) return [] as string[]
+    if (
+      !removingIdleVault &&
+      idleDestinationAddressNorm != null &&
+      useIdleVaultForReallocate
+    ) {
+      return [idleDestinationAddressNorm]
+    }
+    return destinations
+  }, [
+    routingAmount,
+    removingIdleVault,
+    idleDestinationAddressNorm,
+    useIdleVaultForReallocate,
+    destinations,
+  ])
 
   const supplyMap = useMemo(() => {
     const m = new Map<string, bigint>()
@@ -138,6 +286,15 @@ export default function WithdrawQueueRemoveWizard({
     }
     return m
   }, [withdrawMarketStates])
+
+  /** Synthetic source assets for dust so off-chain `reallocate` packing matches on-chain post top-up. */
+  const supplyMapForAllocations = useMemo(() => {
+    const m = new Map(supplyMap)
+    if (removeIndex != null && removedHasDustOnly && removedState) {
+      m.set(addrKey(removedState.address), DUST_TOP_UP_WEI)
+    }
+    return m
+  }, [supplyMap, removeIndex, removedHasDustOnly, removedState])
 
   const capMap = useMemo(() => {
     const m = new Map<string, bigint>()
@@ -162,12 +319,12 @@ export default function WithdrawQueueRemoveWizard({
     newSupplyQueueHasPositiveCaps(projectedSupplyQueueAfterRemoval, capMap)
 
   const headroomOk =
-    amountToMove === Z ||
-    (destinations.length > 0 &&
+    routingAmount === Z ||
+    (effectiveDestinationMarkets.length > 0 &&
       destinationsHaveEnoughHeadroom({
-        amountToMove,
-        destinationMarkets: destinations,
-        supplyAssetsByMarket: supplyMap,
+        amountToMove: routingAmount,
+        destinationMarkets: effectiveDestinationMarkets,
+        supplyAssetsByMarket: supplyMapForAllocations,
         capByMarket: capMap,
       }))
 
@@ -175,12 +332,12 @@ export default function WithdrawQueueRemoveWizard({
     removedState != null &&
     removedState.pendingCapValidAt === Z &&
     removedState.removableAt === Z &&
-    (amountToMove === Z || removedState.enabled)
+    (removedVaultAssets === Z || removedState.enabled)
 
   const destinationsValid =
-    amountToMove === Z ||
-    (destinations.length > 0 &&
-      destinations.every((d) => {
+    routingAmount === Z ||
+    (effectiveDestinationMarkets.length > 0 &&
+      effectiveDestinationMarkets.every((d) => {
         const st = stateByAddress.get(addrKey(d))
         if (st == null || !st.enabled || st.cap <= Z) return false
         return vaultMarketSupplyHeadroom(st.supplyAssets, st.cap) > Z
@@ -211,7 +368,74 @@ export default function WithdrawQueueRemoveWizard({
     supplyQueueRemovalCapsOk &&
     !execAuthorityLoading &&
     effectiveAuth != null &&
-    effectiveAuth.mode !== 'denied'
+    effectiveAuth.mode !== 'denied' &&
+    (!removedHasDustOnly || underlyingMeta != null)
+
+  const dustExecutorAddress = useMemo(
+    () =>
+      dustUnderlyingExecutorAddress({
+        removeIndex,
+        withdrawMarketStates,
+        permLoading: perm.loading,
+        allocatorAuth: perm.allocatorAuth,
+        ownerCuratorAuth: perm.ownerCuratorAuth,
+        account,
+      }),
+    [
+      removeIndex,
+      withdrawMarketStates,
+      perm.loading,
+      perm.allocatorAuth,
+      perm.ownerCuratorAuth,
+      account,
+    ]
+  )
+
+  const dustFundingWarning =
+    removedHasDustOnly &&
+    underlyingMeta != null &&
+    dustExecutorAddress != null &&
+    dustExecutorBalance != null &&
+    dustExecutorBalance < DUST_TOP_UP_WEI
+
+  useEffect(() => {
+    if (!provider || !underlyingMeta || removeIndex == null || !statesAligned || dustExecutorAddress == null) {
+      setDustPreviewAllowance(null)
+      setDustExecutorBalance(null)
+      return
+    }
+    const st = withdrawMarketStates[removeIndex]
+    if (!st || !isWithdrawMarketDustPosition(st)) {
+      setDustPreviewAllowance(null)
+      setDustExecutorBalance(null)
+      return
+    }
+    let cancelled = false
+    const token = new Contract(underlyingMeta.address, erc20Abi, provider)
+    void Promise.all([token.allowance(dustExecutorAddress, st.address), token.balanceOf(dustExecutorAddress)])
+      .then(([allow, bal]: [unknown, unknown]) => {
+        if (!cancelled) {
+          setDustPreviewAllowance(BigInt(String(allow)))
+          setDustExecutorBalance(BigInt(String(bal)))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDustPreviewAllowance(null)
+          setDustExecutorBalance(null)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [
+    provider,
+    underlyingMeta,
+    removeIndex,
+    statesAligned,
+    withdrawMarketStates,
+    dustExecutorAddress,
+  ])
 
   const formatBal = useCallback(
     (assets: bigint): string => {
@@ -254,22 +478,27 @@ export default function WithdrawQueueRemoveWizard({
     const indexes = buildWithdrawQueueIndexesAfterRemoval(removeIndex, withdrawMarkets.length)
     const removed = withdrawMarketStates[removeIndex]
     const needSubmitCap = removed.cap > Z
+    const dust = isWithdrawMarketDustPosition(removed)
+    const routeAmt =
+      removed.supplyShares > Z && removed.supplyAssets === Z ? DUST_TOP_UP_WEI : removed.supplyAssets
     const inSupply = supplyQueueAddresses.some((a) => addrKey(a) === addrKey(removed.address))
     const newSupplyQueue =
       alsoRemoveFromSupplyQueue && inSupply
         ? supplyQueueAfterRemovingMarket(supplyQueueAddresses, removed.address)
         : undefined
+    const fullyEmpty = removed.supplyShares === Z && removed.supplyAssets === Z
+
     let vaultCallDatas: `0x${string}`[]
     try {
-      if (amountToMove === Z && !needSubmitCap && newSupplyQueue === undefined) {
+      if (fullyEmpty && !needSubmitCap && newSupplyQueue === undefined) {
         vaultCallDatas = [encodeUpdateWithdrawQueueOnly(indexes)]
       } else {
         const allocations =
-          amountToMove > Z
+          routeAmt > Z
             ? buildReallocateAllocations({
                 sourceMarket: removed.address,
-                destinationMarkets: destinations,
-                supplyAssetsByMarket: supplyMap,
+                destinationMarkets: effectiveDestinationMarkets,
+                supplyAssetsByMarket: supplyMapForAllocations,
                 capByMarket: capMap,
               })
             : null
@@ -286,6 +515,44 @@ export default function WithdrawQueueRemoveWizard({
       return
     }
 
+    let dustPrefix: TargetedCall[] = []
+    if (dust) {
+      if (!underlyingMeta) {
+        setExecErr('Vault underlying asset is unknown; run Check again before dust mitigation.')
+        return
+      }
+      const overview = { owner: ownerAddress, curator: curatorAddress }
+      const auth = needSubmitCap
+        ? await classifyOwnerOrCuratorVaultAction(provider, account, overview, ownerKind, curatorKind)
+        : await classifyAllocatorVaultAction(
+            provider,
+            vaultAddress,
+            account,
+            overview,
+            ownerKind,
+            curatorKind
+          )
+      if (auth.mode === 'denied') {
+        setExecErr('Wallet cannot execute dust top-up for this batch.')
+        return
+      }
+      const approver =
+        auth.mode === 'safe_propose' && auth.executingSafeAddress != null
+          ? getAddress(auth.executingSafeAddress)
+          : getAddress(account)
+      const token = new Contract(underlyingMeta.address, erc20Abi, provider)
+      const cur = BigInt(String(await token.allowance(approver, removed.address)))
+      dustPrefix = buildDustMitigationBatch({
+        underlying: underlyingMeta.address,
+        market: removed.address,
+        vault: vaultAddress,
+        topUpAmount: DUST_TOP_UP_WEI,
+        currentAllowance: cur,
+      }).calls
+    }
+
+    const batchCalls = [...dustPrefix, ...vaultCalldatasToTargetedCalls(vaultAddress, vaultCallDatas)]
+
     setBusy(true)
     try {
       const signer = await provider.getSigner()
@@ -301,7 +568,7 @@ export default function WithdrawQueueRemoveWizard({
         curatorKind,
         connectedAccount: account,
         requiresOwnerOrCuratorCapabilities: needSubmitCap,
-        vaultCallDatas,
+        batchCalls,
       })
       setTxSuccess({ url: transactionUrl, linkLabel: successLinkLabel, outcome })
     } catch (e) {
@@ -322,16 +589,22 @@ export default function WithdrawQueueRemoveWizard({
     withdrawMarketStates,
     statesAligned,
     withdrawMarkets.length,
-    amountToMove,
-    destinations,
-    supplyMap,
+    effectiveDestinationMarkets,
+    supplyMapForAllocations,
     capMap,
     alsoRemoveFromSupplyQueue,
     supplyQueueAddresses,
+    underlyingMeta,
   ])
 
   const readyToRoute = removeIndex != null && headroomOk && removalPreconditionsOk && destinationsValid
-  const hideUnselectedMoveButtons = readyToRoute && amountToMove > Z
+  const showManualDestinationPicker =
+    routingAmount > Z &&
+    (removingIdleVault ||
+      idleDestinationInfo == null ||
+      idleDestinationAddressNorm == null ||
+      !useIdleVaultForReallocate)
+  const hideUnselectedMoveButtons = readyToRoute && routingAmount > Z && showManualDestinationPicker
 
   const vaultActionPreview = useMemo(() => {
     if (removeIndex == null || !statesAligned) return null
@@ -348,14 +621,30 @@ export default function WithdrawQueueRemoveWizard({
 
     type Step = { id: string; method: string; argLabel: string; copyValue: string }
     const steps: Step[] = []
-    if (amountToMove > Z) {
+    if (
+      underlyingMeta != null &&
+      isWithdrawMarketDustPosition(removed) &&
+      dustPreviewAllowance != null
+    ) {
+      const { copySteps } = buildDustMitigationBatch({
+        underlying: underlyingMeta.address,
+        market: removed.address,
+        vault: vaultAddress,
+        topUpAmount: DUST_TOP_UP_WEI,
+        currentAllowance: dustPreviewAllowance,
+      })
+      for (const s of copySteps) {
+        steps.push({ id: s.id, method: s.method, argLabel: s.argLabel, copyValue: s.copyValue })
+      }
+    }
+    if (routingAmount > Z) {
       let allocs: MarketAllocationTuple[]
-      if (destinations.length > 0) {
+      if (effectiveDestinationMarkets.length > 0) {
         try {
           allocs = buildReallocateAllocations({
             sourceMarket: removed.address,
-            destinationMarkets: destinations,
-            supplyAssetsByMarket: supplyMap,
+            destinationMarkets: effectiveDestinationMarkets,
+            supplyAssetsByMarket: supplyMapForAllocations,
             capByMarket: capMap,
           })
         } catch {
@@ -400,11 +689,14 @@ export default function WithdrawQueueRemoveWizard({
     withdrawMarketStates,
     supplyQueueAddresses,
     alsoRemoveFromSupplyQueue,
-    amountToMove,
-    destinations,
-    supplyMap,
+    routingAmount,
+    effectiveDestinationMarkets,
+    supplyMapForAllocations,
     capMap,
     withdrawMarkets.length,
+    underlyingMeta,
+    vaultAddress,
+    dustPreviewAllowance,
   ])
 
   if (withdrawMarkets.length === 0) {
@@ -456,7 +748,7 @@ export default function WithdrawQueueRemoveWizard({
                         type="radio"
                         name="withdraw-remove-market"
                         checked={removeIndex === i}
-                        onChange={() => setRemoveIndex(i)}
+                        onChange={() => applyRemoveIndex(i)}
                         className="sr-only"
                       />
                       <div className="min-w-0 flex-1">
@@ -467,9 +759,13 @@ export default function WithdrawQueueRemoveWizard({
                               #{m.siloConfigId.toString()}
                             </span>
                           ) : null}
-                          <span className="text-xs shrink-0">
-                            <span className="silo-text-soft">balance </span>
-                            <span className="font-mono tabular-nums silo-text-main">{formatBal(st.supplyAssets)}</span>
+                          <span className="text-xs shrink-0 inline-flex items-center gap-1">
+                            <span className="silo-text-soft">assets </span>
+                            {isWithdrawMarketDustPosition(st) ? (
+                              <DustPositionBadge />
+                            ) : (
+                              <span className="font-mono tabular-nums silo-text-main">{formatBal(st.supplyAssets)}</span>
+                            )}
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 mt-1 min-w-0">
@@ -499,11 +795,15 @@ export default function WithdrawQueueRemoveWizard({
                       </span>
                     ) : null}
                     {removedState ? (
-                      <span className="text-xs shrink-0">
-                        <span className="silo-text-soft">balance </span>
-                        <span className="font-mono tabular-nums silo-text-main">
-                          {formatBal(removedState.supplyAssets)}
-                        </span>
+                      <span className="text-xs shrink-0 inline-flex items-center gap-1">
+                        <span className="silo-text-soft">assets </span>
+                        {isWithdrawMarketDustPosition(removedState) ? (
+                          <DustPositionBadge />
+                        ) : (
+                          <span className="font-mono tabular-nums silo-text-main">
+                            {formatBal(removedState.supplyAssets)}
+                          </span>
+                        )}
                       </span>
                     ) : null}
                   </div>
@@ -541,13 +841,54 @@ export default function WithdrawQueueRemoveWizard({
                 onClick={() => {
                   setRemoveIndex(null)
                   setDestinations([])
-                  setAlsoRemoveFromSupplyQueue(false)
+                  setUseIdleVaultForReallocate(true)
+                  setAlsoRemoveFromSupplyQueue(true)
                 }}
               >
                 Choose another market
               </button>
 
-              {amountToMove > Z ? (
+              {removeIndex != null &&
+              statesAligned &&
+              removedState &&
+              removedState.supplyShares === Z &&
+              removedState.supplyAssets === Z ? (
+                <p className="text-sm silo-text-soft max-w-prose">
+                  There are no vault funds on this market to move, so reallocation is not needed. You can still remove it
+                  from the withdraw queue (and zero the cap if applicable) with <strong>Execute</strong> below.
+                </p>
+              ) : null}
+
+              {removedHasDustOnly && effectiveAuth?.mode === 'direct' ? (
+                <p className="text-xs silo-text-soft max-w-prose">
+                  Dust mitigation sends ERC-20 / ERC-4626 transactions from your wallet first; you may need several
+                  confirmations, then the vault transaction(s).
+                </p>
+              ) : null}
+
+              {routingAmount > Z && idleDestinationInfo != null && idleDestinationAddressNorm != null ? (
+                <label
+                  className={`flex items-start gap-3 select-none max-w-prose ${
+                    removingIdleVault ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    disabled={removingIdleVault}
+                    checked={removingIdleVault ? false : useIdleVaultForReallocate}
+                    onChange={(e) => {
+                      if (removingIdleVault) return
+                      const on = e.target.checked
+                      setUseIdleVaultForReallocate(on)
+                      if (on) setDestinations([])
+                    }}
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--silo-border)] silo-text-main disabled:cursor-not-allowed"
+                  />
+                  <span className="text-sm silo-text-main">Move all funds to Idle Vault.</span>
+                </label>
+              ) : null}
+
+              {showManualDestinationPicker ? (
                 <div className="space-y-2">
                   <p className="text-sm font-medium silo-text-main">Choose a market to move funds to</p>
                   <ul className="space-y-2">
@@ -594,9 +935,15 @@ export default function WithdrawQueueRemoveWizard({
                                   #{m.siloConfigId.toString()}
                                 </span>
                               ) : null}
-                              <span className="text-xs shrink-0">
-                                <span className="silo-text-soft">balance </span>
-                                <span className="font-mono tabular-nums silo-text-main">{formatBal(st.supplyAssets)}</span>
+                              <span className="text-xs shrink-0 inline-flex items-center gap-1">
+                                <span className="silo-text-soft">assets </span>
+                                {isWithdrawMarketDustPosition(st) ? (
+                                  <DustPositionBadge />
+                                ) : (
+                                  <span className="font-mono tabular-nums silo-text-main">
+                                    {formatBal(st.supplyAssets)}
+                                  </span>
+                                )}
                               </span>
                               <span className="text-xs shrink-0">
                                 <span className="silo-text-soft">(cap </span>
@@ -634,7 +981,7 @@ export default function WithdrawQueueRemoveWizard({
                 </p>
               ) : null}
 
-              {!headroomOk && amountToMove > Z && destinations.length > 0 ? (
+              {!headroomOk && routingAmount > Z && effectiveDestinationMarkets.length > 0 ? (
                 <p className="text-sm silo-alert silo-alert-error">
                   No single selected market has enough cap headroom for the full amount. Include a market that can absorb it
                   all (or remove liquidity from the source first).
@@ -643,7 +990,7 @@ export default function WithdrawQueueRemoveWizard({
 
               {vaultActionPreview ? (
                 <div className="rounded-xl border border-[var(--silo-border)] bg-[var(--silo-surface)] px-3 py-3 space-y-2">
-                  <p className="text-sm font-medium silo-text-main">Planned vault calls</p>
+                  <p className="text-sm font-medium silo-text-main">Planned calls</p>
                   <ol className="list-decimal list-outside space-y-4 text-sm silo-text-main m-0 pl-5 sm:pl-6">
                     {vaultActionPreview.map((s) => (
                       <li key={s.id} className="min-w-0 pl-1 space-y-1.5">
@@ -661,6 +1008,38 @@ export default function WithdrawQueueRemoveWizard({
                       </li>
                     ))}
                   </ol>
+                </div>
+              ) : null}
+
+              {dustFundingWarning && underlyingMeta && dustExecutorAddress ? (
+                <div className="text-sm silo-alert silo-alert-warning">
+                  <p className="m-0 font-semibold silo-text-main">Warning</p>
+                  <p className="mt-2 mb-0 leading-relaxed silo-text-main">
+                    You can still propose or send this batch, but the <strong>deposit</strong> step needs the executor to
+                    hold at least <strong>{DUST_TOP_UP_WEI.toString()} wei</strong>{' '}
+                    <a
+                      href={getExplorerAddressUrl(chainId, getAddress(underlyingMeta.address))}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold underline decoration-1 underline-offset-2 hover:opacity-90"
+                    >
+                      {underlyingMeta.symbol.trim() || 'underlying'}
+                    </a>{' '}
+                    on{' '}
+                    <span className="inline-flex flex-wrap items-center gap-1 align-middle">
+                      <a
+                        href={getExplorerAddressUrl(chainId, dustExecutorAddress)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-xs font-semibold underline decoration-1 underline-offset-2 hover:opacity-90 tabular-nums"
+                      >
+                        {shortAddr(dustExecutorAddress)}
+                      </a>
+                      <CopyButton value={dustExecutorAddress} />
+                    </span>
+                    . Send that <strong>{DUST_TOP_UP_WEI.toString()} wei</strong> of this token to this address before
+                    executing so the dust top-up can succeed.
+                  </p>
                 </div>
               ) : null}
 

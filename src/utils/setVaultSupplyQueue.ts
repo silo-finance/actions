@@ -7,7 +7,10 @@ import { getExplorerTxUrl } from '@/utils/networks'
 import { getSafeWalletQueueUrl } from '@/utils/safeAppLinks'
 import { loadAbi } from '@/utils/loadAbi'
 import type { OwnerKind } from '@/utils/ownerKind'
-import { proposeReallocateRemoveWithdrawQueueViaSafe } from '@/utils/reallocateRemoveWithdrawMarket'
+import {
+  proposeReallocateRemoveWithdrawQueueViaSafe,
+  vaultCalldatasToTargetedCalls,
+} from '@/utils/reallocateRemoveWithdrawMarket'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import { classifyAllocatorVaultAction } from '@/utils/vaultActionAuthority'
 import { executeVaultCallsFromSigner } from '@/utils/vaultMulticall'
@@ -113,7 +116,7 @@ export async function setSupplyQueueForOwner(params: SetSupplyQueueParams): Prom
       safeAddress,
       vaultAddress,
       proposerAccount: connectedAccount,
-      vaultCallDatas: callDatas,
+      batchCalls: vaultCalldatasToTargetedCalls(vaultAddress, callDatas),
       origin: acceptOrdered.length > 0 ? SAFE_BATCH_ORIGIN : 'Silo Actions: set supply queue',
     })
     const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)

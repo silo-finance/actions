@@ -1,0 +1,12 @@
+{
+  "name": "Silo Actions",
+  "description": "Admin actions for silos and vaults.",
+  "iconPath": "safe-app-icon.svg",
+  "icons": [
+    {
+      "src": "safe-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

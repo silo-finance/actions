@@ -27,6 +27,7 @@ const patternCirclesUrl = `${basePath}/pattern-circles.svg`
 export const metadata: Metadata = {
   title: 'Control Panel',
   description: 'Execute actions across markets and vaults',
+  manifest: `${basePath || ''}/manifest.json`
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

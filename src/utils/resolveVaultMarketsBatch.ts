@@ -42,8 +42,8 @@ async function fetchVaultPositionAssets(
     const abi = kind === 'IdleVault' ? idleVaultAbi : siloAbi
     const m = new Contract(marketNorm, abi, provider)
     const shares = await m.balanceOf(vaultNorm)
-    const convert = m.getFunction('convertToAssets(uint256)')
-    const assets = await convert.staticCall(shares)
+    const preview = m.getFunction('previewRedeem(uint256)')
+    const assets = await preview.staticCall(shares)
     return BigInt(assets.toString())
   } catch {
     return null

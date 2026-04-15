@@ -535,6 +535,7 @@ function VaultPageInner() {
               count={withdrawQueueSize}
               chainId={chainId}
               items={withdraw}
+              queueStates={withdrawMarketStates}
               loading={loading}
               emptyMessage={
                 loading ? '…' : hasLoaded ? 'Queue is empty' : 'Run Check to load the queue'

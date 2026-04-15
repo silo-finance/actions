@@ -6,11 +6,14 @@ const siloVaultAbi = loadAbi(siloVaultArtifact)
 
 const erc4626Read = [
   'function balanceOf(address account) view returns (uint256)',
-  'function convertToAssets(uint256 shares) view returns (uint256)',
+  'function previewRedeem(uint256 shares) view returns (uint256)',
 ] as const
 
 export type WithdrawMarketOnchainState = {
   address: string
+  /** Vault ERC-4626 shares on this market (`balanceOf(vault)`). */
+  supplyShares: bigint
+  /** `previewRedeem(supplyShares)` — withdraw-oriented principal in underlying; can be 0 while `supplyShares` &gt; 0 (dust). */
   supplyAssets: bigint
   cap: bigint
   enabled: boolean
@@ -41,7 +44,7 @@ export async function fetchVaultMarketStates(
         vault.config(addr),
         vault.pendingCap(addr),
       ])
-      const supplyAssets = BigInt(await m.convertToAssets(shares))
+      const supplyAssets = BigInt(String(await m.previewRedeem(shares)))
       const cap = BigInt(cfg.cap)
       const enabled = Boolean(cfg.enabled)
       const pendingCapValue = BigInt(pending.value)
@@ -49,6 +52,7 @@ export async function fetchVaultMarketStates(
       const removableAt = BigInt(cfg.removableAt)
       return {
         address: addr,
+        supplyShares: BigInt(String(shares)),
         supplyAssets,
         cap,
         enabled,
