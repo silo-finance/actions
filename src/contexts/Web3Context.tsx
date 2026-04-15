@@ -2,6 +2,10 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { BrowserProvider } from 'ethers'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain, useWalletClient, WagmiProvider } from 'wagmi'
+import { wagmiConfig } from '@/config/wagmi'
+import type { Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import { getWalletAddEthereumChainParameter } from '@/utils/networks'
 
 function switchFailedBecauseChainNotInWallet(err: unknown): boolean {
@@ -21,22 +25,16 @@ function switchFailedBecauseChainNotInWallet(err: unknown): boolean {
   )
 }
 
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>
-      on?: (event: string, handler: (...args: unknown[]) => void) => void
-      removeListener?: (event: string, handler: (...args: unknown[]) => void) => void
-    }
-  }
-}
+export type ConnectMethod = 'auto' | 'injected' | 'walletConnect'
 
 type Web3ContextValue = {
   account: string
   chainId: number | null
   provider: BrowserProvider | null
+  /** EIP-1193 provider for Safe SDK and `wallet_*` calls (injected or WalletConnect). */
+  eip1193Provider: Eip1193Provider | null
   isConnected: boolean
-  connect: () => Promise<void>
+  connect: (method?: ConnectMethod) => Promise<void>
   disconnect: () => void
   switchNetwork: (targetChainId: number) => Promise<void>
   refreshChainId: () => Promise<void>
@@ -44,135 +42,160 @@ type Web3ContextValue = {
 
 const Web3Context = createContext<Web3ContextValue | undefined>(undefined)
 
-export function Web3Provider({ children }: { children: React.ReactNode }) {
-  const [account, setAccount] = useState('')
-  const [chainId, setChainId] = useState<number | null>(null)
+let queryClientSingleton: QueryClient | undefined
+function getOrCreateQueryClient() {
+  if (typeof window === 'undefined') {
+    return new QueryClient({ defaultOptions: { queries: { staleTime: 60000 } } })
+  }
+  if (!queryClientSingleton) {
+    queryClientSingleton = new QueryClient({ defaultOptions: { queries: { staleTime: 60000 } } })
+  }
+  return queryClientSingleton
+}
+
+function Web3StateProvider({ children }: { children: React.ReactNode }) {
+  const { address, isConnected, chainId: accountChainId, connector } = useAccount()
+  const defaultChainId = useChainId()
+  const { data: walletClient } = useWalletClient()
+  const { connectAsync, connectors } = useConnect()
+  const { disconnectAsync } = useDisconnect()
+  const { switchChainAsync } = useSwitchChain()
+
+  const account = address ?? ''
+  const chainId = isConnected ? (accountChainId ?? defaultChainId) : null
+
   const [browserProvider, setBrowserProvider] = useState<BrowserProvider | null>(null)
-
-  const refreshChainId = useCallback(async () => {
-    if (!window.ethereum) return
-    try {
-      const hex = (await window.ethereum.request({ method: 'eth_chainId' })) as string
-      setChainId(parseInt(hex, 16))
-    } catch {
-      setChainId(null)
-    }
-  }, [])
-
-  /** Ethers v6 caches network on BrowserProvider; after wallet chain switch it must be recreated or RPC throws `network changed`. */
-  const recreateBrowserProvider = useCallback(() => {
-    if (typeof window === 'undefined' || !window.ethereum) {
-      setBrowserProvider(null)
-      return
-    }
-    setBrowserProvider(new BrowserProvider(window.ethereum))
-  }, [])
+  const [eip1193Provider, setEip1193Provider] = useState<Eip1193Provider | null>(null)
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.ethereum) return
-    const eth = window.ethereum
+    if (!walletClient?.account || !walletClient.chain) {
+      setBrowserProvider(null)
+      setEip1193Provider(null)
+      return
+    }
+    const transport = walletClient.transport as unknown as Eip1193Provider
+    const network = {
+      chainId: walletClient.chain.id,
+      name: walletClient.chain.name,
+      ensAddress: walletClient.chain.contracts?.ensRegistry?.address,
+    }
+    setBrowserProvider(new BrowserProvider(transport, network))
+    setEip1193Provider(transport)
+  }, [walletClient])
 
-    recreateBrowserProvider()
+  const refreshChainId = useCallback(async () => {
+    try {
+      const p = (await connector?.getProvider?.()) as Eip1193Provider | undefined
+      if (!p?.request) return
+      await p.request({ method: 'eth_chainId' })
+    } catch {
+      // ignore
+    }
+  }, [connector])
 
-    /** Restore session without a popup — MetaMask already granted this origin. */
+  const connect = useCallback(
+    async (method: ConnectMethod = 'auto') => {
+      const injectedC = connectors.find((c) => c.type === 'injected')
+      const wcC = connectors.find((c) => c.type === 'walletConnect')
+
+      const tryInjected = async () => {
+        if (!injectedC) throw new Error('no_injected')
+        await connectAsync({ connector: injectedC })
+      }
+      const tryWc = async () => {
+        if (!wcC) {
+          alert(
+            'WalletConnect is not configured. Set NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in your environment, or use a browser extension wallet.'
+          )
+          throw new Error('no_walletconnect')
+        }
+        await connectAsync({ connector: wcC })
+      }
+
+      try {
+        if (method === 'injected') {
+          await tryInjected()
+          return
+        }
+        if (method === 'walletConnect') {
+          await tryWc()
+          return
+        }
+        if (injectedC) {
+          try {
+            await tryInjected()
+            return
+          } catch {
+            /* try WC */
+          }
+        }
+        if (wcC) {
+          await tryWc()
+          return
+        }
+        alert('No wallet connector is available. Install a browser wallet or configure WalletConnect.')
+      } catch (e) {
+        console.error('connect', e)
+      }
+    },
+    [connectAsync, connectors]
+  )
+
+  const disconnect = useCallback(() => {
     void (async () => {
       try {
-        const accounts = (await eth.request({ method: 'eth_accounts' })) as string[]
-        if (accounts.length > 0) {
-          setAccount(accounts[0])
-          await refreshChainId()
-        }
+        await disconnectAsync()
       } catch {
         // ignore
       }
     })()
-
-    const onChainChanged = () => {
-      void refreshChainId()
-      recreateBrowserProvider()
-    }
-
-    const onAccountsChanged = (accs: unknown) => {
-      const accounts = accs as string[]
-      if (!Array.isArray(accounts) || accounts.length === 0) {
-        setAccount('')
-        setChainId(null)
-        return
-      }
-      setAccount(accounts[0])
-      void refreshChainId()
-      recreateBrowserProvider()
-    }
-
-    eth.on?.('chainChanged', onChainChanged)
-    eth.on?.('accountsChanged', onAccountsChanged)
-    return () => {
-      eth.removeListener?.('chainChanged', onChainChanged)
-      eth.removeListener?.('accountsChanged', onAccountsChanged)
-    }
-  }, [recreateBrowserProvider, refreshChainId])
-
-  const connect = useCallback(async () => {
-    if (!window.ethereum) {
-      alert('MetaMask is not installed. Please install MetaMask to continue.')
-      return
-    }
-    try {
-      const accounts = (await window.ethereum.request({ method: 'eth_requestAccounts' })) as string[]
-      if (accounts.length > 0) {
-        setAccount(accounts[0])
-        await refreshChainId()
-      }
-    } catch (e) {
-      console.error('connect', e)
-    }
-  }, [refreshChainId])
-
-  const disconnect = useCallback(() => {
-    setAccount('')
-    setChainId(null)
-  }, [])
+  }, [disconnectAsync])
 
   const switchNetwork = useCallback(
     async (targetChainId: number) => {
-      if (!window.ethereum) return
       const chainIdHex = `0x${targetChainId.toString(16)}`
-      try {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: chainIdHex }],
-        })
-        await refreshChainId()
-        recreateBrowserProvider()
-      } catch (error) {
-        const walletError = error as { code?: number; message?: string }
-        if (walletError.code === 4001) return
-        if (walletError.code === -32002) {
-          alert('Network switch request is already pending in wallet.')
+      if (switchChainAsync) {
+        try {
+          await switchChainAsync({ chainId: targetChainId })
           return
+        } catch (error) {
+          const walletError = error as { code?: number; message?: string }
+          if (walletError.code === 4001) return
+          if (walletError.code === -32002) {
+            alert('Network switch request is already pending in wallet.')
+            return
+          }
+          /* Fall through: try `wallet_switchEthereumChain` / `wallet_addEthereumChain` on the connector EIP-1193 provider. */
         }
+      }
 
-        const shouldTryAdd =
-          walletError.code === 4902 || switchFailedBecauseChainNotInWallet(error)
-
+      let eth: Eip1193Provider | null = null
+      try {
+        const p = (await connector?.getProvider?.()) as Eip1193Provider | undefined
+        if (p?.request) eth = p
+      } catch {
+        eth = null
+      }
+      if (!eth) {
+        alert('Could not switch network. Connect a wallet first.')
+        return
+      }
+      try {
+        await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: chainIdHex }] })
+      } catch (swErr) {
+        const we = swErr as { code?: number; message?: string }
+        if (we.code === 4001) return
+        const shouldTryAdd = we.code === 4902 || switchFailedBecauseChainNotInWallet(swErr)
         if (shouldTryAdd) {
           const addParams = getWalletAddEthereumChainParameter(targetChainId)
           if (addParams) {
             try {
-              await window.ethereum.request({
-                method: 'wallet_addEthereumChain',
-                params: [addParams],
-              })
+              await eth.request({ method: 'wallet_addEthereumChain', params: [addParams] })
               try {
-                await window.ethereum.request({
-                  method: 'wallet_switchEthereumChain',
-                  params: [{ chainId: chainIdHex }],
-                })
+                await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: chainIdHex }] })
               } catch {
                 /* Some wallets already activate the chain after add. */
               }
-              await refreshChainId()
-              recreateBrowserProvider()
               return
             } catch (addErr) {
               const ae = addErr as { code?: number; message?: string }
@@ -184,11 +207,10 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
             }
           }
         }
-
-        alert(`Failed to switch network.${walletError.message ? ` ${walletError.message}` : ''}`)
+        alert(`Failed to switch network.${we.message ? ` ${we.message}` : ''}`)
       }
     },
-    [refreshChainId, recreateBrowserProvider]
+    [connector, switchChainAsync]
   )
 
   const value = useMemo<Web3ContextValue>(
@@ -196,16 +218,38 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
       account,
       chainId,
       provider: account && browserProvider ? browserProvider : null,
-      isConnected: Boolean(account),
+      eip1193Provider: account && eip1193Provider ? eip1193Provider : null,
+      isConnected: Boolean(isConnected && account),
       connect,
       disconnect,
       switchNetwork,
       refreshChainId,
     }),
-    [account, chainId, browserProvider, connect, disconnect, switchNetwork, refreshChainId]
+    [
+      account,
+      browserProvider,
+      chainId,
+      connect,
+      disconnect,
+      eip1193Provider,
+      isConnected,
+      refreshChainId,
+      switchNetwork,
+    ]
   )
 
   return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>
+}
+
+export function Web3Provider({ children }: { children: React.ReactNode }) {
+  const queryClient = useMemo(() => getOrCreateQueryClient(), [])
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <Web3StateProvider>{children}</Web3StateProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
 }
 
 export function useWeb3() {

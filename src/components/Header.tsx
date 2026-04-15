@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -14,6 +15,17 @@ export default function Header() {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const { account, chainId, isConnected, connect, disconnect, switchNetwork } = useWeb3()
+  const connectMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (!connectMenuRef.current?.contains(e.target as Node)) {
+        connectMenuRef.current?.querySelector('details')?.removeAttribute('open')
+      }
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    return () => document.removeEventListener('mousedown', onDocMouseDown)
+  }, [])
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
   const unionLogoSrc = `${basePath}/Union.svg`
 
@@ -129,13 +141,42 @@ export default function Header() {
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => void connect()}
-                className="header-connect-button font-semibold py-2 px-4 rounded-full transition-colors duration-200 text-xs"
-              >
-                Connect MetaMask
-              </button>
+              <div ref={connectMenuRef} className="relative flex flex-col items-end gap-1">
+                <details className="group relative">
+                  <summary className="header-connect-button list-none cursor-pointer font-semibold py-2 px-4 rounded-full transition-colors duration-200 text-xs [&::-webkit-details-marker]:hidden">
+                    Connect wallet
+                  </summary>
+                  <div className="absolute right-0 z-[60] mt-1 min-w-[11rem] rounded-xl border border-[var(--header-toggle-border)] bg-[var(--silo-surface-1)] py-1 shadow-lg">
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-xs font-semibold hover:bg-[var(--silo-surface-2)]"
+                      onClick={() => {
+                        void connect('injected')
+                        connectMenuRef.current?.querySelector('details')?.removeAttribute('open')
+                      }}
+                    >
+                      Browser extension
+                    </button>
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-xs font-semibold hover:bg-[var(--silo-surface-2)]"
+                      onClick={() => {
+                        void connect('walletConnect')
+                        connectMenuRef.current?.querySelector('details')?.removeAttribute('open')
+                      }}
+                    >
+                      WalletConnect
+                    </button>
+                  </div>
+                </details>
+                <button
+                  type="button"
+                  onClick={() => void connect('auto')}
+                  className="header-link text-[10px] font-semibold uppercase tracking-wide"
+                >
+                  Auto-detect
+                </button>
+              </div>
             )}
           </div>
         </div>
