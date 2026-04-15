@@ -135,19 +135,24 @@ body {
 .silo-top-card {
   border-width: 2px;
   border-color: rgba(255, 255, 255, 0.88);
-  background-image:
-    var(--pattern-circles-static-url),
-    linear-gradient(180deg, color-mix(in srgb, var(--silo-deep-purple) 38%, transparent) 0%, color-mix(in srgb, var(--silo-soft-purple) 22%, transparent) 32%, rgba(255, 255, 255, 0) 58%);
-  background-repeat: no-repeat, no-repeat;
-  background-size: 210px 198px, cover;
-  background-position: -38px -76px, top left;
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--silo-deep-purple) 24%, transparent) 0%,
+    color-mix(in srgb, var(--silo-soft-purple) 12%, transparent) 34%,
+    rgba(255, 255, 255, 0) 72%
+  );
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .theme-dark .silo-top-card {
   border-color: color-mix(in srgb, #ffffff 30%, var(--silo-border));
-  background-image:
-    var(--pattern-circles-static-url),
-    linear-gradient(180deg, rgba(132, 148, 255, 0.34) 0%, rgba(132, 148, 255, 0.16) 32%, rgba(26, 32, 45, 0) 58%);
+  background-image: linear-gradient(
+    180deg,
+    rgba(62, 76, 103, 0.36) 0%,
+    rgba(52, 64, 87, 0.24) 32%,
+    rgba(33, 41, 54, 0) 74%
+  );
 }
 
 .silo-panel-soft {

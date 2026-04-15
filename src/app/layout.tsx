@@ -22,7 +22,6 @@ const dmMono = DM_Mono({
 })
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
-const patternCirclesUrl = `${basePath}/pattern-circles.svg`
 
 export const metadata: Metadata = {
   title: 'Control Panel',
@@ -34,7 +33,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${dmSans.variable} ${dmMono.variable}`} suppressHydrationWarning>
       <head>
-        <style>{`:root{--pattern-circles-url:url(${patternCirclesUrl});--pattern-circles-static-url:url(${patternCirclesUrl})}`}</style>
         <script
           dangerouslySetInnerHTML={{
             __html: `
