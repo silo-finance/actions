@@ -103,6 +103,8 @@ export default function WithdrawQueueRemoveWizard({
   const [removeIndex, setRemoveIndex] = useState<number | null>(null)
   /** Destination markets in the order funds are routed (reallocate supply order). */
   const [destinations, setDestinations] = useState<string[]>([])
+  /** When an Idle Vault exists in the withdraw queue (other than the removed row), route the full move there. */
+  const [useIdleVaultForReallocate, setUseIdleVaultForReallocate] = useState(true)
   const [alsoRemoveFromSupplyQueue, setAlsoRemoveFromSupplyQueue] = useState(false)
 
   const supplyQueueAddresses = useMemo(
@@ -130,6 +132,75 @@ export default function WithdrawQueueRemoveWizard({
 
   const removedState = removeIndex != null ? withdrawMarketStates[removeIndex] : null
   const amountToMove = removedState?.supplyAssets ?? Z
+
+  /** Another row in the withdraw queue that is our Idle Vault (local resolution from Check). */
+  const idleDestinationInfo = useMemo(() => {
+    if (removeIndex == null) return null
+    for (let i = 0; i < withdrawMarkets.length; i++) {
+      if (i === removeIndex) continue
+      const m = withdrawMarkets[i]!
+      if (m.kind === 'IdleVault') {
+        return { index: i, address: m.address, label: m.label }
+      }
+    }
+    return null
+  }, [withdrawMarkets, removeIndex])
+
+  const idleDestinationAddressNorm = useMemo(() => {
+    if (!idleDestinationInfo) return null
+    try {
+      return getAddress(idleDestinationInfo.address)
+    } catch {
+      return null
+    }
+  }, [idleDestinationInfo])
+
+  const removingIdleVault =
+    removeIndex != null && withdrawMarkets[removeIndex]?.kind === 'IdleVault'
+
+  const applyRemoveIndex = useCallback(
+    (i: number) => {
+      setRemoveIndex(i)
+      if (withdrawMarkets[i]!.kind === 'IdleVault') {
+        setUseIdleVaultForReallocate(false)
+        setDestinations([])
+        return
+      }
+      let hasOtherIdle = false
+      for (let j = 0; j < withdrawMarkets.length; j++) {
+        if (j === i) continue
+        if (withdrawMarkets[j]!.kind === 'IdleVault') {
+          hasOtherIdle = true
+          break
+        }
+      }
+      if (hasOtherIdle) {
+        setUseIdleVaultForReallocate(true)
+        setDestinations([])
+      } else {
+        setUseIdleVaultForReallocate(false)
+      }
+    },
+    [withdrawMarkets]
+  )
+
+  const effectiveDestinationMarkets = useMemo(() => {
+    if (amountToMove <= Z) return [] as string[]
+    if (
+      !removingIdleVault &&
+      idleDestinationAddressNorm != null &&
+      useIdleVaultForReallocate
+    ) {
+      return [idleDestinationAddressNorm]
+    }
+    return destinations
+  }, [
+    amountToMove,
+    removingIdleVault,
+    idleDestinationAddressNorm,
+    useIdleVaultForReallocate,
+    destinations,
+  ])
 
   const supplyMap = useMemo(() => {
     const m = new Map<string, bigint>()
@@ -163,10 +234,10 @@ export default function WithdrawQueueRemoveWizard({
 
   const headroomOk =
     amountToMove === Z ||
-    (destinations.length > 0 &&
+    (effectiveDestinationMarkets.length > 0 &&
       destinationsHaveEnoughHeadroom({
         amountToMove,
-        destinationMarkets: destinations,
+        destinationMarkets: effectiveDestinationMarkets,
         supplyAssetsByMarket: supplyMap,
         capByMarket: capMap,
       }))
@@ -179,8 +250,8 @@ export default function WithdrawQueueRemoveWizard({
 
   const destinationsValid =
     amountToMove === Z ||
-    (destinations.length > 0 &&
-      destinations.every((d) => {
+    (effectiveDestinationMarkets.length > 0 &&
+      effectiveDestinationMarkets.every((d) => {
         const st = stateByAddress.get(addrKey(d))
         if (st == null || !st.enabled || st.cap <= Z) return false
         return vaultMarketSupplyHeadroom(st.supplyAssets, st.cap) > Z
@@ -268,7 +339,7 @@ export default function WithdrawQueueRemoveWizard({
           amountToMove > Z
             ? buildReallocateAllocations({
                 sourceMarket: removed.address,
-                destinationMarkets: destinations,
+                destinationMarkets: effectiveDestinationMarkets,
                 supplyAssetsByMarket: supplyMap,
                 capByMarket: capMap,
               })
@@ -323,7 +394,7 @@ export default function WithdrawQueueRemoveWizard({
     statesAligned,
     withdrawMarkets.length,
     amountToMove,
-    destinations,
+    effectiveDestinationMarkets,
     supplyMap,
     capMap,
     alsoRemoveFromSupplyQueue,
@@ -331,7 +402,13 @@ export default function WithdrawQueueRemoveWizard({
   ])
 
   const readyToRoute = removeIndex != null && headroomOk && removalPreconditionsOk && destinationsValid
-  const hideUnselectedMoveButtons = readyToRoute && amountToMove > Z
+  const showManualDestinationPicker =
+    amountToMove > Z &&
+    (removingIdleVault ||
+      idleDestinationInfo == null ||
+      idleDestinationAddressNorm == null ||
+      !useIdleVaultForReallocate)
+  const hideUnselectedMoveButtons = readyToRoute && amountToMove > Z && showManualDestinationPicker
 
   const vaultActionPreview = useMemo(() => {
     if (removeIndex == null || !statesAligned) return null
@@ -350,11 +427,11 @@ export default function WithdrawQueueRemoveWizard({
     const steps: Step[] = []
     if (amountToMove > Z) {
       let allocs: MarketAllocationTuple[]
-      if (destinations.length > 0) {
+      if (effectiveDestinationMarkets.length > 0) {
         try {
           allocs = buildReallocateAllocations({
             sourceMarket: removed.address,
-            destinationMarkets: destinations,
+            destinationMarkets: effectiveDestinationMarkets,
             supplyAssetsByMarket: supplyMap,
             capByMarket: capMap,
           })
@@ -401,7 +478,7 @@ export default function WithdrawQueueRemoveWizard({
     supplyQueueAddresses,
     alsoRemoveFromSupplyQueue,
     amountToMove,
-    destinations,
+    effectiveDestinationMarkets,
     supplyMap,
     capMap,
     withdrawMarkets.length,
@@ -456,7 +533,7 @@ export default function WithdrawQueueRemoveWizard({
                         type="radio"
                         name="withdraw-remove-market"
                         checked={removeIndex === i}
-                        onChange={() => setRemoveIndex(i)}
+                        onChange={() => applyRemoveIndex(i)}
                         className="sr-only"
                       />
                       <div className="min-w-0 flex-1">
@@ -541,13 +618,43 @@ export default function WithdrawQueueRemoveWizard({
                 onClick={() => {
                   setRemoveIndex(null)
                   setDestinations([])
+                  setUseIdleVaultForReallocate(true)
                   setAlsoRemoveFromSupplyQueue(false)
                 }}
               >
                 Choose another market
               </button>
 
-              {amountToMove > Z ? (
+              {removeIndex != null && statesAligned && amountToMove === Z ? (
+                <p className="text-sm silo-text-soft max-w-prose">
+                  There are no vault funds on this market to move, so reallocation is not needed. You can still remove it
+                  from the withdraw queue (and zero the cap if applicable) with <strong>Execute</strong> below.
+                </p>
+              ) : null}
+
+              {amountToMove > Z && idleDestinationInfo != null && idleDestinationAddressNorm != null ? (
+                <label
+                  className={`flex items-start gap-3 select-none max-w-prose ${
+                    removingIdleVault ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    disabled={removingIdleVault}
+                    checked={removingIdleVault ? false : useIdleVaultForReallocate}
+                    onChange={(e) => {
+                      if (removingIdleVault) return
+                      const on = e.target.checked
+                      setUseIdleVaultForReallocate(on)
+                      if (on) setDestinations([])
+                    }}
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--silo-border)] silo-text-main disabled:cursor-not-allowed"
+                  />
+                  <span className="text-sm silo-text-main">Move all funds to Idle Vault.</span>
+                </label>
+              ) : null}
+
+              {showManualDestinationPicker ? (
                 <div className="space-y-2">
                   <p className="text-sm font-medium silo-text-main">Choose a market to move funds to</p>
                   <ul className="space-y-2">
@@ -634,7 +741,7 @@ export default function WithdrawQueueRemoveWizard({
                 </p>
               ) : null}
 
-              {!headroomOk && amountToMove > Z && destinations.length > 0 ? (
+              {!headroomOk && amountToMove > Z && effectiveDestinationMarkets.length > 0 ? (
                 <p className="text-sm silo-alert silo-alert-error">
                   No single selected market has enough cap headroom for the full amount. Include a market that can absorb it
                   all (or remove liquidity from the source first).
