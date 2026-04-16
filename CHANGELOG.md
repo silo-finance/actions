@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.5] - 2026-04-16
+
+### Fixed
+- fix missing "strip-hex-prefix" package
+- fix packages warnings by using wagmi v3
+- npm i
+- revert: "fix: address connect wallet issues"
+
 ## [0.8.4] - 2026-04-16
 
 ### Added
@@ -12,10 +20,11 @@
 ### Changed
 - README: manual smoke matrix and Safe App manifest notes
 
-
 ### Fixed
 - check if NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID not empty
 - fix: address connect wallet issues
+
+
 ## [0.8.3] - 2026-04-16
 
 ### Fixed

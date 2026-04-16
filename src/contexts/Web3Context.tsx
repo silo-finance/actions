@@ -1,14 +1,21 @@
 'use client'
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { BrowserProvider } from 'ethers'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain, useWalletClient, WagmiProvider } from 'wagmi'
+import {
+  useChainId,
+  useConnect,
+  useConnectors,
+  useConnection,
+  useDisconnect,
+  useSwitchChain,
+  useWalletClient,
+  WagmiProvider,
+} from 'wagmi'
 import { wagmiConfig } from '@/config/wagmi'
 import type { Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import { getWalletAddEthereumChainParameter } from '@/utils/networks'
-import { getInjectedProvidersSnapshot } from '@/wallet/injectedProviders'
-import { setPendingInjectedTarget } from '@/wallet/pendingInjectedTarget'
 
 function switchFailedBecauseChainNotInWallet(err: unknown): boolean {
   const e = err as { code?: number; message?: string }
@@ -36,11 +43,7 @@ type Web3ContextValue = {
   /** EIP-1193 provider for Safe SDK and `wallet_*` calls (injected or WalletConnect). */
   eip1193Provider: Eip1193Provider | null
   isConnected: boolean
-  /** True when connected via wagmi `safe()` (Safe{Wallet} iframe). */
-  isSafeAppSession: boolean
   connect: (method?: ConnectMethod) => Promise<void>
-  /** Connect a browser extension announced via EIP-6963 (`rdns` or `uuid`). */
-  connectInjectedByRdns: (rdnsOrUuid: string) => Promise<void>
   disconnect: () => void
   switchNetwork: (targetChainId: number) => Promise<void>
   refreshChainId: () => Promise<void>
@@ -60,17 +63,16 @@ function getOrCreateQueryClient() {
 }
 
 function Web3StateProvider({ children }: { children: React.ReactNode }) {
-  const { address, isConnected, chainId: accountChainId, connector } = useAccount()
+  const { address, isConnected, chainId: accountChainId, connector } = useConnection()
   const defaultChainId = useChainId()
   const { data: walletClient } = useWalletClient()
-  const { connectAsync, connectors } = useConnect()
-  const { disconnectAsync } = useDisconnect()
-  const { switchChainAsync } = useSwitchChain()
-  const safeAutoTried = useRef(false)
+  const connectMutation = useConnect()
+  const connectors = useConnectors()
+  const disconnectMutation = useDisconnect()
+  const switchChain = useSwitchChain()
 
   const account = address ?? ''
   const chainId = isConnected ? (accountChainId ?? defaultChainId) : null
-  const isSafeAppSession = connector?.id === 'safe'
 
   const [browserProvider, setBrowserProvider] = useState<BrowserProvider | null>(null)
   const [eip1193Provider, setEip1193Provider] = useState<Eip1193Provider | null>(null)
@@ -91,18 +93,6 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
     setEip1193Provider(transport)
   }, [walletClient])
 
-  /** Auto-connect inside Safe{Wallet} iframe using wagmi `safe()` connector. */
-  useEffect(() => {
-    if (typeof window === 'undefined' || window.parent === window) return
-    if (safeAutoTried.current || isConnected) return
-    const safeC = connectors.find((c) => c.id === 'safe')
-    if (!safeC) return
-    safeAutoTried.current = true
-    void connectAsync({ connector: safeC }).catch(() => {
-      safeAutoTried.current = false
-    })
-  }, [connectAsync, connectors, isConnected])
-
   const refreshChainId = useCallback(async () => {
     try {
       const p = (await connector?.getProvider?.()) as Eip1193Provider | undefined
@@ -120,8 +110,7 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
 
       const tryInjected = async () => {
         if (!injectedC) throw new Error('no_injected')
-        setPendingInjectedTarget(null)
-        await connectAsync({ connector: injectedC })
+        await connectMutation.mutateAsync({ connector: injectedC })
       }
       const tryWc = async () => {
         if (!wcC) {
@@ -130,7 +119,7 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
           )
           throw new Error('no_walletconnect')
         }
-        await connectAsync({ connector: wcC })
+        await connectMutation.mutateAsync({ connector: wcC })
       }
 
       try {
@@ -159,62 +148,33 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
         console.error('connect', e)
       }
     },
-    [connectAsync, connectors]
-  )
-
-  const connectInjectedByRdns = useCallback(
-    async (rdnsOrUuid: string) => {
-      const list = getInjectedProvidersSnapshot()
-      const d =
-        list.find((x) => x.info.rdns === rdnsOrUuid) || list.find((x) => x.info.uuid === rdnsOrUuid)
-      if (!d) {
-        alert('That wallet was not found. Close the menu and try again, or use “Browser extension”.')
-        return
-      }
-      const injectedC = connectors.find((c) => c.type === 'injected')
-      if (!injectedC) {
-        alert('Injected connector is not available.')
-        return
-      }
-      setPendingInjectedTarget(d)
-      try {
-        await connectAsync({ connector: injectedC })
-      } catch (e) {
-        console.error('connectInjectedByRdns', e)
-      } finally {
-        setPendingInjectedTarget(null)
-      }
-    },
-    [connectAsync, connectors]
+    [connectMutation, connectors]
   )
 
   const disconnect = useCallback(() => {
-    safeAutoTried.current = false
     void (async () => {
       try {
-        await disconnectAsync()
+        await disconnectMutation.mutateAsync()
       } catch {
         // ignore
       }
     })()
-  }, [disconnectAsync])
+  }, [disconnectMutation])
 
   const switchNetwork = useCallback(
     async (targetChainId: number) => {
       const chainIdHex = `0x${targetChainId.toString(16)}`
-      if (switchChainAsync) {
-        try {
-          await switchChainAsync({ chainId: targetChainId })
+      try {
+        await switchChain.mutateAsync({ chainId: targetChainId })
+        return
+      } catch (error) {
+        const walletError = error as { code?: number; message?: string }
+        if (walletError.code === 4001) return
+        if (walletError.code === -32002) {
+          alert('Network switch request is already pending in wallet.')
           return
-        } catch (error) {
-          const walletError = error as { code?: number; message?: string }
-          if (walletError.code === 4001) return
-          if (walletError.code === -32002) {
-            alert('Network switch request is already pending in wallet.')
-            return
-          }
-          /* Fall through: try `wallet_switchEthereumChain` / `wallet_addEthereumChain` on the connector EIP-1193 provider. */
         }
+        /* Fall through: try `wallet_switchEthereumChain` / `wallet_addEthereumChain` on the connector EIP-1193 provider. */
       }
 
       let eth: Eip1193Provider | null = null
@@ -258,7 +218,7 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
         alert(`Failed to switch network.${we.message ? ` ${we.message}` : ''}`)
       }
     },
-    [connector, switchChainAsync]
+    [connector, switchChain]
   )
 
   const value = useMemo<Web3ContextValue>(
@@ -268,9 +228,7 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
       provider: account && browserProvider ? browserProvider : null,
       eip1193Provider: account && eip1193Provider ? eip1193Provider : null,
       isConnected: Boolean(isConnected && account),
-      isSafeAppSession,
       connect,
-      connectInjectedByRdns,
       disconnect,
       switchNetwork,
       refreshChainId,
@@ -280,11 +238,9 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
       browserProvider,
       chainId,
       connect,
-      connectInjectedByRdns,
       disconnect,
       eip1193Provider,
       isConnected,
-      isSafeAppSession,
       refreshChainId,
       switchNetwork,
     ]
