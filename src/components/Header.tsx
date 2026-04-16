@@ -15,7 +15,16 @@ import ConnectWalletPanelContent from '@/components/ConnectWalletPanelContent'
 export default function Header() {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
-  const { account, chainId, isConnected, connect, disconnect, switchNetwork } = useWeb3()
+  const {
+    account,
+    chainId,
+    isConnected,
+    connect,
+    connectInjectedByRdns,
+    disconnect,
+    switchNetwork,
+    isSafeAppSession,
+  } = useWeb3()
   const connectMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -103,7 +112,15 @@ export default function Header() {
 
             {isConnected ? (
               <div className="flex flex-col items-end gap-1">
-                <div className="text-right flex items-center gap-2 justify-end">
+                <div className="text-right flex items-center gap-2 justify-end flex-wrap">
+                  {isSafeAppSession ? (
+                    <span
+                      className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border border-[var(--header-toggle-border)] header-text-soft"
+                      title="Running inside Safe{Wallet} as a Safe App"
+                    >
+                      Safe App
+                    </span>
+                  ) : null}
                   <div className="header-text text-xs font-mono" title={normalizeAddress(account) ?? account}>
                     {formatAddress(account)}
                   </div>
@@ -153,6 +170,7 @@ export default function Header() {
                   <div className="wallet-connect-dropdown wallet-connect-panel" role="presentation">
                     <ConnectWalletPanelContent
                       mutedClassName="text-xs font-medium header-text-soft"
+                      connectInjectedByRdns={connectInjectedByRdns}
                       onPick={(method) => {
                         void connect(method)
                         connectMenuRef.current?.querySelector('details')?.removeAttribute('open')

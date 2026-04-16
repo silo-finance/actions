@@ -1,8 +1,17 @@
 import { createConfig, http } from 'wagmi'
-import { injected, walletConnect } from 'wagmi/connectors'
+import { injected, safe, walletConnect } from 'wagmi/connectors'
 import { appChains } from '@/config/viemChains'
+import { getPendingInjectedTarget } from '@/wallet/pendingInjectedTarget'
 
 const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+
+let loggedMissingWcId = false
+if (typeof window !== 'undefined' && !wcProjectId && !loggedMissingWcId) {
+  loggedMissingWcId = true
+  console.warn(
+    '[Silo Actions] WalletConnect disabled: NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID was empty at build time.',
+  )
+}
 
 function transports() {
   const out: Record<number, ReturnType<typeof http>> = {}
@@ -14,7 +23,21 @@ function transports() {
 }
 
 const connectors = [
-  injected({ shimDisconnect: true }),
+  injected({
+    shimDisconnect: true,
+    target: () => {
+      const d = getPendingInjectedTarget()
+      if (!d) return undefined
+      return {
+        id: d.info.uuid,
+        name: d.info.name,
+        provider: d.provider,
+        rdns: d.info.rdns,
+        icon: d.info.icon,
+      }
+    },
+  }),
+  safe({ shimDisconnect: true }),
   ...(wcProjectId
     ? [
         walletConnect({
