@@ -2,7 +2,7 @@ import { createConfig, createStorage, http, noopStorage } from 'wagmi'
 import { injected, walletConnect } from 'wagmi/connectors'
 import { appChains } from '@/config/viemChains'
 
-const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim()
 
 let loggedMissingWcId = false
 if (typeof window !== 'undefined' && !wcProjectId && !loggedMissingWcId) {

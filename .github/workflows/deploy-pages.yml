@@ -58,8 +58,12 @@ jobs:
           # Set to true in repo Variables to fail deploy when WC id is missing.
           STRICT: ${{ vars.DEPLOY_REQUIRE_WALLETCONNECT_PROJECT_ID }}
         run: |
-          if [ -n "$WC" ]; then
-            echo "::notice::NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is set (length ${#WC})."
+          WC_TRIMMED="$(printf '%s' "$WC" | tr -d '\r\n' | xargs)"
+          if [ -n "$WC_TRIMMED" ]; then
+            echo "::notice::NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is set (raw length ${#WC}, trimmed length ${#WC_TRIMMED})."
+            if [ "$WC" != "$WC_TRIMMED" ]; then
+              echo "::warning::NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID contains surrounding whitespace/newlines; trimmed value will be used by the app build."
+            fi
           else
             echo "::warning::NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is empty — WalletConnect will be omitted from the build."
             if [ "$STRICT" = "true" ] || [ "$STRICT" = "1" ]; then
