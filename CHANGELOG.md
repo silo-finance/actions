@@ -8,6 +8,7 @@
 - npm i
 - revert: "fix: address connect wallet issues"
 
+- use .nvmrc for nodejs version
 ## [0.8.4] - 2026-04-16
 
 ### Added
