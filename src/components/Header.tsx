@@ -10,6 +10,7 @@ import { useWeb3 } from '@/contexts/Web3Context'
 import { NETWORK_CONFIGS, getNetworkDisplayName } from '@/utils/networks'
 import { normalizeAddress } from '@/utils/addressValidation'
 import CopyButton from '@/components/CopyButton'
+import ConnectWalletPanelContent from '@/components/ConnectWalletPanelContent'
 
 export default function Header() {
   const pathname = usePathname()
@@ -141,41 +142,24 @@ export default function Header() {
                 </button>
               </div>
             ) : (
-              <div ref={connectMenuRef} className="relative flex flex-col items-end gap-1">
+              <div ref={connectMenuRef} className="relative flex flex-col items-end">
                 <details className="group relative">
-                  <summary className="header-connect-button list-none cursor-pointer font-semibold py-2 px-4 rounded-full transition-colors duration-200 text-xs [&::-webkit-details-marker]:hidden">
-                    Connect wallet
+                  <summary className="header-connect-button list-none cursor-pointer font-semibold py-2.5 px-4 rounded-full transition-colors duration-200 text-sm flex items-center justify-center gap-2 min-w-[11.5rem] [&::-webkit-details-marker]:hidden open:ring-2 open:ring-[var(--silo-accent)] open:ring-offset-2 open:ring-offset-[var(--header-bg)]">
+                    <span>Connect wallet</span>
+                    <span className="text-[10px] font-bold opacity-75 select-none" aria-hidden>
+                      ▾
+                    </span>
                   </summary>
-                  <div className="absolute right-0 z-[60] mt-1 min-w-[11rem] rounded-xl border border-[var(--header-toggle-border)] bg-[var(--silo-surface-1)] py-1 shadow-lg">
-                    <button
-                      type="button"
-                      className="block w-full px-3 py-2 text-left text-xs font-semibold hover:bg-[var(--silo-surface-2)]"
-                      onClick={() => {
-                        void connect('injected')
+                  <div className="wallet-connect-dropdown wallet-connect-panel" role="presentation">
+                    <ConnectWalletPanelContent
+                      mutedClassName="text-xs font-medium header-text-soft"
+                      onPick={(method) => {
+                        void connect(method)
                         connectMenuRef.current?.querySelector('details')?.removeAttribute('open')
                       }}
-                    >
-                      Browser extension
-                    </button>
-                    <button
-                      type="button"
-                      className="block w-full px-3 py-2 text-left text-xs font-semibold hover:bg-[var(--silo-surface-2)]"
-                      onClick={() => {
-                        void connect('walletConnect')
-                        connectMenuRef.current?.querySelector('details')?.removeAttribute('open')
-                      }}
-                    >
-                      WalletConnect
-                    </button>
+                    />
                   </div>
                 </details>
-                <button
-                  type="button"
-                  onClick={() => void connect('auto')}
-                  className="header-link text-[10px] font-semibold uppercase tracking-wide"
-                >
-                  Auto-detect
-                </button>
               </div>
             )}
           </div>

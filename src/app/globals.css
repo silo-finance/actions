@@ -269,6 +269,147 @@ body {
   background-color: var(--header-connect-bg-hover);
 }
 
+/* Connect wallet — shared panel (header dropdown + page modal) */
+.wallet-connect-panel {
+  padding: 0.65rem;
+  border-radius: 14px;
+  border: 1px solid var(--silo-border);
+  background: var(--silo-surface);
+  color: var(--silo-text);
+  box-shadow:
+    0 14px 44px rgba(15, 20, 31, 0.16),
+    0 0 0 1px color-mix(in srgb, var(--silo-accent) 10%, transparent);
+}
+
+.theme-dark .wallet-connect-panel {
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.42),
+    0 0 0 1px color-mix(in srgb, var(--silo-accent) 18%, var(--silo-border));
+}
+
+.wallet-connect-dropdown {
+  position: absolute;
+  right: 0;
+  z-index: 60;
+  margin-top: 0.45rem;
+  min-width: 18rem;
+  max-width: min(22rem, calc(100vw - 2rem));
+}
+
+.wallet-connect-label {
+  padding: 0.35rem 0.6rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--silo-text-soft);
+}
+
+.wallet-connect-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.25rem;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--silo-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.wallet-connect-item:hover {
+  background: color-mix(in srgb, var(--silo-soft-purple) 38%, var(--silo-surface));
+  border-color: color-mix(in srgb, var(--silo-accent) 42%, var(--silo-border));
+}
+
+.wallet-connect-item:focus-visible {
+  outline: none;
+  border-color: var(--silo-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--silo-accent) 35%, transparent);
+}
+
+.wallet-connect-hint {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.6rem 0.15rem;
+  border-top: 1px solid var(--silo-border);
+}
+
+.wallet-connect-auto {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.5rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--silo-accent);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.wallet-connect-auto:hover {
+  background: color-mix(in srgb, var(--silo-accent-soft) 55%, var(--silo-surface));
+  color: var(--silo-text);
+}
+
+.wallet-connect-modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 20, 31, 0.52);
+  backdrop-filter: blur(6px);
+}
+
+.theme-dark .wallet-connect-modal-root {
+  background: rgba(6, 10, 14, 0.68);
+}
+
+.wallet-connect-modal-card {
+  width: 100%;
+  max-width: 22rem;
+  max-height: min(90vh, 34rem);
+  overflow-y: auto;
+}
+
+.wallet-connect-modal-close {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--silo-border);
+  background: var(--silo-surface-2);
+  color: var(--silo-text);
+  font-size: 1.35rem;
+  line-height: 1;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.wallet-connect-modal-close:hover {
+  border-color: color-mix(in srgb, var(--silo-accent) 45%, var(--silo-border));
+  background: var(--silo-surface);
+}
+
 /* Form fields — aligned with silo-market-crafter */
 .silo-input {
   background: var(--silo-surface);

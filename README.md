@@ -32,6 +32,12 @@ npm run build
 
 GitHub Pages deployment is configured in `.github/workflows/deploy-pages.yml`.
 
+For WalletConnect on the deployed site, add a **repository variable** (not required for local-only extension wallets):
+
+1. GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** → **New repository variable**
+2. Name: `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`, value: your Reown / WalletConnect project id  
+   The deploy workflow passes it into `npm run build` as `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`.
+
 ## Manual actions (when the app UI is unavailable)
 
 Step-by-step instructions for doing the same thing inside a multisig UI (e.g. Safe{Wallet}). No deep technical background—only what to click and what to paste.
