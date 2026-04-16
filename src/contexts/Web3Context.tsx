@@ -3,7 +3,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { BrowserProvider } from 'ethers'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain, useWalletClient, WagmiProvider } from 'wagmi'
+import {
+  useChainId,
+  useConnect,
+  useConnectors,
+  useConnection,
+  useDisconnect,
+  useSwitchChain,
+  useWalletClient,
+  WagmiProvider,
+} from 'wagmi'
 import { wagmiConfig } from '@/config/wagmi'
 import type { Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import { getWalletAddEthereumChainParameter } from '@/utils/networks'
@@ -54,12 +63,13 @@ function getOrCreateQueryClient() {
 }
 
 function Web3StateProvider({ children }: { children: React.ReactNode }) {
-  const { address, isConnected, chainId: accountChainId, connector } = useAccount()
+  const { address, isConnected, chainId: accountChainId, connector } = useConnection()
   const defaultChainId = useChainId()
   const { data: walletClient } = useWalletClient()
-  const { connectAsync, connectors } = useConnect()
-  const { disconnectAsync } = useDisconnect()
-  const { switchChainAsync } = useSwitchChain()
+  const connectMutation = useConnect()
+  const connectors = useConnectors()
+  const disconnectMutation = useDisconnect()
+  const switchChain = useSwitchChain()
 
   const account = address ?? ''
   const chainId = isConnected ? (accountChainId ?? defaultChainId) : null
@@ -100,7 +110,7 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
 
       const tryInjected = async () => {
         if (!injectedC) throw new Error('no_injected')
-        await connectAsync({ connector: injectedC })
+        await connectMutation.mutateAsync({ connector: injectedC })
       }
       const tryWc = async () => {
         if (!wcC) {
@@ -109,7 +119,7 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
           )
           throw new Error('no_walletconnect')
         }
-        await connectAsync({ connector: wcC })
+        await connectMutation.mutateAsync({ connector: wcC })
       }
 
       try {
@@ -138,35 +148,33 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
         console.error('connect', e)
       }
     },
-    [connectAsync, connectors]
+    [connectMutation, connectors]
   )
 
   const disconnect = useCallback(() => {
     void (async () => {
       try {
-        await disconnectAsync()
+        await disconnectMutation.mutateAsync()
       } catch {
         // ignore
       }
     })()
-  }, [disconnectAsync])
+  }, [disconnectMutation])
 
   const switchNetwork = useCallback(
     async (targetChainId: number) => {
       const chainIdHex = `0x${targetChainId.toString(16)}`
-      if (switchChainAsync) {
-        try {
-          await switchChainAsync({ chainId: targetChainId })
+      try {
+        await switchChain.mutateAsync({ chainId: targetChainId })
+        return
+      } catch (error) {
+        const walletError = error as { code?: number; message?: string }
+        if (walletError.code === 4001) return
+        if (walletError.code === -32002) {
+          alert('Network switch request is already pending in wallet.')
           return
-        } catch (error) {
-          const walletError = error as { code?: number; message?: string }
-          if (walletError.code === 4001) return
-          if (walletError.code === -32002) {
-            alert('Network switch request is already pending in wallet.')
-            return
-          }
-          /* Fall through: try `wallet_switchEthereumChain` / `wallet_addEthereumChain` on the connector EIP-1193 provider. */
         }
+        /* Fall through: try `wallet_switchEthereumChain` / `wallet_addEthereumChain` on the connector EIP-1193 provider. */
       }
 
       let eth: Eip1193Provider | null = null
@@ -210,7 +218,7 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
         alert(`Failed to switch network.${we.message ? ` ${we.message}` : ''}`)
       }
     },
-    [connector, switchChainAsync]
+    [connector, switchChain]
   )
 
   const value = useMemo<Web3ContextValue>(

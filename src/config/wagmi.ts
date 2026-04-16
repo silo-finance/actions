@@ -1,4 +1,4 @@
-import { createConfig, http } from 'wagmi'
+import { createConfig, createStorage, http, noopStorage } from 'wagmi'
 import { injected, walletConnect } from 'wagmi/connectors'
 import { appChains } from '@/config/viemChains'
 
@@ -47,4 +47,8 @@ export const wagmiConfig = createConfig({
   connectors,
   transports: transports(),
   ssr: true,
+  storage: createStorage({
+    storage:
+      typeof window !== 'undefined' && window.localStorage ? window.localStorage : noopStorage,
+  }),
 })
