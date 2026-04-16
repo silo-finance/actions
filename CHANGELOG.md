@@ -12,10 +12,11 @@
 ### Changed
 - README: manual smoke matrix and Safe App manifest notes
 
-
 ### Fixed
 - check if NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID not empty
 - fix: address connect wallet issues
+
+
 ## [0.8.3] - 2026-04-16
 
 ### Fixed

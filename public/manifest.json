@@ -1,6 +1,5 @@
 {
-  "name": "Silo Control Panel",
-  "shortName": "ControlPanel",
+  "name": "Silo Actions",
   "description": "Admin actions for silos and vaults.",
   "iconPath": "safe-app-icon.svg",
   "icons": [

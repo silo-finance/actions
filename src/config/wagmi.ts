@@ -1,7 +1,6 @@
 import { createConfig, http } from 'wagmi'
-import { injected, safe, walletConnect } from 'wagmi/connectors'
+import { injected, walletConnect } from 'wagmi/connectors'
 import { appChains } from '@/config/viemChains'
-import { getPendingInjectedTarget } from '@/wallet/pendingInjectedTarget'
 
 const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
 
@@ -23,21 +22,7 @@ function transports() {
 }
 
 const connectors = [
-  injected({
-    shimDisconnect: true,
-    target: () => {
-      const d = getPendingInjectedTarget()
-      if (!d) return undefined
-      return {
-        id: d.info.uuid,
-        name: d.info.name,
-        provider: d.provider,
-        rdns: d.info.rdns,
-        icon: d.info.icon,
-      }
-    },
-  }),
-  safe({ shimDisconnect: true }),
+  injected({ shimDisconnect: true }),
   ...(wcProjectId
     ? [
         walletConnect({
