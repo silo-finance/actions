@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.3] - 2026-04-16
+
+### Fixed
+- fix wallet connect, add project ID
+
 ## [0.8.2] - 2026-04-15
 
 ### Added
