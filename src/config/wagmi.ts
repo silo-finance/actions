@@ -5,6 +5,14 @@ import { getPendingInjectedTarget } from '@/wallet/pendingInjectedTarget'
 
 const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
 
+let loggedMissingWcId = false
+if (typeof window !== 'undefined' && !wcProjectId && !loggedMissingWcId) {
+  loggedMissingWcId = true
+  console.warn(
+    '[Silo Actions] WalletConnect disabled: NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID was empty at build time.',
+  )
+}
+
 function transports() {
   const out: Record<number, ReturnType<typeof http>> = {}
   for (const chain of appChains) {
