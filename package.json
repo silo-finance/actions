@@ -6,7 +6,7 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "dev": "NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next dev",
+    "dev": "rm -rf .next && NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next dev",
     "build": "NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next build",
     "start": "next start",
     "lint": "next lint --max-warnings 0",
@@ -30,6 +30,7 @@
     "porto": "0.2.37",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "strip-hex-prefix": "1.0.0",
     "three": "0.183.2",
     "viem": "2.48.0",
     "wagmi": "3.6.2"
