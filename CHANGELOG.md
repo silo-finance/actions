@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.5] - 2026-04-16
+
+### Fixed
+- fix missing "strip-hex-prefix" package
+- fix packages warnings by using wagmi v3
+- npm i
+- revert: "fix: address connect wallet issues"
+
 ## [0.8.4] - 2026-04-16
 
 ### Added
