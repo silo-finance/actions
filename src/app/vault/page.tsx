@@ -10,6 +10,7 @@ import ShareLinkCopyButton from '@/components/ShareLinkCopyButton'
 import SupplyQueueColumn from '@/components/SupplyQueueColumn'
 import VaultActionsColumn from '@/components/VaultActionsColumn'
 import VaultSummaryPanel from '@/components/VaultSummaryPanel'
+import ConnectWalletModal from '@/components/ConnectWalletModal'
 import { VaultPermissionsProvider } from '@/contexts/VaultPermissionsContext'
 import { useWeb3 } from '@/contexts/Web3Context'
 import { extractHexAddressLike } from '@/utils/addressFromInput'
@@ -42,7 +43,9 @@ function VaultPageInner() {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const router = useRouter()
-  const { provider, chainId, isConnected, connect, switchNetwork, account } = useWeb3()
+  const { provider, chainId, isConnected, switchNetwork, account } = useWeb3()
+  const [connectModalOpen, setConnectModalOpen] = useState(false)
+  const closeConnectModal = useCallback(() => setConnectModalOpen(false), [])
   const [input, setInput] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -395,11 +398,12 @@ function VaultPageInner() {
           <p className="text-sm silo-text-main">Connect a wallet (browser extension or WalletConnect) to read on-chain data.</p>
           <button
             type="button"
-            onClick={() => void connect('auto')}
-            className="header-connect-button font-semibold py-2 px-4 rounded-full text-xs"
+            onClick={() => setConnectModalOpen(true)}
+            className="header-connect-button font-semibold py-2.5 px-4 rounded-full text-sm"
           >
             Connect wallet
           </button>
+          <ConnectWalletModal open={connectModalOpen} onClose={closeConnectModal} />
         </div>
       )}
 
