@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.6] - 2026-04-16
+
+### Fixed
+- handle white spaces, eg new line for the environmental variables
+
 ## [0.8.5] - 2026-04-16
 
 ### Fixed
