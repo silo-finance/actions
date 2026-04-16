@@ -11,7 +11,7 @@ type Props = {
 }
 
 export default function ConnectWalletModal({ open, onClose }: Props) {
-  const { connect, isConnected } = useWeb3()
+  const { connect, connectInjectedByRdns, isConnected } = useWeb3()
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -78,7 +78,10 @@ export default function ConnectWalletModal({ open, onClose }: Props) {
             ×
           </button>
         </div>
-        <ConnectWalletPanelContent onPick={(m) => void handlePick(m)} />
+        <ConnectWalletPanelContent
+          connectInjectedByRdns={connectInjectedByRdns}
+          onPick={(m) => void handlePick(m)}
+        />
       </div>
     </div>,
     document.body

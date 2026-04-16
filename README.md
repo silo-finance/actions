@@ -21,6 +21,21 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
 
 Without this variable, **Browser extension** still works; the WalletConnect option will prompt you to configure the project id.
 
+**EIP-6963:** When several extensions are installed (MetaMask, Rabby, etc.), the connect panel lists **Detected extensions** so you pick the correct provider instead of whichever overwrote `window.ethereum`.
+
+**Safe{Wallet}:** If you open this UI as a **Safe App** (iframe under `app.safe.global`), the app uses wagmi’s built-in **`safe()`** connector to attach to the Safe host and auto-connect when possible. Optional read-only context: [`initSafeAppBridge`](src/wallet/safeAppBridge.ts).
+
+**Safe App manifest:** [`public/manifest.json`](public/manifest.json) is exposed at `{NEXT_PUBLIC_BASE_PATH}/manifest.json` (same origin as the app). Use that URL when adding a **custom Safe App** in Safe{Wallet}. Full rollout notes: [`plan/wallet-safe-rollout-spec.md`](plan/wallet-safe-rollout-spec.md).
+
+### Manual smoke tests (wallet / Safe)
+
+| # | Scenario | What to verify |
+|---|----------|----------------|
+| 1 | MetaMask only, EOA vault owner | Connect → `direct` vault action works |
+| 2 | MetaMask + Rabby installed | Both appear under **Detected extensions**; each connects to the right wallet |
+| 3 | WalletConnect (QR) | Connect completes; one `direct` or `safe_propose` flow |
+| 4 | Safe{Wallet} → Apps → Add custom app → your deployed URL | App loads in iframe; wallet connects (Safe connector); chain matches Safe |
+
 ## Production build
 
 ```bash

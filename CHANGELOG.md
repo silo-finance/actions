@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.4] - 2026-04-16
+
+### Added
+- Rollout spec [`plan/wallet-safe-rollout-spec.md`](plan/wallet-safe-rollout-spec.md) and optional Safe catalog checklist [`plan/safe-apps-listing.md`](plan/safe-apps-listing.md)
+- EIP-6963 announced-wallet list in the connect UI; per-wallet connect via shared `injected` target
+- wagmi `safe()` connector plus `@safe-global/safe-apps-sdk` / `safe-apps-provider` for Safe{Wallet} iframe; auto-connect when opened as a Safe App
+- Vitest: `encodeSetSupplyQueueEmpty`, `sortDestinationsByHeadroomDesc`, `buildWithdrawMarketRemovalVaultCallDatas` (minimal calldata path)
+- `public/manifest.json`: `shortName` for Safe App metadata
+
+### Changed
+- README: manual smoke matrix and Safe App manifest notes
+
 ## [0.8.3] - 2026-04-16
 
 ### Fixed
