@@ -1,11 +1,5 @@
 import { defineConfig } from '@playwright/test'
-
-/** GitHub Pages project URL is a path under the host; baseURL must not end with `/` so `goto('./')` resolves in-repo. */
-function smokeBaseUrl(): string | undefined {
-  const raw = process.env.SMOKE_BASE_URL?.trim()
-  if (!raw) return undefined
-  return raw.replace(/\/+$/, '')
-}
+import { normalizeSmokeBaseUrl } from './src/utils/smokeBaseUrl'
 
 export default defineConfig({
   testDir: 'tests/smoke',
@@ -14,7 +8,7 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 75_000 },
   use: {
-    baseURL: smokeBaseUrl(),
+    baseURL: normalizeSmokeBaseUrl(process.env.SMOKE_BASE_URL),
     trace: 'on-first-retry',
   },
 })

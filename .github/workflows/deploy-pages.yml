@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
+      deployed_sha: ${{ steps.meta.outputs.deployed_sha }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -92,6 +93,10 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Capture deployed metadata
+        id: meta
+        run: echo "deployed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   post_deploy_smoke:
     needs: deploy
@@ -160,3 +165,49 @@ jobs:
         env:
           SMOKE_BASE_URL: ${{ needs.deploy.outputs.page_url }}
         run: npm run test:smoke
+
+  mark_pages_deployment_failed:
+    needs: [deploy, post_deploy_smoke]
+    if: >-
+      always() &&
+      needs.deploy.result == 'success' &&
+      needs.post_deploy_smoke.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      deployments: write
+      contents: read
+    steps:
+      - name: Mark current github-pages deployment as failure
+        env:
+          DEPLOYED_SHA: ${{ needs.deploy.outputs.deployed_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOYED_SHA:-}" ]; then
+            echo "::error::Missing deployed SHA from deploy job."
+            exit 1
+          fi
+
+          echo "::notice::Looking up github-pages deployment for SHA: ${DEPLOYED_SHA}"
+          DEPLOYMENT_ID="$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/deployments" \
+            -f environment='github-pages' \
+            -f sha="${DEPLOYED_SHA}" \
+            -f per_page='1' \
+            --jq '.[0].id')"
+
+          if [ -z "${DEPLOYMENT_ID:-}" ] || [ "${DEPLOYMENT_ID}" = "null" ]; then
+            echo "::error::No github-pages deployment found for SHA ${DEPLOYED_SHA}."
+            exit 1
+          fi
+
+          echo "::notice::Marking deployment ${DEPLOYMENT_ID} as failure (smoke test failed)."
+          gh api \
+            --method POST \
+            "/repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" \
+            -f state='failure' \
+            -f auto_inactive='true' \
+            -f description='Post-deploy smoke test failed' \
+            -f log_url="${RUN_URL}" >/dev/null
+
+          echo "::notice::Deployment ${DEPLOYMENT_ID} status updated to failure."

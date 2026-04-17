@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { normalizeSmokeBaseUrl } from '../../src/utils/smokeBaseUrl'
 
 /** Default: mainnet VOLTS vault deep link (matches deploy workflow smoke URL). */
 const DEFAULT_SMOKE_PAGE_PATH =
@@ -23,14 +24,25 @@ test('vault page (VOLTS deep link) loads and no uncaught runtime errors', async 
   })
 
   const path = smokePagePath()
-  const base = (process.env.SMOKE_BASE_URL ?? '').replace(/\/+$/, '')
+  const base = normalizeSmokeBaseUrl(process.env.SMOKE_BASE_URL) ?? ''
   console.log(`[smoke] SMOKE_BASE_URL (raw): ${process.env.SMOKE_BASE_URL ?? '<unset>'}`)
-  console.log(`[smoke] normalized base (no trailing slash): ${base || '<empty>'}`)
+  console.log(`[smoke] normalized base (forced trailing slash): ${base || '<empty>'}`)
   console.log(`[smoke] SMOKE_PAGE_PATH: ${path}`)
 
   // With baseURL like https://org.github.io/repo, goto('/') drops the repo segment; keep paths relative to base.
-  await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  console.log(`[smoke] loaded URL: ${page.url()}`)
+  const response = await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const loadedUrl = page.url()
+  const status = response?.status() ?? null
+  console.log(`[smoke] loaded URL: ${loadedUrl}`)
+  console.log(`[smoke] initial navigation HTTP status: ${status ?? '<no-response>'}`)
+
+  // Fail fast on non-200 HTTP response before running UI/runtime assertions.
+  if (status !== 200) {
+    const statusText = response?.statusText() ?? '<unknown>'
+    throw new Error(
+      `[smoke] expected HTTP 200 for "${loadedUrl}", got ${status ?? '<no-response>'} ${statusText}`
+    )
+  }
 
   const vaultHeading = page.getByRole('heading', { name: 'Vault' })
   const vaultInput = page.locator('#vault-input')

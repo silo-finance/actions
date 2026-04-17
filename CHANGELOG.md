@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.10] - 2026-04-17
+
+### Fixed
+- notify github about failed deployment
+- fix base path for smoking tests
+
 ## [0.8.9] - 2026-04-17
 
 ### Fixed

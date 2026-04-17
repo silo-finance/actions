@@ -41,7 +41,7 @@ For WalletConnect on the deployed site, add a **repository variable** (not requi
 ### Post-deploy smoke test
 
 After each successful GitHub Pages deployment, the workflow runs a **Playwright** smoke test against the **vault** deep link (full URL example: `https://org.github.io/repo/vault/?chain=1&address=0x5362…`). In test config we use repo-relative path `./vault/?...` (resolved against `SMOKE_BASE_URL`) so `https://org.github.io/repo` is not mistaken for site root. It checks that the **Vault** heading appears, the address field is prefilled from the URL, and fails on **uncaught page errors** or **`console.error`** (typical for serious React runtime problems). CI logs print the exact full URL under test.
-If that smoke test fails, the workflow run ends as **failed** (no custom rollback job).
+If that smoke test fails, the workflow run ends as **failed** and an additional CI job marks the just-created `github-pages` deployment status as `failure` via GitHub Deployments API. This gives GitHub an explicit signal that the newest deployment is unhealthy, so the previously active deployment can remain the active one.
 
 **Local smoke against any URL:**
 
