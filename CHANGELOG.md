@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.12] - 2026-04-17
+
+### Fixed
+- fix: ensure githab is notified about failed deployment
+- fix: ensure issue with page rendering is detected by test
+
 ## [0.8.11] - 2026-04-17
 
 ### Fixed
