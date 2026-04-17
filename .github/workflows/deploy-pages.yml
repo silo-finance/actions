@@ -548,11 +548,3 @@ jobs:
           echo "::error::Post-deploy smoke did not succeed and rollback did not complete (post_deploy=${POST_DEPLOY}, rollback=${RB_RESULT})."
           exit 1
 
-  finalize_deployment:
-    needs: smoke_gate
-    if: success()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Final deployment marker
-        run: |
-          echo "OK: deploy + post-deploy smoke passed, or rollback deploy completed after failed smoke."
