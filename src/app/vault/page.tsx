@@ -40,8 +40,7 @@ function parseChainFromSearchParam(raw: string | null): number | null {
 }
 
 function VaultPageInner() {
-  // TEMPORARY (production rollback test): force a client-side render crash on Vault page.
-  // This keeps static hosting HTTP status at 200, but breaks React rendering in the browser.
+  // Intentional crash for rollback/smoke validation.
   if (typeof window !== 'undefined') {
     throw new Error('Rollback smoke test: intentional client render crash on /vault.')
   }

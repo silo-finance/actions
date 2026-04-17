@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page, TestInfo } from '@playwright/test'
-import { normalizeSmokeBaseUrl } from '../../src/utils/smokeBaseUrl'
+import { normalizeSmokeBaseUrl, resolveSmokeTargetUrl } from '../utils/smokeBaseUrl'
 
 /** Default: mainnet VOLTS vault deep link (matches deploy workflow smoke URL). */
 const DEFAULT_SMOKE_PAGE_PATH =
@@ -26,7 +26,8 @@ async function readVaultUiState(page: Page, issues: string[]) {
   const headingVisible = await vaultHeading.isVisible().catch(() => false)
   let inputVal = ''
   try {
-    inputVal = await vaultInput.inputValue()
+    // Do not block polling loop for long auto-waits when the input is missing/crashed.
+    inputVal = await vaultInput.inputValue({ timeout: 200 })
   } catch {
     inputVal = ''
   }
@@ -42,7 +43,64 @@ async function readVaultUiState(page: Page, issues: string[]) {
   }
 }
 
+async function failIfIssuesDetected(
+  page: Page,
+  testInfo: TestInfo,
+  issues: string[],
+  stage: string
+) {
+  const pageErrors = Array.from(new Set(issues.filter((m) => m.startsWith('pageerror'))))
+  if (pageErrors.length > 0) {
+    await attachScreenshot(testInfo, page, `failure-pageerror-${stage}.png`)
+    throw new Error(
+      `[smoke] uncaught page error(s) [${stage}] (unique=${pageErrors.length}):\n` +
+        `${pageErrors.join('\n')}\n` +
+        `URL: ${page.url()}`
+    )
+  }
+  const consoleErrors = Array.from(new Set(issues.filter((m) => m.startsWith('console:'))))
+  if (consoleErrors.length > 0) {
+    await attachScreenshot(testInfo, page, `failure-console-error-${stage}.png`)
+    throw new Error(
+      `[smoke] console.error detected [${stage}] (unique=${consoleErrors.length}):\n` +
+        `${consoleErrors.join('\n')}\n` +
+        `URL: ${page.url()}`
+    )
+  }
+}
+
+async function failIfAppRuntimeErrorPageVisible(page: Page, testInfo: TestInfo, stage: string) {
+  const marker = page.getByTestId('app-runtime-error')
+  const markerVisible = await marker.isVisible().catch(() => false)
+  if (!markerVisible) return
+
+  const snippet = await page
+    .evaluate(() => document.body?.innerText?.slice(0, 2000) ?? '')
+    .catch(() => '<no body text>')
+  await attachScreenshot(testInfo, page, `failure-app-runtime-error-page-${stage}.png`)
+  throw new Error(
+    `[smoke] custom app runtime error page detected [${stage}] (APP-500).\n` +
+      `URL: ${page.url()}\n` +
+      `Body snippet:\n${snippet}`
+  )
+}
+
 test('vault page (VOLTS deep link) loads and no uncaught runtime errors', async ({ page }, testInfo) => {
+  test.setTimeout(150_000)
+
+  const path = smokePagePath()
+  const baseRaw = process.env.SMOKE_BASE_URL
+  const baseNormalized = normalizeSmokeBaseUrl(baseRaw)
+
+  console.log('[smoke] ===== smoke test inputs (debug) =====')
+  console.log(`[smoke] SMOKE_BASE_URL (raw from env): ${JSON.stringify(baseRaw ?? null)}`)
+  console.log(
+    `[smoke] SMOKE_BASE_URL (normalized): ${baseNormalized ?? '<empty — will fail on resolve>'}`
+  )
+  console.log(`[smoke] SMOKE_PAGE_PATH (raw from env): ${JSON.stringify(process.env.SMOKE_PAGE_PATH ?? null)}`)
+  console.log(`[smoke] SMOKE_PAGE_PATH (effective for test): ${path}`)
+  console.log('[smoke] ======================================')
+
   const issues: string[] = []
 
   page.on('pageerror', (err) => {
@@ -51,17 +109,16 @@ test('vault page (VOLTS deep link) loads and no uncaught runtime errors', async 
 
   page.on('console', (msg) => {
     if (msg.type() === 'error') {
-      issues.push(`console: ${msg.text()}`)
+      const loc = msg.location()
+      const where = loc.url ? ` @ ${loc.url}:${loc.lineNumber}:${loc.columnNumber}` : ''
+      issues.push(`console: ${msg.text()}${where}`)
     }
   })
 
-  const path = smokePagePath()
-  const base = normalizeSmokeBaseUrl(process.env.SMOKE_BASE_URL) ?? ''
-  console.log(`[smoke] SMOKE_BASE_URL (raw): ${process.env.SMOKE_BASE_URL ?? '<unset>'}`)
-  console.log(`[smoke] normalized base: ${base || '<empty>'}`)
-  console.log(`[smoke] SMOKE_PAGE_PATH: ${path}`)
+  const targetUrl = resolveSmokeTargetUrl(baseRaw, path)
+  console.log(`[smoke] resolved navigation URL: ${targetUrl}`)
 
-  const response = await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const response = await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   const loadedUrl = page.url()
   const status = response?.status() ?? null
   console.log(`[smoke] loaded URL: ${loadedUrl}`)
@@ -74,31 +131,28 @@ test('vault page (VOLTS deep link) loads and no uncaught runtime errors', async 
     )
   }
 
-  // Let the browser run a paint + microtasks so client-only render errors (e.g. intentional /vault crash)
-  // reach `page.on('pageerror')` before we start asserting on DOM.
+  // Let the browser run a paint + microtasks so client-only render errors reach `page.on('pageerror')` before we assert on DOM.
   await page.waitForTimeout(150)
-  const earlyPe = issues.filter((m) => m.startsWith('pageerror'))
-  if (earlyPe.length > 0) {
-    await attachScreenshot(testInfo, page, 'failure-pageerror-early.png')
-    throw new Error(
-      `[smoke] uncaught page error(s) right after navigation:\n${earlyPe.join('\n')}\nURL: ${page.url()}`
-    )
-  }
+  await failIfAppRuntimeErrorPageVisible(page, testInfo, 'early')
+  await failIfIssuesDetected(page, testInfo, issues, 'early')
 
   const deadline = Date.now() + 75_000
   let iteration = 0
-  let lastLog = 0
+  // Must not start at 0: `Date.now() - 0` would fire a fake "still waiting" on the first poll (~250ms).
+  let lastHeartbeatLog = Date.now()
+
+  console.log(
+    '[smoke] polling until Vault heading + deep-linked address in #vault-input (transient empty input is ok during hydration)'
+  )
 
   while (Date.now() < deadline) {
     iteration += 1
-    const st = await readVaultUiState(page, issues)
 
-    if (st.pageErrors.length > 0) {
-      await attachScreenshot(testInfo, page, 'failure-pageerror.png')
-      throw new Error(
-        `[smoke] uncaught page error(s):\n${st.pageErrors.join('\n')}\nURL: ${page.url()}`
-      )
-    }
+    // Fail fast before any DOM polling that could auto-wait.
+    await failIfIssuesDetected(page, testInfo, issues, 'poll')
+    await failIfAppRuntimeErrorPageVisible(page, testInfo, 'poll')
+
+    const st = await readVaultUiState(page, issues)
 
     if (st.headingVisible && st.addressInInput) {
       console.log(`[smoke] vault UI ready after ${iteration} iteration(s)`)
@@ -106,10 +160,10 @@ test('vault page (VOLTS deep link) loads and no uncaught runtime errors', async 
     }
 
     const now = Date.now()
-    if (now - lastLog > 10_000) {
-      lastLog = now
+    if (now - lastHeartbeatLog >= 10_000) {
+      lastHeartbeatLog = now
       console.log(
-        `[smoke] still waiting (${Math.round((deadline - now) / 1000)}s left): ` +
+        `[smoke] heartbeat — poll window ~${Math.round((deadline - now) / 1000)}s left: ` +
           `headingVisible=${st.headingVisible}, inputLen=${st.inputLength}, ` +
           `addressInInput=${st.addressInInput}, inputPreview=${JSON.stringify(st.inputPreview)}, ` +
           `consoleErrors=${st.consoleErrors.length}` +
@@ -137,6 +191,11 @@ test('vault page (VOLTS deep link) loads and no uncaught runtime errors', async 
         `URL=${page.url()}`
     )
   }
+
+  // Keep the page alive for a short stabilization window to catch late async React/runtime crashes.
+  await page.waitForTimeout(1_500)
+  await failIfAppRuntimeErrorPageVisible(page, testInfo, 'stabilization')
+  await failIfIssuesDetected(page, testInfo, issues, 'stabilization')
 
   expect(issues, issues.join('\n')).toEqual([])
 })

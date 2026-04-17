@@ -40,10 +40,9 @@ For WalletConnect on the deployed site, add a **repository variable** (not requi
 
 ### Post-deploy smoke test
 
-After each successful GitHub Pages deployment, the workflow runs a **Playwright** smoke test against the **vault** deep link (full URL example: `https://org.github.io/repo/vault/?chain=1&address=0x5362…`). In test config we use repo-relative path `./vault/?...` (resolved against `SMOKE_BASE_URL`) so `https://org.github.io/repo` is not mistaken for site root. It checks that the **Vault** heading appears, the address field is prefilled from the URL, and fails on **uncaught page errors** or **`console.error`** (typical for serious React runtime problems). CI logs print the exact full URL under test.
-If that smoke test fails, the workflow run ends as **failed** and an additional CI job marks the just-created `github-pages` deployment status as `failure` via the GitHub Deployments API (`POST .../deployments/{id}/statuses`). The lookup uses a correct **GET query string** (`?environment=github-pages&sha=...`), because `gh api` form fields (`-f`) do not apply to GET list calls. Smoke logs also print periodic UI snapshots (heading visible, input length/preview, console error count) and attach a full-page screenshot on failure.
+After `actions/deploy-pages` publishes the site, the **same** `deploy` workflow job runs a **Playwright** smoke test against the **vault** deep link (full URL example: `https://org.github.io/repo/vault/?chain=1&address=0x5362…`). The test resolves the repo-relative path `./vault/?...` with `SMOKE_BASE_URL` into an absolute URL (Playwright does not reliably combine `./…` with `use.baseURL` alone). It checks that the **Vault** heading appears, the address field is prefilled from the URL, and fails on **uncaught page errors** or **`console.error`**. If smoke fails, that job fails and the workflow run is **failed** (no separate follow-up job). CI installs browsers with `npx playwright install chromium --with-deps` before the test.
 
-**Local smoke against any URL:**
+**Local smoke against any URL** (install browsers once: `npx playwright install`):
 
 ```bash
 SMOKE_BASE_URL=https://your-org.github.io/your-repo \
@@ -52,6 +51,8 @@ npm run test:smoke
 ```
 
 `SMOKE_PAGE_PATH` is optional; the default matches the vault URL used in Actions.
+
+For local runs, `SMOKE_BASE_URL` and `SMOKE_PAGE_PATH` can live in **`.env.local`** (same as Next.js). `playwright.config.ts` loads those files via `@next/env` before tests run. In CI, the workflow sets `SMOKE_BASE_URL` explicitly on the job.
 
 ## Manual actions (when the app UI is unavailable)
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeSmokeBaseUrl } from '@/utils/smokeBaseUrl'
+import { normalizeSmokeBaseUrl, resolveSmokeTargetUrl } from './smokeBaseUrl'
 
 describe('normalizeSmokeBaseUrl', () => {
   it('returns undefined for empty input', () => {
@@ -26,5 +26,20 @@ describe('normalizeSmokeBaseUrl', () => {
     expect(normalizeSmokeBaseUrl('https://example.com/actions?x=1#frag')).toBe(
       'https://example.com/actions/?x=1#frag'
     )
+  })
+})
+
+describe('resolveSmokeTargetUrl', () => {
+  it('throws when base is missing', () => {
+    expect(() => resolveSmokeTargetUrl(undefined, './vault/?x=1')).toThrow(/SMOKE_BASE_URL is required/)
+  })
+
+  it('resolves ./vault path against Pages base', () => {
+    expect(
+      resolveSmokeTargetUrl(
+        'https://silo-finance.github.io/actions',
+        './vault/?chain=1&address=0xabc'
+      )
+    ).toBe('https://silo-finance.github.io/actions/vault/?chain=1&address=0xabc')
   })
 })
