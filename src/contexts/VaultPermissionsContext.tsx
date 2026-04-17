@@ -10,6 +10,13 @@ import {
 import type { VaultActionAuthority } from '@/utils/vaultActionAuthority'
 import { formatWalletRpcFailureMessage } from '@/utils/rpcErrors'
 
+function isExpectedNetworkSwitchError(error: unknown): boolean {
+  const e = error as { code?: string; event?: string; message?: string }
+  if (e.code === 'NETWORK_ERROR' && e.event === 'changed') return true
+  const msg = (e.message ?? '').toLowerCase()
+  return msg.includes('network changed')
+}
+
 export type VaultPermissionsSummary = {
   vault: string
   owner: string
@@ -40,10 +47,12 @@ type ProviderProps = {
   children: ReactNode
   /** When true, runs classification for `summary` and `account`. */
   enabled: boolean
+  /** When true, keep last resolved permissions and skip reclassification. */
+  freeze?: boolean
   summary: VaultPermissionsSummary | null
 }
 
-export function VaultPermissionsProvider({ children, enabled, summary }: ProviderProps) {
+export function VaultPermissionsProvider({ children, enabled, freeze = false, summary }: ProviderProps) {
   const { provider, account } = useWeb3()
   const [loading, setLoading] = useState(false)
   const [classificationError, setClassificationError] = useState<string | null>(null)
@@ -57,6 +66,10 @@ export function VaultPermissionsProvider({ children, enabled, summary }: Provide
   }, [])
 
   useEffect(() => {
+    if (freeze) {
+      setLoading(false)
+      return
+    }
     if (!enabled || !summary || !provider || !account) {
       setAllocatorAuth(null)
       setOwnerCuratorAuth(null)
@@ -95,6 +108,9 @@ export function VaultPermissionsProvider({ children, enabled, summary }: Provide
           setClassificationError(null)
         }
       } catch (e) {
+        if (cancelled || isExpectedNetworkSwitchError(e)) {
+          return
+        }
         console.error('VaultPermissionsProvider classification', e)
         if (!cancelled) {
           setAllocatorAuth(null)
@@ -109,10 +125,10 @@ export function VaultPermissionsProvider({ children, enabled, summary }: Provide
     return () => {
       cancelled = true
     }
-  }, [enabled, summary, provider, account, retryNonce])
+  }, [enabled, freeze, summary, provider, account, retryNonce])
 
   const value = useMemo((): VaultPermissionsContextValue => {
-    const active = Boolean(enabled && summary && account)
+    const active = Boolean(summary && account && (enabled || freeze))
     const permissionsReady = Boolean(
       active &&
         !loading &&
@@ -135,6 +151,7 @@ export function VaultPermissionsProvider({ children, enabled, summary }: Provide
     }
   }, [
     enabled,
+    freeze,
     summary,
     account,
     loading,
