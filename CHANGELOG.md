@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.20] - 2026-04-17
+
+### Fixed
+- fix: ensure rollback is not skipped
+
 ## [0.8.19] - 2026-04-17
 
 ### Fixed
