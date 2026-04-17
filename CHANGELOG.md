@@ -8,6 +8,7 @@
 - fix: maximum update depth exceeded
 - remove wallet autodetection
 
+- fix linter errors
 ## [0.8.26] - 2026-04-17
 
 ### Fixed
