@@ -40,11 +40,6 @@ function parseChainFromSearchParam(raw: string | null): number | null {
 }
 
 function VaultPageInner() {
-  // Intentional crash for rollback/smoke validation.
-  if (typeof window !== 'undefined') {
-    throw new Error('Rollback smoke test: intentional client render crash on /vault.')
-  }
-
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const router = useRouter()
