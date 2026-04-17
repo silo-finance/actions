@@ -54,7 +54,7 @@ function getSectionBounds(lines, version) {
   return { sectionStart, sectionEnd };
 }
 
-function upsertVersionSection(changelog, version, commitMessages, date) {
+function upsertVersionSection(changelog, version, commitMessages, date, sectionTitle) {
   if (commitMessages.length === 0) {
     return { updatedChangelog: changelog, changed: false };
   }
@@ -63,61 +63,15 @@ function upsertVersionSection(changelog, version, commitMessages, date) {
   const bounds = getSectionBounds(lines, version);
   const newBullets = commitMessages.map((message) => `- ${message}`);
 
-  if (!bounds) {
-    const titleIndex = lines[0] === "# Changelog" ? 0 : -1;
-    const insertAt = titleIndex === 0 ? 2 : 0;
-    const section = [
-      `## [${version}] - ${date}`,
-      "",
-      "### Fixed",
-      ...newBullets,
-      "",
-    ];
-    lines.splice(insertAt, 0, ...section);
-    return { updatedChangelog: lines.join("\n"), changed: true };
-  }
-
-  const { sectionStart, sectionEnd } = bounds;
-  const section = lines.slice(sectionStart, sectionEnd);
-  let changed = false;
-
-  let fixedIndex = section.findIndex((line) => line.trim() === "### Fixed");
-  if (fixedIndex === -1) {
-    section.push("", "### Fixed");
-    fixedIndex = section.length - 1;
-    changed = true;
-  }
-
-  let fixedEnd = section.length;
-  for (let index = fixedIndex + 1; index < section.length; index += 1) {
-    if (section[index].startsWith("### ")) {
-      fixedEnd = index;
-      break;
-    }
-  }
-
-  const existingBullets = new Set(
-    section
-      .slice(fixedIndex + 1, fixedEnd)
-      .filter((line) => line.startsWith("- "))
-      .map((line) => line.slice(2).trim()),
-  );
-
-  const bulletsToAdd = commitMessages
-    .filter((message) => !existingBullets.has(message))
-    .map((message) => `- ${message}`);
-
-  if (bulletsToAdd.length > 0) {
-    section.splice(fixedEnd, 0, ...bulletsToAdd);
-    changed = true;
-  }
-
-  if (!changed) {
+  if (bounds) {
     return { updatedChangelog: changelog, changed: false };
   }
 
-  const updatedLines = [...lines.slice(0, sectionStart), ...section, ...lines.slice(sectionEnd)];
-  return { updatedChangelog: updatedLines.join("\n"), changed: true };
+  const titleIndex = lines[0] === "# Changelog" ? 0 : -1;
+  const insertAt = titleIndex === 0 ? 2 : 0;
+  const section = [`## [${version}] - ${date}`, "", `### ${sectionTitle}`, ...newBullets, ""];
+  lines.splice(insertAt, 0, ...section);
+  return { updatedChangelog: lines.join("\n"), changed: true };
 }
 
 function main() {
@@ -132,6 +86,7 @@ function main() {
 
   const [, branchType, version] = branchMatch;
   const date = new Date().toISOString().slice(0, 10);
+  const sectionTitle = branchType === "release" ? "Added" : "Fixed";
 
   const packageJson = JSON.parse(readFileSync(PACKAGE_JSON_PATH, "utf8"));
   let packageChanged = false;
@@ -149,6 +104,7 @@ function main() {
     version,
     commitMessages,
     date,
+    sectionTitle,
   );
 
   if (changelogChanged) {
