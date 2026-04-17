@@ -6,8 +6,7 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "reset": "rm -rf .next && rm -rf ./node_modules && npm i",
-    "dev": "NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next dev",
+    "dev": "rm -rf .next && NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next dev",
     "build": "NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next build",
     "start": "next start",
     "lint": "next lint --max-warnings 0",
