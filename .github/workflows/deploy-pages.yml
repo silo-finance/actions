@@ -11,10 +11,6 @@ on:
         description: "Git ref (tag or commit SHA) to deploy"
         required: true
         default: ""
-      is_rollback:
-        description: "Internal — set by auto-rollback to avoid nested rollbacks"
-        required: false
-        default: "false"
 
 permissions:
   contents: read
@@ -30,7 +26,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
-      deployed_sha: ${{ steps.deployed.outputs.sha }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -98,10 +93,6 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Record deployed SHA
-        id: deployed
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
   post_deploy_smoke:
     needs: deploy
     runs-on: ubuntu-latest
@@ -128,7 +119,6 @@ jobs:
       - name: Log smoke URLs
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
-          DEPLOYED_SHA: ${{ needs.deploy.outputs.deployed_sha }}
         run: |
           set -euo pipefail
           BASE="${PAGE_URL%/}"
@@ -138,7 +128,6 @@ jobs:
           echo "::notice::post_deploy_smoke — Playwright baseURL (trimmed trailing slash): ${BASE}"
           echo "::notice::post_deploy_smoke — vault smoke path: ${SMOKE_PAGE_PATH}"
           echo "::notice::post_deploy_smoke — full vault URL under test: ${SMOKE_FULL_URL}"
-          echo "::notice::post_deploy_smoke — deployed commit (this run): ${DEPLOYED_SHA}"
 
       - name: Wait for vault smoke URL
         env:
@@ -171,92 +160,3 @@ jobs:
         env:
           SMOKE_BASE_URL: ${{ needs.deploy.outputs.page_url }}
         run: npm run test:smoke
-
-  auto_rollback:
-    needs: [deploy, post_deploy_smoke]
-    if: >-
-      always() &&
-      needs.deploy.result == 'success' &&
-      needs.post_deploy_smoke.result == 'failure' &&
-      github.event.inputs.is_rollback != 'true'
-    runs-on: ubuntu-latest
-    env:
-      SMOKE_PAGE_PATH: ./vault/?chain=1&address=0x5362D5086FDef73450145492a66F8EBF210c5B9C
-    permissions:
-      actions: write
-      contents: read
-    steps:
-      - name: Log rollback context (failed deploy)
-        env:
-          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
-          DEPLOYED_SHA: ${{ needs.deploy.outputs.deployed_sha }}
-        run: |
-          set -euo pipefail
-          BASE="${PAGE_URL%/}"
-          REL="${SMOKE_PAGE_PATH#./}"
-          SMOKE_FULL_URL="${BASE}/${REL}"
-          echo "::notice::auto_rollback — post-deploy smoke failed after a successful Pages deploy."
-          echo "::notice::auto_rollback — failed deployment commit: ${DEPLOYED_SHA}"
-          echo "::notice::auto_rollback — Pages URL from deploy job: ${PAGE_URL}"
-          echo "::notice::auto_rollback — vault URL that smoke tested: ${SMOKE_FULL_URL}"
-
-      - name: Checkout (history for rollback SHA)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Resolve rollback commit
-        id: rollback
-        env:
-          DEPLOYED_SHA: ${{ needs.deploy.outputs.deployed_sha }}
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
-        run: |
-          set -euo pipefail
-          ZERO=0000000000000000000000000000000000000000
-          echo "::notice::auto_rollback — event: ${EVENT_NAME}"
-          echo "::notice::auto_rollback — github.event.before (push only): ${BEFORE:-<empty>}"
-          echo "::notice::auto_rollback — deployed SHA to roll back from: ${DEPLOYED_SHA}"
-          if [ "$EVENT_NAME" = "push" ] && [ -n "$BEFORE" ] && [ "$BEFORE" != "$ZERO" ]; then
-            SHA="$BEFORE"
-            echo "::notice::auto_rollback — strategy: previous branch tip (push before)"
-            echo "::notice::auto_rollback — rollback target SHA: $SHA"
-          else
-            SHA=$(git rev-parse "${DEPLOYED_SHA}^")
-            echo "::notice::auto_rollback — strategy: parent commit of deployed SHA (^)"
-            echo "::notice::auto_rollback — rollback target SHA: $SHA"
-          fi
-          RB_SHORT=$(git rev-parse --short "$SHA")
-          RB_SUBJECT=$(git show -s --format=%s "$SHA")
-          echo "::notice::auto_rollback — rollback target ${RB_SHORT} (${SHA}): ${RB_SUBJECT}"
-          if [ "$SHA" = "$DEPLOYED_SHA" ]; then
-            echo "::error::Rollback SHA equals deployed SHA; aborting."
-            exit 1
-          fi
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-
-      - name: Dispatch rollback deploy
-        uses: actions/github-script@v7
-        env:
-          ROLLBACK_SHA: ${{ steps.rollback.outputs.sha }}
-        with:
-          script: |
-            const sha = process.env.ROLLBACK_SHA
-            if (!sha || sha.length < 7) {
-              core.setFailed(`Invalid ROLLBACK_SHA: ${sha}`)
-              return
-            }
-            core.notice(
-              `auto_rollback — dispatching workflow deploy-pages.yml on ref master with inputs.ref=${sha} and inputs.is_rollback=true`,
-            )
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'deploy-pages.yml',
-              ref: 'master',
-              inputs: {
-                ref: sha,
-                is_rollback: 'true',
-              },
-            })
-            core.notice(`auto_rollback — workflow_dispatch sent for rollback commit ${sha}`)
