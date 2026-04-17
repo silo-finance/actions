@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 const CHANGELOG_PATH = "CHANGELOG.md";
 const PACKAGE_JSON_PATH = "package.json";
+const MANIFEST_PATH = "public/manifest.json";
 const BRANCH_PATTERN = /^(release|hotfix)\/(\d+\.\d+\.\d+)$/;
 const IGNORED_COMMIT_PATTERNS = [
   /^Merge pull request #\d+\b/i,
@@ -120,6 +121,17 @@ function upsertVersionSection(changelog, version, commitMessages, date) {
   return { updatedChangelog: updatedLines.join("\n"), changed: true };
 }
 
+function syncManifestVersionFromPackage() {
+  const pkg = JSON.parse(readFileSync(PACKAGE_JSON_PATH, "utf8"));
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+  if (manifest.version === pkg.version) {
+    return false;
+  }
+  manifest.version = pkg.version;
+  writeFileSync(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+  return true;
+}
+
 function main() {
   const headRef = process.env.GITHUB_HEAD_REF ?? "";
   const baseRef = process.env.GITHUB_BASE_REF ?? "master";
@@ -155,8 +167,10 @@ function main() {
     writeFileSync(CHANGELOG_PATH, updatedChangelog);
   }
 
-  if (!packageChanged && !changelogChanged) {
-    console.log(`No changelog/package changes needed for ${branchType}/${version}`);
+  const manifestChanged = syncManifestVersionFromPackage();
+
+  if (!packageChanged && !changelogChanged && !manifestChanged) {
+    console.log(`No changelog/package/manifest changes needed for ${branchType}/${version}`);
     return;
   }
 

@@ -1,12 +1,13 @@
 {
   "name": "silo-actions",
-  "version": "0.8.16",
+  "version": "0.8.17",
   "private": true,
   "engines": {
     "node": ">=20.19.0"
   },
   "scripts": {
     "dev": "rm -rf .next && NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next dev",
+    "prebuild": "node ./scripts/sync-manifest-version.mjs",
     "build": "NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next build",
     "start": "next start",
     "lint": "next lint --max-warnings 0",
