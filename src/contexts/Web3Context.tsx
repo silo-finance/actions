@@ -100,8 +100,9 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
     }
     setBrowserProvider(new BrowserProvider(transport, network))
     setEip1193Provider(transport)
-    /* `walletClient` from `useWalletClient()` often gets a new object reference each render; stable deps avoid a setState loop. */
-  }, [isConnected, address, walletChainId])
+  },
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `useWalletClient().data` is often a new object each render; listing walletClient.* caused a setState feedback loop. isConnected, address, and walletChainId bound the session for this sync.
+  [isConnected, address, walletChainId])
 
   const refreshChainId = useCallback(async () => {
     try {
