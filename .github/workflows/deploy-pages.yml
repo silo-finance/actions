@@ -31,10 +31,33 @@ jobs:
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
       deployed_sha: ${{ steps.meta.outputs.deployed_sha }}
+      deploy_ref: ${{ steps.deploy_ref.outputs.deploy_ref }}
+      rollback_eligible: ${{ steps.rollback_meta.outputs.rollback_eligible }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Resolve deploy ref (for rollback)
+        id: deploy_ref
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.ref }}" ]; then
+            echo "deploy_ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_ref=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rollback eligibility (semver tag vX.Y.Z only)
+        id: rollback_meta
+        shell: bash
+        run: |
+          ref="${{ steps.deploy_ref.outputs.deploy_ref }}"
+          if [[ "$ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "rollback_eligible=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rollback_eligible=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -106,6 +129,8 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      smoke_ok: ${{ steps.record_smoke.outputs.ok }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -135,6 +160,7 @@ jobs:
           echo "::notice::post-deploy smoke — full vault URL under test: ${SMOKE_FULL_URL}"
 
       - name: Wait for vault smoke URL
+        id: wait_smoke_url
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
         run: |
@@ -162,14 +188,250 @@ jobs:
           fi
 
       - name: Post-deploy smoke (Playwright)
+        id: playwright_smoke
+        continue-on-error: true
         env:
           SMOKE_BASE_URL: ${{ needs.deploy.outputs.page_url }}
         run: npm run test:smoke
 
-  finalize_deployment:
+      - name: Record smoke outcome
+        id: record_smoke
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.playwright_smoke.outcome }}" = "success" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Post-deploy smoke passed."
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Post-deploy smoke failed (outcome=${{ steps.playwright_smoke.outcome }})."
+          fi
+
+  rollback_pages:
     needs: [deploy, post_deploy_smoke]
+    if: needs.deploy.outputs.rollback_eligible == 'true' && needs.post_deploy_smoke.outputs.smoke_ok == 'false'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Log rollback context
+        shell: bash
+        env:
+          FAILED_REF: ${{ needs.deploy.outputs.deploy_ref }}
+        run: |
+          echo "::notice::Post-deploy smoke failed for ref ${FAILED_REF}. Redeploying previous semver tag to GitHub Pages."
+
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve previous semver tag
+        id: prev_tag
+        shell: bash
+        env:
+          CURRENT: ${{ needs.deploy.outputs.deploy_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force origin
+          # Newest-first semver order; take the first tag strictly older than CURRENT.
+          PREV=""
+          seen_current=false
+          while IFS= read -r t; do
+            [ -z "$t" ] && continue
+            if [ "$seen_current" = true ]; then
+              PREV="$t"
+              break
+            fi
+            if [ "$t" = "$CURRENT" ]; then
+              seen_current=true
+            fi
+          done < <(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname)
+          if [ -z "$PREV" ]; then
+            echo "::error::No previous semver tag (vX.Y.Z) found to roll back to (or failed ref is not in tag list). Failed ref: ${CURRENT}"
+            exit 1
+          fi
+          echo "prev_tag=$PREV" >> "$GITHUB_OUTPUT"
+          echo "::notice::Rollback target tag: $PREV (failed deploy ref: $CURRENT)"
+
+      - name: Checkout rollback ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.prev_tag.outputs.prev_tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Disable Next.js telemetry
+        run: npx next telemetry disable
+
+      - name: Run linter (fails on errors and warnings)
+        run: npm run lint
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Check WalletConnect project id (build input)
+        env:
+          WC: ${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
+          STRICT: ${{ vars.DEPLOY_REQUIRE_WALLETCONNECT_PROJECT_ID }}
+        run: |
+          WC_TRIMMED="$(printf '%s' "$WC" | tr -d '\r\n' | xargs)"
+          if [ -n "$WC_TRIMMED" ]; then
+            echo "::notice::NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is set (raw length ${#WC}, trimmed length ${#WC_TRIMMED})."
+            if [ "$WC" != "$WC_TRIMMED" ]; then
+              echo "::warning::NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID contains surrounding whitespace/newlines; trimmed value will be used by the app build."
+            fi
+          else
+            echo "::warning::NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is empty — WalletConnect will be omitted from the build."
+            if [ "$STRICT" = "true" ] || [ "$STRICT" = "1" ]; then
+              echo "::error::Strict mode: set repository variable NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID, or set DEPLOY_REQUIRE_WALLETCONNECT_PROJECT_ID to false."
+              exit 1
+            fi
+          fi
+
+      - name: Build static site
+        env:
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+          NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
+        run: npm run build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+      - name: Deploy rollback to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  post_rollback_smoke:
+    needs: [rollback_pages]
+    if: needs.rollback_pages.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      smoke_ok: ${{ steps.record_smoke.outputs.ok }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium --with-deps
+
+      - name: Log rollback smoke URLs
+        env:
+          PAGE_URL: ${{ needs.rollback_pages.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          BASE="${PAGE_URL%/}"
+          REL="${SMOKE_PAGE_PATH#./}"
+          SMOKE_FULL_URL="${BASE}/${REL}"
+          echo "::notice::post-rollback smoke — GitHub Pages base URL: ${PAGE_URL}"
+          echo "::notice::post-rollback smoke — full vault URL under test: ${SMOKE_FULL_URL}"
+
+      - name: Wait for vault smoke URL (after rollback)
+        env:
+          PAGE_URL: ${{ needs.rollback_pages.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          if [ -z "$PAGE_URL" ]; then
+            echo "::error::Rollback job did not produce page_url"
+            exit 1
+          fi
+          BASE="${PAGE_URL%/}"
+          REL="${SMOKE_PAGE_PATH#./}"
+          SMOKE_FULL_URL="${BASE}/${REL}"
+          echo "Waiting for HTTP 200 from: ${SMOKE_FULL_URL}"
+          ok=0
+          for i in $(seq 1 36); do
+            if curl -fsS --max-time 30 "$SMOKE_FULL_URL" >/dev/null; then
+              ok=1
+              break
+            fi
+            echo "Attempt $i: not ready yet, sleeping 10s"
+            sleep 10
+          done
+          if [ "$ok" != "1" ]; then
+            echo "::error::Vault smoke URL did not become reachable in time after rollback"
+            exit 1
+          fi
+
+      - name: Post-rollback smoke (Playwright)
+        id: playwright_smoke
+        continue-on-error: true
+        env:
+          SMOKE_BASE_URL: ${{ needs.rollback_pages.outputs.page_url }}
+        run: npm run test:smoke
+
+      - name: Record rollback smoke outcome
+        id: record_smoke
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.playwright_smoke.outcome }}" = "success" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Post-rollback smoke passed."
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Post-rollback smoke failed (outcome=${{ steps.playwright_smoke.outcome }})."
+          fi
+
+  smoke_gate:
+    needs: [deploy, post_deploy_smoke, rollback_pages, post_rollback_smoke]
+    if: always() && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce primary smoke or successful rollback + smoke
+        shell: bash
+        env:
+          PRIMARY_OK: ${{ needs.post_deploy_smoke.outputs.smoke_ok }}
+          RB_RESULT: ${{ needs.rollback_pages.result }}
+          POST_RB_OK: ${{ needs.post_rollback_smoke.outputs.smoke_ok }}
+        run: |
+          set -euo pipefail
+          if [ "$PRIMARY_OK" = "true" ]; then
+            echo "::notice::Primary post-deploy smoke passed."
+            exit 0
+          fi
+          if [ "$RB_RESULT" = "success" ] && [ "${POST_RB_OK:-false}" = "true" ]; then
+            echo "::notice::Site recovered: rollback deploy + post-rollback smoke passed."
+            exit 0
+          fi
+          if [ "$RB_RESULT" = "skipped" ]; then
+            echo "::error::Post-deploy smoke failed. Automatic rollback applies only to semver tags (vX.Y.Z) on release or workflow_dispatch with a tag ref; redeploy manually if needed."
+            exit 1
+          fi
+          echo "::error::Post-deploy smoke failed and rollback did not restore a healthy site (rollback job: ${RB_RESULT}, post-rollback smoke ok: ${POST_RB_OK:-n/a})."
+          exit 1
+
+  finalize_deployment:
+    needs: smoke_gate
+    if: success()
     runs-on: ubuntu-latest
     steps:
       - name: Final deployment marker
         run: |
-          echo "OK: deploy + post-deploy smoke succeeded"
+          echo "OK: deploy + post-deploy smoke (or rollback recovery) succeeded"

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.16] - 2026-04-17
+
+### Fixed
+- fix: automatic rollback
+
 ## [0.8.15] - 2026-04-17
 
 ### Fixed
