@@ -38,24 +38,20 @@ For WalletConnect on the deployed site, add a **repository variable** (not requi
 2. Name: `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`, value: your Reown / WalletConnect project id  
    The deploy workflow passes it into `npm run build` as `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`.
 
-### Post-deploy smoke test and automatic rollback
+### Post-deploy smoke test
 
-After each successful GitHub Pages deployment, the workflow runs a **Playwright** smoke test against the live site URL: it loads the home page, checks that the main heading appears, and fails if there is an **uncaught page error** or a **`console.error`** from the app (typical for serious React runtime problems).
-
-If that smoke test fails, a follow-up job **dispatches the same workflow again** with:
-
-- `ref` set to the previous commit on `master` when the deploy was triggered by a **push** (using `github.event.before`), or otherwise the **parent** of the commit that was actually deployed (`deployed_sha^`),
-- `is_rollback` set to `true` so that a second failure does **not** trigger another rollback (avoids an infinite loop).
-
-The original workflow run still ends as **failed** so you can inspect logs; the rollback runs as a **new** workflow run. The `auto_rollback` job sets `permissions.actions: write` on `GITHUB_TOKEN` so it can call `workflow_dispatch`. If dispatch still fails, check **Settings** → **Actions** → **General** for any organization-level restrictions on the token.
-
-**Manual rollback:** Actions → **Deploy to GitHub Pages** → **Run workflow**, set `ref` to a known-good tag or commit SHA. Leave `is_rollback` at `false` unless you are debugging the rollback path.
+After each successful GitHub Pages deployment, the workflow runs a **Playwright** smoke test against the **vault** deep link (full URL example: `https://org.github.io/repo/vault/?chain=1&address=0x5362…`). In test config we use repo-relative path `./vault/?...` (resolved against `SMOKE_BASE_URL`) so `https://org.github.io/repo` is not mistaken for site root. It checks that the **Vault** heading appears, the address field is prefilled from the URL, and fails on **uncaught page errors** or **`console.error`** (typical for serious React runtime problems). CI logs print the exact full URL under test.
+If that smoke test fails, the workflow run ends as **failed** (no custom rollback job).
 
 **Local smoke against any URL:**
 
 ```bash
-SMOKE_BASE_URL=https://your-org.github.io/your-repo/ npm run test:smoke
+SMOKE_BASE_URL=https://your-org.github.io/your-repo \
+SMOKE_PAGE_PATH='./vault/?chain=1&address=0x5362D5086FDef73450145492a66F8EBF210c5B9C' \
+npm run test:smoke
 ```
+
+`SMOKE_PAGE_PATH` is optional; the default matches the vault URL used in Actions.
 
 ## Manual actions (when the app UI is unavailable)
 

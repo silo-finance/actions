@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.9] - 2026-04-17
+
+### Fixed
+- remove rollback, github mechanism will be used.
+- fix: ensure rollback process is working, add logs in ci
+
 ## [0.8.8] - 2026-04-17
 
 ### Fixed
