@@ -236,31 +236,76 @@ jobs:
           echo "::error::Post-deploy smoke did not pass (see steps above)."
           exit 1
 
-  # Runs when deploy succeeded but smoke did not (failure or cancelled). Uses `always()` so GitHub
-  # still schedules this job after a failed `post_deploy_smoke` (failed needed jobs skip dependents by default).
-  # Smoke outcome must never block rollback: do not add intermediate jobs that `need` post_deploy_smoke.
+  # MUST use `if: always()` only. A compound `if` that references `needs.post_deploy_smoke.result` is
+  # evaluated unreliably when that job fails, and GitHub leaves this job as skipped. All real checks
+  # live in the first "Decide …" step (exit 0 = no-op job success, no Pages deploy).
   rollback_pages:
     needs: [deploy, post_deploy_smoke]
-    if: |
-      always() &&
-      needs.deploy.result == 'success' &&
-      (needs.post_deploy_smoke.result == 'failure' || needs.post_deploy_smoke.result == 'cancelled') &&
-      needs.deploy.outputs.rollback_eligible == 'true'
+    if: always()
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
+      rollback_ran: ${{ steps.gate.outputs.should_rollback }}
     steps:
+      - name: Decide whether to run Pages rollback
+        id: gate
+        shell: bash
+        env:
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          POST_DEPLOY_RESULT: ${{ needs.post_deploy_smoke.result }}
+          RB_ELIG: ${{ needs.deploy.outputs.rollback_eligible }}
+          FAILED_REF: ${{ needs.deploy.outputs.deploy_ref }}
+        run: |
+          set -euo pipefail
+          echo "::notice::rollback gate: deploy=${DEPLOY_RESULT} post_deploy_smoke=${POST_DEPLOY_RESULT} rollback_eligible=${RB_ELIG} deploy_ref=${FAILED_REF}"
+
+          if [ "$DEPLOY_RESULT" != "success" ]; then
+            echo "should_rollback=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=deploy_not_success" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$RB_ELIG" != "true" ]; then
+            echo "should_rollback=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=not_rollback_eligible" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$POST_DEPLOY_RESULT" = "success" ]; then
+            echo "should_rollback=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=smoke_passed" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$POST_DEPLOY_RESULT" = "skipped" ]; then
+            echo "should_rollback=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=smoke_skipped" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$POST_DEPLOY_RESULT" = "failure" ] || [ "$POST_DEPLOY_RESULT" = "cancelled" ]; then
+            echo "should_rollback=true" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "should_rollback=false" >> "$GITHUB_OUTPUT"
+          echo "skip_reason=unexpected_post_deploy_${POST_DEPLOY_RESULT}" >> "$GITHUB_OUTPUT"
+          exit 0
+
       - name: Log rollback context
+        if: steps.gate.outputs.should_rollback == 'true'
         shell: bash
         env:
           FAILED_REF: ${{ needs.deploy.outputs.deploy_ref }}
         run: |
-          echo "::notice::Post-deploy smoke failed for ref ${FAILED_REF}. Redeploying previous semver tag to GitHub Pages."
+          echo "::notice::Post-deploy smoke did not succeed for ref ${FAILED_REF}. Redeploying previous semver tag to GitHub Pages."
 
       - name: Download smoke outcome (optional sanity check)
+        if: steps.gate.outputs.should_rollback == 'true'
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
@@ -268,6 +313,7 @@ jobs:
           path: smoke-out
 
       - name: Verify smoke artifact agrees with failed job
+        if: steps.gate.outputs.should_rollback == 'true'
         shell: bash
         run: |
           f="smoke-outcome/smoke-result.txt"
@@ -276,12 +322,14 @@ jobs:
           fi
 
       - name: Checkout (full history + tags)
+        if: steps.gate.outputs.should_rollback == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - name: Resolve previous semver tag
+        if: steps.gate.outputs.should_rollback == 'true'
         id: prev_tag
         shell: bash
         env:
@@ -314,29 +362,36 @@ jobs:
           echo "::notice::Rollback target tag: $PREV (failed deploy ref: $CURRENT)"
 
       - name: Checkout rollback ref
+        if: steps.gate.outputs.should_rollback == 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.prev_tag.outputs.prev_tag }}
 
       - name: Setup Node.js
+        if: steps.gate.outputs.should_rollback == 'true'
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: "npm"
 
       - name: Install dependencies
+        if: steps.gate.outputs.should_rollback == 'true'
         run: npm ci --legacy-peer-deps
 
       - name: Disable Next.js telemetry
+        if: steps.gate.outputs.should_rollback == 'true'
         run: npx next telemetry disable
 
       - name: Run linter (fails on errors and warnings)
+        if: steps.gate.outputs.should_rollback == 'true'
         run: npm run lint
 
       - name: Run tests
+        if: steps.gate.outputs.should_rollback == 'true'
         run: npm run test
 
       - name: Check WalletConnect project id (build input)
+        if: steps.gate.outputs.should_rollback == 'true'
         env:
           WC: ${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
           STRICT: ${{ vars.DEPLOY_REQUIRE_WALLETCONNECT_PROJECT_ID }}
@@ -356,25 +411,29 @@ jobs:
           fi
 
       - name: Build static site
+        if: steps.gate.outputs.should_rollback == 'true'
         env:
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
           NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
         run: npm run build
 
       - name: Configure Pages
+        if: steps.gate.outputs.should_rollback == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
+        if: steps.gate.outputs.should_rollback == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./out
 
       - name: Deploy rollback to GitHub Pages
+        if: steps.gate.outputs.should_rollback == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
 
       - name: Log published app version (optional curl)
-        if: success()
+        if: steps.gate.outputs.should_rollback == 'true' && success()
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         shell: bash
@@ -418,21 +477,30 @@ jobs:
           POST_DEPLOY: ${{ needs.post_deploy_smoke.result }}
           RB_RESULT: ${{ needs.rollback_pages.result }}
           RB_ELIG: ${{ needs.deploy.outputs.rollback_eligible }}
+          ROLLBACK_RAN: ${{ needs.rollback_pages.outputs.rollback_ran }}
         run: |
           set -euo pipefail
           if [ "$POST_DEPLOY" = "success" ]; then
             echo "::notice::Primary post-deploy smoke passed."
             exit 0
           fi
-          if [ "$RB_RESULT" = "success" ]; then
-            echo "::notice::Post-deploy smoke failed; rollback Pages deploy finished (see rollback job for optional manifest version log)."
-            exit 0
-          fi
-          if [ "$RB_RESULT" = "skipped" ] && [ "$RB_ELIG" != "true" ]; then
-            echo "::error::Post-deploy smoke failed. Automatic rollback is only for GitHub Releases or deploy refs that look like semver (vX.Y.Z or X.Y.Z). Branch pushes (e.g. master) do not roll back; redeploy from a tag or run workflow_dispatch with a tag ref."
+
+          if [ "$RB_ELIG" != "true" ]; then
+            echo "::error::Post-deploy smoke did not succeed. Automatic rollback only when rollback_eligible (GitHub Release or semver-like ref). Branch-only deploys do not roll back; redeploy from a tag or workflow_dispatch with a tag ref."
             exit 1
           fi
-          echo "::error::Post-deploy smoke did not succeed (post_deploy=${POST_DEPLOY}) and rollback did not complete (rollback=${RB_RESULT})."
+
+          if [ "$RB_RESULT" = "success" ] && [ "$ROLLBACK_RAN" = "true" ]; then
+            echo "::notice::Rollback Pages deploy ran after failed smoke (see rollback job for manifest curl log)."
+            exit 0
+          fi
+
+          if [ "$RB_RESULT" = "success" ] && [ "$ROLLBACK_RAN" != "true" ]; then
+            echo "::error::Smoke failed and rollback was eligible, but rollback_pages did not deploy (gate no-op). Inspect the Decide whether to run Pages rollback step in rollback_pages."
+            exit 1
+          fi
+
+          echo "::error::Post-deploy smoke did not succeed and rollback did not complete (post_deploy=${POST_DEPLOY}, rollback=${RB_RESULT})."
           exit 1
 
   finalize_deployment:
