@@ -70,6 +70,8 @@ function VaultPageInner() {
   const [myVaults, setMyVaults] = useState<SiloV3VaultListItem[]>([])
   const [myVaultsLoading, setMyVaultsLoading] = useState(false)
   const [myVaultsError, setMyVaultsError] = useState('')
+  /** True after the Silo API vault-list request finishes for the current wallet + chain (success or error). */
+  const [myVaultsListResolved, setMyVaultsListResolved] = useState(false)
   const [showMyVaultsPicker, setShowMyVaultsPicker] = useState(false)
   const myVaultsRef = useRef<SiloV3VaultListItem[]>([])
   myVaultsRef.current = myVaults
@@ -254,10 +256,12 @@ function VaultPageInner() {
       setMyVaultsError('')
       setMyVaultsLoading(false)
       setShowMyVaultsPicker(false)
+      setMyVaultsListResolved(false)
       return
     }
 
     let cancelled = false
+    setMyVaultsListResolved(false)
     setMyVaultsLoading(true)
     setMyVaultsError('')
     void (async () => {
@@ -270,11 +274,19 @@ function VaultPageInner() {
       } catch (e) {
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : String(e)
-          setMyVaultsError(msg || 'Could not load vault list from Silo API.')
+          setMyVaultsError(
+            msg
+              ? `Could not load your vault list from the Silo indexer API. ${msg}`
+              : 'Could not load your vault list from the Silo indexer API.'
+          )
           setMyVaults([])
+          setShowMyVaultsPicker(false)
         }
       } finally {
-        if (!cancelled) setMyVaultsLoading(false)
+        if (!cancelled) {
+          setMyVaultsLoading(false)
+          setMyVaultsListResolved(true)
+        }
       }
     })()
 
@@ -438,10 +450,21 @@ function VaultPageInner() {
         {isConnected && chainId != null && isChainSupported(chainId) ? (
           <div className="mt-4">
             {myVaultsLoading ? (
-              <p className="text-xs silo-text-soft m-0">Loading vaults you manage (Silo API)…</p>
+              <p className="text-xs silo-text-soft m-0">Loading vaults you manage (Silo indexer API)…</p>
             ) : null}
             {myVaultsError && !myVaultsLoading ? (
-              <p className="text-xs silo-alert silo-alert-error m-0">{myVaultsError}</p>
+              <p className="mt-3 text-sm silo-alert silo-alert-error m-0" role="alert">
+                {myVaultsError}
+              </p>
+            ) : null}
+            {myVaultsListResolved &&
+            !myVaultsLoading &&
+            !myVaultsError &&
+            myVaults.length === 0 ? (
+              <p className="mt-3 text-xs silo-alert silo-alert-info m-0 leading-relaxed">
+                No vaults were found where this wallet is owner, curator, or guardian in the Silo v3 indexer. (If you
+                are only an allocator, this list cannot show those vaults — paste the vault contract address above.)
+              </p>
             ) : null}
             {showMyVaultsPicker && myVaults.length > 0 ? (
               <div className="mt-3 space-y-2">
