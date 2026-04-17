@@ -36,7 +36,7 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          if git diff --quiet CHANGELOG.md package.json; then
+          if git diff --quiet CHANGELOG.md package.json public/manifest.json; then
             echo "No changes to commit."
             exit 0
           fi
@@ -50,6 +50,6 @@ jobs:
             message="hotfix ${version}"
           fi
 
-          git add CHANGELOG.md package.json
+          git add CHANGELOG.md package.json public/manifest.json
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "$message"
           git push origin HEAD

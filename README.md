@@ -40,15 +40,21 @@ For WalletConnect on the deployed site, add a **repository variable** (not requi
 
 ### Post-deploy smoke test
 
-After `actions/deploy-pages` publishes the site in the `deploy` job, a separate `post_deploy_smoke` job runs the **Playwright** smoke test against the **vault** deep link (full URL example: `https://org.github.io/repo/vault/?chain=1&address=0x5362…`). The test resolves the repo-relative path `./vault/?...` with `SMOKE_BASE_URL` into an absolute URL (Playwright does not reliably combine `./…` with `use.baseURL` alone). It checks that the **Vault** heading appears, the address field is prefilled from the URL, and fails on **uncaught page errors**, **tab crashes**, or **`console.error`**. A `smoke_gate` job then decides whether the workflow is allowed to succeed (see automatic rollback below). When everything passes, `finalize_deployment` prints an `OK` marker.
+After `actions/deploy-pages` publishes the site in the `deploy` job, a separate `post_deploy_smoke` job runs the **Playwright** smoke test against the **vault** deep link (full URL example: `https://org.github.io/repo/vault/?chain=1&address=0x5362…`). The test resolves the repo-relative path `./vault/?...` with `SMOKE_BASE_URL` into an absolute URL (Playwright does not reliably combine `./…` with `use.baseURL` alone). It checks that the **Vault** heading appears, the address field is prefilled from the URL, and fails on **uncaught page errors**, **tab crashes**, or **`console.error`**.
+
+That smoke job uses **`continue-on-error: true`** on purpose: if any step fails (including the HTTP wait or Playwright), GitHub would otherwise **skip** follow-up jobs such as `rollback_pages`. With this setting, the job still exposes `smoke_ok` and downstream rollback can run. A `smoke_gate` job then fails the workflow unless primary smoke passed **or** a rollback deploy completed. When the gate passes, `finalize_deployment` prints an `OK` marker.
 
 #### Automatic rollback (semver tags only)
 
-GitHub Pages does **not** provide a native “revert this deployment” API after a bad publish. This repo implements rollback in Actions: if post-deploy smoke fails **and** the deployed ref is a strict semver tag `vX.Y.Z` (for example a **published release** or a **workflow_dispatch** run where `ref` is that tag), a `rollback_pages` job redeploys the **previous** `vX.Y.Z` tag from git history (`git tag` sorted by version), then `post_rollback_smoke` runs the same Playwright checks. The workflow only succeeds if either the primary smoke passes or rollback + post-rollback smoke both pass.
+GitHub Pages does **not** provide a native “revert this deployment” API after a bad publish. This repo implements rollback in Actions: if post-deploy smoke fails **and** the deployed ref is a strict semver tag `vX.Y.Z` (for example a **published release** or **workflow_dispatch** with `ref` set to that tag), a `rollback_pages` job redeploys the **previous** `vX.Y.Z` tag from git history (`git tag` sorted by version). There is **no second Playwright run** after rollback.
+
+The Safe app **`public/manifest.json`** includes a **`version`** field (same semver as `package.json`, without a `v` prefix). `npm run build` runs **`prebuild`** first (`scripts/sync-manifest-version.mjs`) so the built site always ships an up-to-date manifest. The PR automation script [`scripts/update-changelog-from-pr.mjs`](scripts/update-changelog-from-pr.mjs) also keeps that field aligned when it bumps `package.json` / `CHANGELOG.md` on `release/*` and `hotfix/*` branches.
+
+After rollback deploy, the workflow **curl**s `https://…/repo/manifest.json` (with retries), reads **`version`** with `jq`, and prints it in the job log; if the file is not reachable yet, it logs a **warning** only.
 
 Non-tag deploys (for example pushes to `master`) still run smoke, but **no automatic rollback** runs if smoke fails; fix forward or run **Deploy to GitHub Pages** manually with `ref` set to the last known good tag.
 
-If rollback smoke fails, the workflow fails: investigate, fix the code, and redeploy (or dispatch the workflow with a stable tag).
+If rollback itself fails (for example no previous tag), the workflow fails: investigate and redeploy manually.
 
 **Local smoke against any URL** (install browsers once: `npx playwright install`):
 

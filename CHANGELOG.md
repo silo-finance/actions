@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.17] - 2026-04-17
+
+### Fixed
+- fix rollback process + version info
+
 ## [0.8.16] - 2026-04-17
 
 ### Fixed
