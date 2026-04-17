@@ -2,6 +2,7 @@ import { Contract, type Provider, getAddress } from 'ethers'
 import erc20Artifact from '@/abis/ERC20.json'
 import siloVaultArtifact from '@/abis/SiloVault.json'
 import { loadAbi } from '@/utils/loadAbi'
+import { buildReadMulticallCall, executeReadMulticall } from '@/utils/readMulticall'
 
 const siloVaultAbi = loadAbi(siloVaultArtifact)
 const erc20Abi = loadAbi(erc20Artifact)
@@ -55,16 +56,40 @@ export async function fetchVaultUnderlyingMeta(
 }
 
 async function readQueues(
-  vault: Contract,
+  provider: Provider,
+  vaultAddress: string,
   sLen: number,
   wLen: number
 ): Promise<{ supply: string[]; withdraw: string[] }> {
-  const supply = await Promise.all(
-    Array.from({ length: sLen }, (_, i) => vault.supplyQueue(i).then((a: string) => String(a)))
-  )
-  const withdraw = await Promise.all(
-    Array.from({ length: wLen }, (_, i) => vault.withdrawQueue(i).then((a: string) => String(a)))
-  )
+  const vaultNorm = getAddress(vaultAddress)
+  const vault = new Contract(vaultNorm, siloVaultAbi, provider)
+  const calls = [
+    ...Array.from({ length: sLen }, (_, i) =>
+      buildReadMulticallCall({
+        target: vaultNorm,
+        abi: siloVaultAbi,
+        functionName: 'supplyQueue',
+        args: [i],
+        fallback: async () => vault.supplyQueue(i),
+        decodeResult: (value) => String(value),
+      })
+    ),
+    ...Array.from({ length: wLen }, (_, i) =>
+      buildReadMulticallCall({
+        target: vaultNorm,
+        abi: siloVaultAbi,
+        functionName: 'withdrawQueue',
+        args: [i],
+        fallback: async () => vault.withdrawQueue(i),
+        decodeResult: (value) => String(value),
+      })
+    ),
+  ]
+  const result = await executeReadMulticall(provider, calls, {
+    debugLabel: 'vaultReader:readQueues',
+  })
+  const supply = result.slice(0, sLen).map((a) => String(a))
+  const withdraw = result.slice(sLen, sLen + wLen).map((a) => String(a))
   return { supply, withdraw }
 }
 
@@ -72,12 +97,25 @@ export async function fetchVaultQueues(provider: Provider, vaultAddress: string)
   supply: string[]
   withdraw: string[]
 }> {
-  const vault = new Contract(vaultAddress, siloVaultAbi, provider)
-  const [supplyLen, withdrawLen] = await Promise.all([
-    vault.supplyQueueLength(),
-    vault.withdrawQueueLength(),
+  const vaultNorm = getAddress(vaultAddress)
+  const vault = new Contract(vaultNorm, siloVaultAbi, provider)
+  const [supplyLen, withdrawLen] = await executeReadMulticall(provider, [
+    buildReadMulticallCall({
+      target: vaultNorm,
+      abi: siloVaultAbi,
+      functionName: 'supplyQueueLength',
+      fallback: async () => vault.supplyQueueLength(),
+      decodeResult: (value) => Number(value),
+    }),
+    buildReadMulticallCall({
+      target: vaultNorm,
+      abi: siloVaultAbi,
+      functionName: 'withdrawQueueLength',
+      fallback: async () => vault.withdrawQueueLength(),
+      decodeResult: (value) => Number(value),
+    }),
   ])
-  return readQueues(vault, Number(supplyLen), Number(withdrawLen))
+  return readQueues(provider, vaultNorm, Number(supplyLen), Number(withdrawLen))
 }
 
 export type VaultOverview = {
@@ -91,18 +129,57 @@ export type VaultOverview = {
 
 /** Owner, timelock, curator, guardian, and both queues in one flow (single vault Contract instance). */
 export async function fetchVaultOverview(provider: Provider, vaultAddress: string): Promise<VaultOverview> {
-  const vault = new Contract(vaultAddress, siloVaultAbi, provider)
-  const [owner, timelock, supplyLen, withdrawLen, curator, guardian] = await Promise.all([
-    vault.owner(),
-    vault.timelock(),
-    vault.supplyQueueLength(),
-    vault.withdrawQueueLength(),
-    vault.curator(),
-    vault.guardian(),
-  ])
+  const vaultNorm = getAddress(vaultAddress)
+  const vault = new Contract(vaultNorm, siloVaultAbi, provider)
+  const [owner, timelock, supplyLen, withdrawLen, curator, guardian] = await executeReadMulticall(
+    provider,
+    [
+      buildReadMulticallCall({
+        target: vaultNorm,
+        abi: siloVaultAbi,
+        functionName: 'owner',
+        fallback: async () => vault.owner(),
+      }),
+      buildReadMulticallCall({
+        target: vaultNorm,
+        abi: siloVaultAbi,
+        functionName: 'timelock',
+        fallback: async () => vault.timelock(),
+      }),
+      buildReadMulticallCall({
+        target: vaultNorm,
+        abi: siloVaultAbi,
+        functionName: 'supplyQueueLength',
+        fallback: async () => vault.supplyQueueLength(),
+        decodeResult: (value) => Number(value),
+      }),
+      buildReadMulticallCall({
+        target: vaultNorm,
+        abi: siloVaultAbi,
+        functionName: 'withdrawQueueLength',
+        fallback: async () => vault.withdrawQueueLength(),
+        decodeResult: (value) => Number(value),
+      }),
+      buildReadMulticallCall({
+        target: vaultNorm,
+        abi: siloVaultAbi,
+        functionName: 'curator',
+        fallback: async () => vault.curator(),
+      }),
+      buildReadMulticallCall({
+        target: vaultNorm,
+        abi: siloVaultAbi,
+        functionName: 'guardian',
+        fallback: async () => vault.guardian(),
+      }),
+    ],
+    {
+      debugLabel: 'vaultReader:overviewHead',
+    }
+  )
   const sLen = Number(supplyLen)
   const wLen = Number(withdrawLen)
-  const { supply, withdraw } = await readQueues(vault, sLen, wLen)
+  const { supply, withdraw } = await readQueues(provider, vaultNorm, sLen, wLen)
   return {
     supply,
     withdraw,
