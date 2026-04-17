@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.22] - 2026-04-17
+
+### Fixed
+- fix: find last tag to rollback
+
 ## [0.8.21] - 2026-04-17
 
 ### Fixed
