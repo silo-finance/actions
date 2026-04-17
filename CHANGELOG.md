@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.27] - 2026-04-17
+
+### Fixed
+- your vaults info
+- display errors in UI
+- fix: maximum update depth exceeded
+- remove wallet autodetection
+
 ## [0.8.26] - 2026-04-17
 
 ### Fixed
