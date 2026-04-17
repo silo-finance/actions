@@ -394,9 +394,13 @@ jobs:
             exit 1
           fi
 
-          PREV="${tags[0]}"
+          if [ "${#tags[@]}" -lt 2 ]; then
+            echo "::error::Need at least 2 semver tags for non-tag rollback (deploy ref: ${CURRENT})."
+            exit 1
+          fi
+          PREV="${tags[1]}"
           echo "prev_tag=$PREV" >> "$GITHUB_OUTPUT"
-          echo "::notice::Rollback non-tag deploy ${raw} -> newest tag ${PREV} (by creatordate)"
+          echo "::notice::Rollback non-tag deploy ${raw} -> previous tag ${PREV} (by creatordate)"
 
       - name: Checkout rollback ref
         if: steps.gate.outputs.should_rollback == 'true'
