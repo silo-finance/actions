@@ -1,7 +1,7 @@
 {
-  "name": "Silo Actions",
-  "version": "0.8.16",
-  "description": "Admin actions for silos and vaults.",
+  "name": "Silo Control Panel",
+  "version": "0.8.17",
+  "description": "Execute actions across markets and vaults",
   "iconPath": "safe-app-icon.svg",
   "icons": [
     {
