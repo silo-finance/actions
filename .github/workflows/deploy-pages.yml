@@ -171,4 +171,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Final deployment marker
-        run: echo "OK: deploy + post-deploy smoke succeeded"
+        run: |
+          echo "OK: deploy + post-deploy smoke succeeded"
