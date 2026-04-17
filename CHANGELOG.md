@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.26] - 2026-04-17
+
+### Fixed
+- remove unnecessary "finalize_deployment" job
+- revert crashing code that was added on purpose for QA
+
 ## [0.8.25] - 2026-04-17
 
 ### Fixed
