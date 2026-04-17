@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.2] - 2026-04-17
+
+### Added
+- better info about your vaults
+
 ## [0.9.1] - 2026-04-17
 
 ### Added
