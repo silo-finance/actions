@@ -17,7 +17,7 @@ import {
 } from '@/utils/vaultActionAuthority'
 import {
   executeTargetedBatchFromSigner,
-  sendTargetedBatchFromSigner,
+  sendSafeWalletBatch,
   type TargetedCall,
 } from '@/utils/vaultMulticall'
 
@@ -348,12 +348,19 @@ export async function executeReallocateRemoveWithdrawQueue(
   if (auth.mode === 'safe_as_wallet' && auth.executingSafeAddress != null) {
     const safeAddress = getAddress(auth.executingSafeAddress)
     /**
-     * Safe is the connected wallet: each `eth_sendTransaction` becomes its own Safe proposal in the
-     * queue. Contiguous vault calls still get packed into `vault.multicall`, so a no-dust flow is one
-     * proposal; with dust top-up (ERC-20 approve + ERC-4626 deposit + vault batch) the Safe receives
-     * three separate pending transactions in the queue.
+     * Safe is the connected wallet. Emit an EIP-5792 `wallet_sendCalls` bundle with every action
+     * as a separate entry (dust-approve, dust-deposit, reallocate, submitCap, updateWithdrawQueue,
+     * setSupplyQueue). Safe{Wallet} / Safe Apps wrap the whole thing in one MultiSend proposal and
+     * decode each entry against its target ABI, so co-signers see the real method names instead of
+     * a single opaque `vault.multicall(bytes[])` blob.
      */
-    await sendTargetedBatchFromSigner(signer, vaultAddress, batchCalls)
+    await sendSafeWalletBatch({
+      ethereum,
+      signer,
+      chainId,
+      from: safeAddress,
+      calls: batchCalls,
+    })
     const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
     if (!transactionUrl) {
       throw new Error('Could not build a Safe{Wallet} link for this network.')

@@ -13,7 +13,7 @@ import {
 } from '@/utils/reallocateRemoveWithdrawMarket'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import { classifyAllocatorVaultAction } from '@/utils/vaultActionAuthority'
-import { executeVaultCallsFromSigner, sendVaultCallsFromSigner } from '@/utils/vaultMulticall'
+import { executeVaultCallsFromSigner, sendSafeWalletBatch } from '@/utils/vaultMulticall'
 
 const siloVaultAbi = loadAbi(siloVaultArtifact)
 const vaultIface = new Interface(siloVaultAbi)
@@ -110,8 +110,13 @@ export async function setSupplyQueueForOwner(params: SetSupplyQueueParams): Prom
 
   if (auth.mode === 'safe_as_wallet' && auth.executingSafeAddress != null) {
     const safeAddress = getAddress(auth.executingSafeAddress)
-    /** Safe is the connected wallet: one `eth_sendTransaction` → Safe{Wallet} queues a proposal. */
-    await sendVaultCallsFromSigner(signer, vaultAddress, callDatas)
+    await sendSafeWalletBatch({
+      ethereum,
+      signer,
+      chainId,
+      from: safeAddress,
+      calls: vaultCalldatasToTargetedCalls(vaultAddress, callDatas),
+    })
     const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
     if (!transactionUrl) {
       throw new Error('Could not build a Safe{Wallet} link for this network.')
