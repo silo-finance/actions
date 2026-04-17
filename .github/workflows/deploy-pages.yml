@@ -51,17 +51,24 @@ jobs:
             echo "deploy_ref=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Rollback eligibility (release or semver tag ref)
+      - name: Rollback eligibility (release, semver tag, or default branch)
         id: rollback_meta
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           ref="${{ steps.deploy_ref.outputs.deploy_ref }}"
+          ref_branch="${ref#refs/heads/}"
           eligible=false
-          if [ "${{ github.event_name }}" = "release" ]; then
+          if [ "$EVENT_NAME" = "release" ]; then
             eligible=true
           elif [[ "$ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             eligible=true
           elif [[ "$ref" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            eligible=true
+          elif { [ "$EVENT_NAME" = "push" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; } \
+            && { [ "$ref" = "$DEFAULT_BRANCH" ] || [ "$ref_branch" = "$DEFAULT_BRANCH" ]; }; then
             eligible=true
           fi
           echo "rollback_eligible=$eligible" >> "$GITHUB_OUTPUT"
@@ -337,28 +344,54 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --tags --force origin
-          current="${CURRENT#refs/tags/}"
+
+          raw="${CURRENT#refs/tags/}"
+          raw="${raw#refs/heads/}"
+          current="$raw"
           if [[ "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             current="v${current}"
           fi
-          PREV=""
-          seen_current=false
+
+          tags=()
           while IFS= read -r t; do
-            [ -z "$t" ] && continue
-            if [ "$seen_current" = true ]; then
-              PREV="$t"
-              break
-            fi
-            if [ "$t" = "$current" ]; then
-              seen_current=true
-            fi
+            [[ -n "$t" ]] && tags+=("$t")
           done < <(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-creatordate)
-          if [ -z "$PREV" ]; then
-            echo "::error::No previous tag (deploy ref: ${CURRENT})."
+
+          if [ "${#tags[@]}" -eq 0 ]; then
+            echo "::error::No vX.Y.Z tags in repo; cannot roll back (deploy ref: ${CURRENT})."
             exit 1
           fi
+
+          PREV=""
+          if [[ "$current" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            seen_current=false
+            found=false
+            for t in "${tags[@]}"; do
+              if [ "$seen_current" = true ]; then
+                PREV="$t"
+                break
+              fi
+              if [ "$t" = "$current" ]; then
+                seen_current=true
+                found=true
+              fi
+            done
+            if [ -n "$PREV" ]; then
+              echo "prev_tag=$PREV" >> "$GITHUB_OUTPUT"
+              echo "::notice::Rollback: ${CURRENT} -> $PREV (chronologically previous tag)"
+              exit 0
+            fi
+            if [ "$found" = true ]; then
+              echo "::error::No chronologically earlier tag (deploy ref: ${CURRENT})."
+              exit 1
+            fi
+            echo "::error::Deploy ref looks like semver but is not a tag in this repo: ${CURRENT}"
+            exit 1
+          fi
+
+          PREV="${tags[0]}"
           echo "prev_tag=$PREV" >> "$GITHUB_OUTPUT"
-          echo "::notice::Rollback: ${CURRENT} -> $PREV"
+          echo "::notice::Rollback non-tag deploy ${raw} -> newest tag ${PREV} (by creatordate)"
 
       - name: Checkout rollback ref
         if: steps.gate.outputs.should_rollback == 'true'
@@ -485,7 +518,7 @@ jobs:
           fi
 
           if [ "$RB_ELIG" != "true" ]; then
-            echo "::error::Post-deploy smoke did not succeed. Automatic rollback runs only for a published Release or a deploy ref matching vX.Y.Z / X.Y.Z (then the workflow redeploys the previous vX.Y.Z tag)."
+            echo "::error::Post-deploy smoke did not succeed. Automatic rollback runs for a published Release, a vX.Y.Z / X.Y.Z deploy ref, or push / workflow_dispatch on the repository default branch."
             exit 1
           fi
 
