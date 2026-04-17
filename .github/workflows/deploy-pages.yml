@@ -181,6 +181,7 @@ jobs:
         env:
           DEPLOYED_SHA: ${{ needs.deploy.outputs.deployed_sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [ -z "${DEPLOYED_SHA:-}" ]; then
@@ -189,25 +190,24 @@ jobs:
           fi
 
           echo "::notice::Looking up github-pages deployment for SHA: ${DEPLOYED_SHA}"
-          DEPLOYMENT_ID="$(gh api \
-            "/repos/${GITHUB_REPOSITORY}/deployments" \
-            -f environment='github-pages' \
-            -f sha="${DEPLOYED_SHA}" \
-            -f per_page='1' \
-            --jq '.[0].id')"
+          # NOTE: `gh api` with GET must pass filters as query string. `-f` sends a form body and does not apply here.
+          QUERY="environment=github-pages&sha=${DEPLOYED_SHA}&per_page=30"
+          DEPLOYMENT_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/deployments?${QUERY}")"
+          echo "::notice::Deployments response (first 2000 chars): ${DEPLOYMENT_JSON:0:2000}"
+
+          DEPLOYMENT_ID="$(echo "${DEPLOYMENT_JSON}" | jq -r 'if length == 0 then empty else (sort_by(.created_at) | reverse | .[0].id) end')"
 
           if [ -z "${DEPLOYMENT_ID:-}" ] || [ "${DEPLOYMENT_ID}" = "null" ]; then
-            echo "::error::No github-pages deployment found for SHA ${DEPLOYED_SHA}."
+            echo "::error::No github-pages deployment found for SHA ${DEPLOYED_SHA} (empty list or jq parse issue)."
             exit 1
           fi
 
           echo "::notice::Marking deployment ${DEPLOYMENT_ID} as failure (smoke test failed)."
           gh api \
             --method POST \
-            "/repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" \
+            "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" \
             -f state='failure' \
-            -f auto_inactive='true' \
             -f description='Post-deploy smoke test failed' \
-            -f log_url="${RUN_URL}" >/dev/null
+            -f log_url="${RUN_URL}"
 
           echo "::notice::Deployment ${DEPLOYMENT_ID} status updated to failure."
