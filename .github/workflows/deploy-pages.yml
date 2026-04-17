@@ -11,6 +11,10 @@ on:
         description: "Git ref (tag or commit SHA) to deploy"
         required: true
         default: ""
+      is_rollback:
+        description: "Internal — set by auto-rollback to avoid nested rollbacks"
+        required: false
+        default: "false"
 
 permissions:
   contents: read
@@ -24,6 +28,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+      deployed_sha: ${{ steps.deployed.outputs.sha }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -90,3 +97,117 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Record deployed SHA
+        id: deployed
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  post_deploy_smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium --with-deps
+
+      - name: Wait for Pages URL
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          if [ -z "$PAGE_URL" ]; then
+            echo "::error::deploy job did not produce page_url"
+            exit 1
+          fi
+          echo "Waiting for $PAGE_URL ..."
+          ok=0
+          for i in $(seq 1 36); do
+            if curl -fsS --max-time 30 "$PAGE_URL" >/dev/null; then
+              ok=1
+              break
+            fi
+            echo "Attempt $i: not ready yet, sleeping 10s"
+            sleep 10
+          done
+          if [ "$ok" != "1" ]; then
+            echo "::error::Site did not become reachable in time"
+            exit 1
+          fi
+
+      - name: Post-deploy smoke (Playwright)
+        env:
+          SMOKE_BASE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: npm run test:smoke
+
+  auto_rollback:
+    needs: [deploy, post_deploy_smoke]
+    if: >-
+      always() &&
+      needs.deploy.result == 'success' &&
+      needs.post_deploy_smoke.result == 'failure' &&
+      github.event.inputs.is_rollback != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Checkout (history for rollback SHA)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve rollback commit
+        id: rollback
+        env:
+          DEPLOYED_SHA: ${{ needs.deploy.outputs.deployed_sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          ZERO=0000000000000000000000000000000000000000
+          if [ "$EVENT_NAME" = "push" ] && [ -n "$BEFORE" ] && [ "$BEFORE" != "$ZERO" ]; then
+            SHA="$BEFORE"
+            echo "Using push event before: $SHA"
+          else
+            SHA=$(git rev-parse "${DEPLOYED_SHA}^")
+            echo "Using parent of deployed commit: $SHA"
+          fi
+          if [ "$SHA" = "$DEPLOYED_SHA" ]; then
+            echo "::error::Rollback SHA equals deployed SHA; aborting."
+            exit 1
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch rollback deploy
+        uses: actions/github-script@v7
+        env:
+          ROLLBACK_SHA: ${{ steps.rollback.outputs.sha }}
+        with:
+          script: |
+            const sha = process.env.ROLLBACK_SHA
+            if (!sha || sha.length < 7) {
+              core.setFailed(`Invalid ROLLBACK_SHA: ${sha}`)
+              return
+            }
+            core.info(`Dispatching deploy workflow for rollback ref: ${sha}`)
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy-pages.yml',
+              ref: 'master',
+              inputs: {
+                ref: sha,
+                is_rollback: 'true',
+              },
+            })

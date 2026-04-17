@@ -38,6 +38,25 @@ For WalletConnect on the deployed site, add a **repository variable** (not requi
 2. Name: `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`, value: your Reown / WalletConnect project id  
    The deploy workflow passes it into `npm run build` as `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`.
 
+### Post-deploy smoke test and automatic rollback
+
+After each successful GitHub Pages deployment, the workflow runs a **Playwright** smoke test against the live site URL: it loads the home page, checks that the main heading appears, and fails if there is an **uncaught page error** or a **`console.error`** from the app (typical for serious React runtime problems).
+
+If that smoke test fails, a follow-up job **dispatches the same workflow again** with:
+
+- `ref` set to the previous commit on `master` when the deploy was triggered by a **push** (using `github.event.before`), or otherwise the **parent** of the commit that was actually deployed (`deployed_sha^`),
+- `is_rollback` set to `true` so that a second failure does **not** trigger another rollback (avoids an infinite loop).
+
+The original workflow run still ends as **failed** so you can inspect logs; the rollback runs as a **new** workflow run. The `auto_rollback` job sets `permissions.actions: write` on `GITHUB_TOKEN` so it can call `workflow_dispatch`. If dispatch still fails, check **Settings** → **Actions** → **General** for any organization-level restrictions on the token.
+
+**Manual rollback:** Actions → **Deploy to GitHub Pages** → **Run workflow**, set `ref` to a known-good tag or commit SHA. Leave `is_rollback` at `false` unless you are debugging the rollback path.
+
+**Local smoke against any URL:**
+
+```bash
+SMOKE_BASE_URL=https://your-org.github.io/your-repo/ npm run test:smoke
+```
+
 ## Manual actions (when the app UI is unavailable)
 
 Step-by-step instructions for doing the same thing inside a multisig UI (e.g. Safe{Wallet}). No deep technical background—only what to click and what to paste.

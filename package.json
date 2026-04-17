@@ -1,6 +1,6 @@
 {
   "name": "silo-actions",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "private": true,
   "engines": {
     "node": ">=20.19.0"
@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint --max-warnings 0",
     "type-check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:smoke": "playwright test"
   },
   "dependencies": {
     "@base-org/account": "2.5.4",
@@ -36,6 +37,7 @@
     "wagmi": "3.6.2"
   },
   "devDependencies": {
+    "@playwright/test": "1.49.1",
     "@types/node": "20.10.5",
     "@types/react": "18.2.45",
     "@types/react-dom": "18.2.18",
