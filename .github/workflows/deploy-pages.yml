@@ -51,7 +51,7 @@ jobs:
             echo "deploy_ref=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Rollback eligibility (release tag or semver ref)
+      - name: Rollback eligibility (release or semver tag ref)
         id: rollback_meta
         shell: bash
         run: |
@@ -302,7 +302,7 @@ jobs:
         env:
           FAILED_REF: ${{ needs.deploy.outputs.deploy_ref }}
         run: |
-          echo "::notice::Post-deploy smoke did not succeed for ref ${FAILED_REF}. Redeploying previous semver tag to GitHub Pages."
+          echo "::notice::Post-deploy smoke did not succeed for ref ${FAILED_REF}. Redeploying previous tag to GitHub Pages."
 
       - name: Download smoke outcome (optional sanity check)
         if: steps.gate.outputs.should_rollback == 'true'
@@ -328,7 +328,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Resolve previous semver tag
+      - name: Resolve previous tag
         if: steps.gate.outputs.should_rollback == 'true'
         id: prev_tag
         shell: bash
@@ -337,11 +337,10 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --tags --force origin
-          # Align with git tags (repo uses v-prefixed semver tags).
-          if [[ "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            CURRENT="v${CURRENT}"
+          current="${CURRENT#refs/tags/}"
+          if [[ "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            current="v${current}"
           fi
-          # Newest-first semver order; take the first tag strictly older than CURRENT.
           PREV=""
           seen_current=false
           while IFS= read -r t; do
@@ -350,16 +349,16 @@ jobs:
               PREV="$t"
               break
             fi
-            if [ "$t" = "$CURRENT" ]; then
+            if [ "$t" = "$current" ]; then
               seen_current=true
             fi
-          done < <(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname)
+          done < <(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-creatordate)
           if [ -z "$PREV" ]; then
-            echo "::error::No previous semver tag (vX.Y.Z) found to roll back to (or failed ref is not in tag list). Failed ref: ${CURRENT}"
+            echo "::error::No previous tag (deploy ref: ${CURRENT})."
             exit 1
           fi
           echo "prev_tag=$PREV" >> "$GITHUB_OUTPUT"
-          echo "::notice::Rollback target tag: $PREV (failed deploy ref: $CURRENT)"
+          echo "::notice::Rollback: ${CURRENT} -> $PREV"
 
       - name: Checkout rollback ref
         if: steps.gate.outputs.should_rollback == 'true'
@@ -486,7 +485,7 @@ jobs:
           fi
 
           if [ "$RB_ELIG" != "true" ]; then
-            echo "::error::Post-deploy smoke did not succeed. Automatic rollback only when rollback_eligible (GitHub Release or semver-like ref). Branch-only deploys do not roll back; redeploy from a tag or workflow_dispatch with a tag ref."
+            echo "::error::Post-deploy smoke did not succeed. Automatic rollback runs only for a published Release or a deploy ref matching vX.Y.Z / X.Y.Z (then the workflow redeploys the previous vX.Y.Z tag)."
             exit 1
           fi
 
