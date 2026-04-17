@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0] - 2026-04-17
+
+### Added
+- use multicall to reduce number of RPC calls
+- improve automation for changelog
+
 ## [0.8.27] - 2026-04-17
 
 ### Fixed
