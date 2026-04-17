@@ -28,7 +28,7 @@ import {
   classifyOwnerOrCuratorVaultAction,
   type VaultActionAuthority,
 } from '@/utils/vaultActionAuthority'
-import { formatWalletRpcFailureMessage } from '@/utils/rpcErrors'
+import { formatWalletRpcFailureMessage, toUserErrorMessage } from '@/utils/rpcErrors'
 import { getExplorerAddressUrl } from '@/utils/networks'
 import { loadAbi } from '@/utils/loadAbi'
 import {
@@ -510,7 +510,7 @@ export default function WithdrawQueueRemoveWizard({
         })
       }
     } catch (e) {
-      setExecErr(e instanceof Error ? e.message : String(e))
+      setExecErr(toUserErrorMessage(e, 'Could not build the reallocate batch.'))
       return
     }
 
@@ -579,7 +579,7 @@ export default function WithdrawQueueRemoveWizard({
       })
       setTxSuccess({ url: transactionUrl, linkLabel: successLinkLabel, outcome })
     } catch (e) {
-      setExecErr(e instanceof Error ? e.message : String(e))
+      setExecErr(toUserErrorMessage(e))
     } finally {
       setBusy(false)
     }

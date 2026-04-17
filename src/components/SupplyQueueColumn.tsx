@@ -15,6 +15,7 @@ import { SET_SUPPLY_QUEUE_ROLES_DESCRIPTION } from '@/utils/connectedVaultRole'
 import { ONLY_FOR_ALLOCATOR_ACTIONS } from '@/utils/vaultActionRoleCopy'
 import { formatAcceptCapArgsCopy, formatSetSupplyQueueArgsCopy } from '@/utils/formatVaultActionCopyArgs'
 import { setSupplyQueueForOwner } from '@/utils/setVaultSupplyQueue'
+import { toUserErrorMessage } from '@/utils/rpcErrors'
 import type { OwnerKind } from '@/utils/ownerKind'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import {
@@ -668,8 +669,7 @@ export default function SupplyQueueColumn({
       setRemovedKeys([])
       setReorderUnlocked(false)
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setLocalError(msg || 'Could not complete the request.')
+      setLocalError(toUserErrorMessage(e, 'Could not complete the request.'))
     } finally {
       setBusy(false)
     }

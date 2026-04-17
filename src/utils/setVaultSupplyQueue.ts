@@ -112,7 +112,6 @@ export async function setSupplyQueueForOwner(params: SetSupplyQueueParams): Prom
     const safeAddress = getAddress(auth.executingSafeAddress)
     await sendSafeWalletBatch({
       ethereum,
-      signer,
       chainId,
       from: safeAddress,
       calls: vaultCalldatasToTargetedCalls(vaultAddress, callDatas),

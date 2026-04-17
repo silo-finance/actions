@@ -144,7 +144,6 @@ export async function clearSupplyQueueForOwner(
     const safeAddress = getAddress(auth.executingSafeAddress)
     await sendSafeWalletBatch({
       ethereum,
-      signer,
       chainId,
       from: safeAddress,
       calls: [{ to: getAddress(vaultAddress), data: encodeSetSupplyQueueEmpty() }],

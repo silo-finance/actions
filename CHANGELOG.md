@@ -2,30 +2,15 @@
 
 ## [Unreleased]
 
-### Fixed
-- WalletConnect + Safe{Wallet} / Rabby impersonate flow: when the connected wallet is the Safe
-  itself, actions now `eth_sendTransaction` through that wallet (Safe queues a proposal internally)
-  instead of `personal_sign(safeTxHash) + apiKit.proposeTransaction`, which used to land in the Safe
-  as a plain "message sign" or, with Rabby, block waiting for extra EIP-1271 signatures.
-- Reallocate + remove withdraw market with dust top-up now lands in Safe{Wallet} as **one** queued
-  proposal (MultiSend) instead of only the first `approve` being visible. Multi-call batches in
-  `safe_as_wallet` mode are submitted via EIP-5792 `wallet_sendCalls`; Safe{Wallet} v2 and Safe Apps
-  iframes (`safe-apps-provider`) map this to a single `sdk.txs.send({ txs })` MultiSend proposal.
-  Wallets without EIP-5792 fall back to sequential `eth_sendTransaction` (legacy behaviour, logged).
-- `safe_as_wallet` batches now pass every action as a separate MultiSend entry (no
-  `vault.multicall(bytes[])` envelope) so Safe decodes each call against its real ABI — owners see
-  `approve`, `deposit`, `reallocate`, `submitCap`, `updateWithdrawQueue`, `setSupplyQueue` by name
-  instead of one opaque `multicall` blob.
-- Dedupe `wagmiConfig` across Fast Refresh / React StrictMode with a `globalThis` cache to stop the
-  "WalletConnect Core is already initialized" dev warning.
-
 ### Added
-- `safe_as_wallet` execution mode in `vaultActionAuthority` for the `connectedAccount === Safe role`
-  case, with `safe_wallet_queue` success outcome and dedicated copy in `TransactionSuccessSummary`.
-- `wagmi/connectors` `safe()` connector so the dApp also works inside a Safe Apps iframe.
-- `sendSafeWalletBatch` helper in `vaultMulticall` that submits each call verbatim through
-  EIP-5792 `wallet_sendCalls` (with a sequential `eth_sendTransaction` fallback for non-EIP-5792
-  wallets), keeping every action individually decodable in the Safe review UI.
+- Support for using the dApp with a Safe multisig: as a Safe App inside Safe{Wallet}, via
+  Safe{Wallet} mobile over WalletConnect, and with Rabby impersonate. Owner, allocator, and
+  curator actions arrive in the Safe queue as a single transaction proposal with every step
+  decoded by its method name, ready for co-signer review.
+
+### Fixed
+- Readable wallet error messages — user-rejected prompts and RPC failures are now shown as short,
+  human-friendly text instead of raw error objects.
 
 ## [0.9.2] - 2026-04-17
 

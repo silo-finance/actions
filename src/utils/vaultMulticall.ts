@@ -8,6 +8,26 @@ type Eip1193LikeProvider = {
   request: (args: { method: string; params?: unknown }) => Promise<unknown>
 }
 
+/**
+ * Sends one transaction through the raw EIP-1193 transport and returns immediately with the
+ * wallet-reported hash. Intentionally does NOT use ethers' `JsonRpcSigner.sendTransaction`, which
+ * polls `getTransaction(hash)` indefinitely (see ethers `provider-jsonrpc.js::sendTransaction`).
+ * That polling is fatal for Safe{Wallet}: Safe returns a synthetic `safeTxHash` that will never
+ * match a real chain tx (the executed Safe tx has a different `execTransaction` hash), so ethers
+ * would hang the UI on "Waiting for wallet…" forever even after the Safe proposal is executed.
+ */
+async function ethSendTransactionRaw(
+  ethereum: Eip1193LikeProvider,
+  from: string,
+  to: string,
+  data: `0x${string}`
+): Promise<void> {
+  await ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [{ from, to, data, value: '0x0' }],
+  })
+}
+
 /** One on-chain call in a batch (same or different `to` contracts). */
 export type TargetedCall = {
   to: string
@@ -110,7 +130,6 @@ export async function executeTargetedBatchFromSigner(
  */
 export async function sendSafeWalletBatch(params: {
   ethereum: Eip1193LikeProvider
-  signer: Signer
   chainId: number
   from: string
   calls: TargetedCall[]
@@ -123,7 +142,7 @@ export async function sendSafeWalletBatch(params: {
 
   if (normalized.length === 1) {
     const c = normalized[0]!
-    await params.signer.sendTransaction({ to: c.to, data: c.data })
+    await ethSendTransactionRaw(params.ethereum, from, c.to, c.data)
     return
   }
 
@@ -177,6 +196,6 @@ export async function sendSafeWalletBatch(params: {
     '[Silo Actions] Connected wallet does not implement EIP-5792 wallet_sendCalls. Falling back to sequential eth_sendTransaction; expect one Safe proposal per call.'
   )
   for (const c of normalized) {
-    await params.signer.sendTransaction({ to: c.to, data: c.data })
+    await ethSendTransactionRaw(params.ethereum, from, c.to, c.data)
   }
 }

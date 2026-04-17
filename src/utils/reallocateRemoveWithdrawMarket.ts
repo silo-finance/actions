@@ -356,7 +356,6 @@ export async function executeReallocateRemoveWithdrawQueue(
      */
     await sendSafeWalletBatch({
       ethereum,
-      signer,
       chainId,
       from: safeAddress,
       calls: batchCalls,
