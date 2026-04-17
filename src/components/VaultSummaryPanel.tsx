@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import CopyButton from '@/components/CopyButton'
+import { useVaultPermissions } from '@/contexts/VaultPermissionsContext'
 import { getExplorerAddressUrl } from '@/utils/networks'
 import { formatTimelockSeconds } from '@/utils/timelockFormat'
 import type { OwnerKind } from '@/utils/ownerKind'
@@ -107,6 +108,12 @@ export default function VaultSummaryPanel({
   actions,
 }: Props) {
   const { daysText, rawSeconds } = formatTimelockSeconds(timelockSeconds)
+  const perm = useVaultPermissions()
+  /** Action-path RPC failed; parallel “your role” text could wrongly read `none` — do not imply we verified. */
+  const yourRoleDisplayed =
+    perm.classificationError != null
+      ? 'Not verified — wallet RPC did not finish role checks (see banner above).'
+      : yourRoleLabel
 
   return (
     <div className="silo-panel silo-top-card p-5 mb-6">
@@ -138,7 +145,7 @@ export default function VaultSummaryPanel({
             </div>
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2">
               <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Your role</span>
-              <span className="text-sm silo-text-main">{yourRoleLabel}</span>
+              <span className="text-sm silo-text-main">{yourRoleDisplayed}</span>
             </div>
           </div>
         </div>

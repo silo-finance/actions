@@ -176,7 +176,15 @@ export default function SupplyQueueColumn({
     setRemovedKeys([])
   }, [vaultAddress, items])
 
-  const permissionGateLoading =
+  /** Disables queue actions until permissions are known or after an RPC failure (banner explains). */
+  const permissionGateBlocking =
+    hasLoaded &&
+    Boolean(vaultAddress) &&
+    Boolean(account) &&
+    perm.active &&
+    (perm.loading || perm.classificationError != null)
+
+  const permissionGateBusyLabel =
     hasLoaded && Boolean(vaultAddress) && Boolean(account) && perm.active && perm.loading
 
   const mutationAllowed: boolean | null =
@@ -184,7 +192,7 @@ export default function SupplyQueueColumn({
       ? null
       : !isConnected || !account
         ? false
-        : perm.loading
+        : perm.loading || perm.classificationError != null
           ? null
           : perm.canAllocator
 
@@ -773,10 +781,16 @@ export default function SupplyQueueColumn({
           <button
             type="button"
             className="text-xs font-medium silo-text-soft hover:silo-text-main underline shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled={mutationAllowed !== true || permissionGateLoading}
+            disabled={mutationAllowed !== true || permissionGateBlocking}
             onClick={() => handleChangeOrderClick()}
           >
-            {permissionGateLoading ? 'Checking access…' : editOrder.length >= 2 ? 'Change order' : 'Edit queue'}
+            {permissionGateBusyLabel
+              ? 'Checking access…'
+              : perm.classificationError
+                ? 'Could not verify access'
+                : editOrder.length >= 2
+                  ? 'Change order'
+                  : 'Edit queue'}
           </button>
         ) : null}
       </div>
@@ -874,14 +888,14 @@ export default function SupplyQueueColumn({
               <button
                 type="button"
                 onClick={() => handleAddMarketClick()}
-                disabled={mutationAllowed !== true || permissionGateLoading}
+                disabled={mutationAllowed !== true || permissionGateBlocking}
                 className="silo-btn-secondary inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Add market"
               >
                 <span className="text-base leading-none" aria-hidden>
                   +
                 </span>
-                {permissionGateLoading ? 'Checking access…' : 'Add market'}
+                {permissionGateBusyLabel ? 'Checking access…' : perm.classificationError ? 'Could not verify access' : 'Add market'}
               </button>
               <ActionPermissionHint
                 allowed={mutationAllowed !== false || addRowOpen}

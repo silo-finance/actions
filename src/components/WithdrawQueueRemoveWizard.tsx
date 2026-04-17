@@ -28,6 +28,7 @@ import {
   classifyOwnerOrCuratorVaultAction,
   type VaultActionAuthority,
 } from '@/utils/vaultActionAuthority'
+import { formatWalletRpcFailureMessage } from '@/utils/rpcErrors'
 import { getExplorerAddressUrl } from '@/utils/networks'
 import { loadAbi } from '@/utils/loadAbi'
 import {
@@ -520,16 +521,22 @@ export default function WithdrawQueueRemoveWizard({
         return
       }
       const overview = { owner: ownerAddress, curator: curatorAddress }
-      const auth = needSubmitCap
-        ? await classifyOwnerOrCuratorVaultAction(provider, account, overview, ownerKind, curatorKind)
-        : await classifyAllocatorVaultAction(
-            provider,
-            vaultAddress,
-            account,
-            overview,
-            ownerKind,
-            curatorKind
-          )
+      let auth: VaultActionAuthority
+      try {
+        auth = needSubmitCap
+          ? await classifyOwnerOrCuratorVaultAction(provider, account, overview, ownerKind, curatorKind)
+          : await classifyAllocatorVaultAction(
+              provider,
+              vaultAddress,
+              account,
+              overview,
+              ownerKind,
+              curatorKind
+            )
+      } catch (e) {
+        setExecErr(formatWalletRpcFailureMessage(e))
+        return
+      }
       if (auth.mode === 'denied') {
         setExecErr('Wallet cannot execute dust top-up for this batch.')
         return
