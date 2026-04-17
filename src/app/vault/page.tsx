@@ -4,7 +4,7 @@ import { getAddress } from 'ethers'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import QueueColumn from '@/components/QueueColumn'
 import ShareLinkCopyButton from '@/components/ShareLinkCopyButton'
 import SupplyQueueColumn from '@/components/SupplyQueueColumn'
@@ -39,8 +39,9 @@ function parseChainFromSearchParam(raw: string | null): number | null {
   return isChainSupported(n) ? n : null
 }
 
+type CheckLoadSource = 'manual_check' | 'deep_link_auto'
+
 function VaultPageInner() {
-  const searchParams = useSearchParams()
   const pathname = usePathname()
   const router = useRouter()
   const { provider, chainId, isConnected, switchNetwork, account } = useWeb3()
@@ -75,56 +76,76 @@ function VaultPageInner() {
   const [showMyVaultsPicker, setShowMyVaultsPicker] = useState(false)
   const myVaultsRef = useRef<SiloV3VaultListItem[]>([])
   myVaultsRef.current = myVaults
-  const networkName = chainId != null ? getNetworkDisplayName(chainId) : null
-  const networkIconPath = chainId != null ? getNetworkIconPath(chainId) : null
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
-  const networkIconSrc = networkIconPath ? `${basePath}${networkIconPath}` : null
-
-  const chainFromUrl = useMemo(
-    () => parseChainFromSearchParam(searchParams.get('chain')),
-    [searchParams]
+  const initialQueryParams = useMemo(
+    () => (typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search)),
+    []
   )
 
-  /** Canonical link to this vault page (not the raw browser URL). */
-  const vaultShareUrl = useMemo(() => {
-    if (!hasLoaded || !summary?.vault || chainId == null || typeof window === 'undefined') return ''
-    if (!isChainSupported(chainId)) return ''
-    try {
-      const v = getAddress(summary.vault)
-      const q = new URLSearchParams()
-      q.set('address', v)
-      q.set('chain', String(chainId))
-      return `${window.location.origin}${basePath}/vault/?${q.toString()}`
-    } catch {
-      return ''
-    }
-  }, [hasLoaded, summary?.vault, basePath, chainId])
-
+  const chainFromUrl = useMemo(
+    () => parseChainFromSearchParam(initialQueryParams.get('chain')),
+    [initialQueryParams]
+  )
   const vaultFromUrl = useMemo(() => {
-    const raw = searchParams.get('vault') ?? searchParams.get('address')
+    const raw = initialQueryParams.get('vault') ?? initialQueryParams.get('address')
     if (!raw?.trim()) return null
     return normalizeAddress(extractHexAddressLike(raw.trim()))
-  }, [searchParams])
-
-  /** Stable “deep link” identity so we only auto-apply URL `chain` once per navigation, not on every replace(). */
+  }, [initialQueryParams])
   const linkIdentityKey = useMemo(
     () => `${vaultFromUrl?.toLowerCase() ?? ''}|${chainFromUrl ?? ''}`,
     [vaultFromUrl, chainFromUrl]
   )
-
-  const prevLinkIdentityKey = useRef<string | null>(null)
+  const initialDeepLinkIdentityRef = useRef(linkIdentityKey)
+  const isInitialDeepLinkIdentity = linkIdentityKey === initialDeepLinkIdentityRef.current
   const [deepLinkChainApplied, setDeepLinkChainApplied] = useState(() => chainFromUrl == null)
+  const deepLinkAutoCheckKeyRef = useRef<string | null>(null)
+  const deepLinkSwitchStartedRef = useRef(false)
+  const [lastSuccessfulCheck, setLastSuccessfulCheck] = useState<{
+    vault: string
+    chainId: number
+    source: CheckLoadSource
+    nonce: number
+  } | null>(null)
+  const checkSuccessNonceRef = useRef(0)
+  const vaultDisplayChainId = useMemo(
+    () => (hasLoaded && lastSuccessfulCheck ? lastSuccessfulCheck.chainId : chainId),
+    [hasLoaded, lastSuccessfulCheck, chainId]
+  )
+  const isWalletOnLoadedChain =
+    !lastSuccessfulCheck || chainId == null || chainId === lastSuccessfulCheck.chainId
+  const networkName = vaultDisplayChainId != null ? getNetworkDisplayName(vaultDisplayChainId) : null
+  const networkIconPath = vaultDisplayChainId != null ? getNetworkIconPath(vaultDisplayChainId) : null
+  const networkIconSrc = networkIconPath ? `${basePath}${networkIconPath}` : null
 
-  useEffect(() => {
-    if (prevLinkIdentityKey.current === null) {
-      prevLinkIdentityKey.current = linkIdentityKey
-      return
+  /** Canonical link to this vault page (not the raw browser URL). */
+  const vaultShareUrl = useMemo(() => {
+    if (!hasLoaded || !summary?.vault || !lastSuccessfulCheck || chainId == null || typeof window === 'undefined') {
+      return ''
     }
-    if (prevLinkIdentityKey.current !== linkIdentityKey) {
-      prevLinkIdentityKey.current = linkIdentityKey
-      setDeepLinkChainApplied(chainFromUrl == null)
+    if (!isChainSupported(chainId) || chainId !== lastSuccessfulCheck.chainId) return ''
+    if (summary.vault.toLowerCase() !== lastSuccessfulCheck.vault.toLowerCase()) return ''
+    try {
+      const v = getAddress(summary.vault)
+      const q = new URLSearchParams()
+      q.set('address', v)
+      q.set('chain', String(lastSuccessfulCheck.chainId))
+      return `${window.location.origin}${basePath}/vault/?${q.toString()}`
+    } catch {
+      return ''
     }
-  }, [linkIdentityKey, chainFromUrl])
+  }, [hasLoaded, summary?.vault, basePath, chainId, lastSuccessfulCheck])
+
+  const resetLoadedVaultState = useCallback(() => {
+    setSupply([])
+    setWithdraw([])
+    setWithdrawMarketStates([])
+    setVaultUnderlyingMeta(null)
+    setHasLoaded(false)
+    setSupplyQueueSize(undefined)
+    setWithdrawQueueSize(undefined)
+    setSummary(null)
+    setYourRoleLabel('')
+  }, [])
 
   useEffect(() => {
     if (vaultFromUrl) {
@@ -134,6 +155,7 @@ function VaultPageInner() {
 
   /** Once per deep link: if URL contains `chain`, switch wallet to it. After that, header / wallet is source of truth. */
   useEffect(() => {
+    if (!isInitialDeepLinkIdentity) return
     if (!isConnected || chainId == null) return
     if (deepLinkChainApplied) return
     if (chainFromUrl == null || !isChainSupported(chainFromUrl)) {
@@ -144,24 +166,22 @@ function VaultPageInner() {
       setDeepLinkChainApplied(true)
       return
     }
+    if (deepLinkSwitchStartedRef.current) return
+    deepLinkSwitchStartedRef.current = true
     void switchNetwork(chainFromUrl).finally(() => {
       setDeepLinkChainApplied(true)
     })
-  }, [isConnected, chainId, chainFromUrl, switchNetwork, deepLinkChainApplied])
+  }, [isConnected, chainId, chainFromUrl, switchNetwork, deepLinkChainApplied, isInitialDeepLinkIdentity])
 
   const performCheck = useCallback(
-    async (rawInput: string, reopenMyVaultsPickerOnError = false) => {
+    async (
+      rawInput: string,
+      reopenMyVaultsPickerOnError = false,
+      source: CheckLoadSource = 'manual_check'
+    ) => {
       setShowMyVaultsPicker(false)
       setError('')
-      setSupply([])
-      setWithdraw([])
-      setWithdrawMarketStates([])
-      setVaultUnderlyingMeta(null)
-      setHasLoaded(false)
-      setSupplyQueueSize(undefined)
-      setWithdrawQueueSize(undefined)
-      setSummary(null)
-      setYourRoleLabel('')
+      resetLoadedVaultState()
 
       if (!isConnected || !provider || chainId == null) {
         setError('Connect a wallet to load vault queues.')
@@ -185,12 +205,6 @@ function VaultPageInner() {
         if (classified.chainId !== chainId) {
           await switchNetwork(classified.chainId)
         }
-        const net = await provider.getNetwork()
-        const effectiveChainId = Number(net.chainId)
-        if (effectiveChainId !== classified.chainId) {
-          setError('Switch to the network from the explorer URL in your wallet, then press Check again.')
-          return
-        }
       } else if (chainId == null || !isChainSupported(chainId)) {
         setError('This network is not in the supported list. Switch network in the header.')
         return
@@ -200,6 +214,17 @@ function VaultPageInner() {
       const vault = normalizeAddress(raw)
       if (!vault) {
         setError('Enter a valid vault address or a block explorer URL containing the contract address.')
+        return
+      }
+
+      const net = await provider.getNetwork()
+      const effectiveChainId = Number(net.chainId)
+      if (!isChainSupported(effectiveChainId)) {
+        setError('This network is not in the supported list. Switch network in the header.')
+        return
+      }
+      if (classified.kind === 'explorer' && effectiveChainId !== classified.chainId) {
+        setError('Switch to the network from the explorer URL in your wallet, then press Check again.')
         return
       }
 
@@ -230,6 +255,36 @@ function VaultPageInner() {
           guardianKind,
         })
         setHasLoaded(true)
+        checkSuccessNonceRef.current += 1
+        const successSnapshot = {
+          vault,
+          chainId: effectiveChainId,
+          source,
+          nonce: checkSuccessNonceRef.current,
+        }
+        setLastSuccessfulCheck(successSnapshot)
+
+        // Keep URL canonical only after a successful Check.
+        if (pathname) {
+          const p = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
+          const hasVaultAlias = p.has('vault')
+          const addressParam = p.get('address')
+          const canonicalAddr = successSnapshot.vault.toLowerCase()
+          const canonicalChain = String(successSnapshot.chainId)
+          const alreadyCanonical =
+            !hasVaultAlias &&
+            typeof addressParam === 'string' &&
+            addressParam.toLowerCase() === canonicalAddr &&
+            p.get('chain') === canonicalChain
+
+          if (!alreadyCanonical) {
+            p.delete('vault')
+            p.set('address', successSnapshot.vault)
+            p.set('chain', canonicalChain)
+            const qs = p.toString()
+            void router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+          }
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         setError(msg || 'Failed to read vault. Check address and network.')
@@ -243,12 +298,39 @@ function VaultPageInner() {
         setLoading(false)
       }
     },
-    [provider, chainId, isConnected, switchNetwork]
+    [provider, chainId, isConnected, switchNetwork, resetLoadedVaultState, pathname, router]
   )
 
   const handleCheck = useCallback(() => {
-    void performCheck(input, false)
+    void performCheck(input, false, 'manual_check')
   }, [performCheck, input])
+
+  useEffect(() => {
+    if (!isInitialDeepLinkIdentity) return
+    if (!deepLinkChainApplied) return
+    if (loading || hasLoaded) return
+    if (!isConnected || !provider || chainId == null) return
+    if (!vaultFromUrl || chainFromUrl == null || !isChainSupported(chainFromUrl)) return
+    if (chainId !== chainFromUrl) return
+
+    const autoKey = `${linkIdentityKey}|${(account ?? '').toLowerCase()}`
+    if (deepLinkAutoCheckKeyRef.current === autoKey) return
+    deepLinkAutoCheckKeyRef.current = autoKey
+    void performCheck(vaultFromUrl, false, 'deep_link_auto')
+  }, [
+    isInitialDeepLinkIdentity,
+    deepLinkChainApplied,
+    loading,
+    hasLoaded,
+    isConnected,
+    provider,
+    chainId,
+    vaultFromUrl,
+    chainFromUrl,
+    linkIdentityKey,
+    account,
+    performCheck,
+  ])
 
   useEffect(() => {
     if (!isConnected || !account || chainId == null || !isChainSupported(chainId)) {
@@ -298,42 +380,16 @@ function VaultPageInner() {
   const selectVaultFromApi = useCallback(
     (vaultId: string) => {
       setInput(vaultId)
-      void performCheck(vaultId, true)
+      void performCheck(vaultId, true, 'manual_check')
     },
     [performCheck]
   )
 
-  /** After Check: normalize `address` + `chain` in the URL to the loaded vault (only when deep link bootstrap finished). */
-  useEffect(() => {
-    if (!deepLinkChainApplied) return
-    if (!hasLoaded || !summary?.vault || !pathname || chainId == null) return
-    if (!isChainSupported(chainId)) return
-    const p = new URLSearchParams(searchParams.toString())
-    const curAddr = (p.get('vault') ?? p.get('address'))?.toLowerCase()
-    const curChain = p.get('chain')
-    if (curAddr === summary.vault.toLowerCase() && curChain === String(chainId)) return
-    p.delete('vault')
-    p.set('address', summary.vault)
-    p.set('chain', String(chainId))
-    const qs = p.toString()
-    void router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [deepLinkChainApplied, hasLoaded, summary?.vault, chainId, pathname, router, searchParams])
-
-  /** Before / without Check: keep `chain` query aligned with the wallet when the user changes network in the header. */
-  useEffect(() => {
-    if (!deepLinkChainApplied) return
-    if (!pathname || chainId == null || !isChainSupported(chainId)) return
-    if (hasLoaded && summary) return
-
-    const p = new URLSearchParams(searchParams.toString())
-    if (p.get('chain') === String(chainId)) return
-    p.set('chain', String(chainId))
-    const qs = p.toString()
-    void router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [deepLinkChainApplied, pathname, chainId, router, searchParams, hasLoaded, summary])
-
   useEffect(() => {
     if (!hasLoaded || summary == null) {
+      return
+    }
+    if (!isWalletOnLoadedChain) {
       return
     }
     if (!account || !provider) {
@@ -365,7 +421,7 @@ function VaultPageInner() {
     return () => {
       cancelled = true
     }
-  }, [hasLoaded, summary, provider, account])
+  }, [hasLoaded, summary, provider, account, isWalletOnLoadedChain])
 
   return (
     <div className="silo-page px-4 py-8 sm:px-6 max-w-6xl mx-auto">
@@ -495,9 +551,10 @@ function VaultPageInner() {
         ) : null}
       </div>
 
-      {chainId != null && (
+      {vaultDisplayChainId != null && (
         <VaultPermissionsProvider
           enabled={Boolean(isConnected && account && hasLoaded && summary)}
+          freeze={Boolean(hasLoaded && summary && !isWalletOnLoadedChain)}
           summary={
             summary != null
               ? {
@@ -513,7 +570,7 @@ function VaultPageInner() {
           <VaultPermissionsNotice />
           {hasLoaded && summary != null && (
             <VaultSummaryPanel
-              chainId={chainId}
+              chainId={vaultDisplayChainId}
               vaultAddress={summary.vault}
               ownerAddress={summary.owner}
               curatorAddress={summary.curator}
@@ -525,7 +582,7 @@ function VaultPageInner() {
               yourRoleLabel={yourRoleLabel}
               actions={
                 <VaultActionsColumn
-                  chainId={chainId}
+                  chainId={vaultDisplayChainId}
                   vaultAddress={summary.vault}
                   ownerAddress={summary.owner}
                   curatorAddress={summary.curator}
@@ -544,7 +601,7 @@ function VaultPageInner() {
             <SupplyQueueColumn
               title="Supply Queue"
               count={supplyQueueSize}
-              chainId={chainId}
+              chainId={vaultDisplayChainId}
               items={supply}
               loading={loading}
               hasLoaded={hasLoaded}
@@ -561,7 +618,7 @@ function VaultPageInner() {
             <QueueColumn
               title="Withdraw Queue"
               count={withdrawQueueSize}
-              chainId={chainId}
+              chainId={vaultDisplayChainId}
               items={withdraw}
               queueStates={withdrawMarketStates}
               loading={loading}
