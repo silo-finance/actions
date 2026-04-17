@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.19] - 2026-04-17
+
+### Fixed
+- fix: make sure rollback job is not skipped, skip only on failed deploy
+
 ## [0.8.18] - 2026-04-17
 
 ### Fixed
