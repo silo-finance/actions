@@ -9,6 +9,7 @@ import WithdrawQueueRemoveWizard from '@/components/WithdrawQueueRemoveWizard'
 import { useVaultPermissions } from '@/contexts/VaultPermissionsContext'
 import { useWeb3 } from '@/contexts/Web3Context'
 import { clearSupplyQueueForOwner } from '@/utils/clearVaultSupplyQueue'
+import { toUserErrorMessage } from '@/utils/rpcErrors'
 import type { OwnerKind } from '@/utils/ownerKind'
 import type { ResolvedMarket } from '@/utils/resolveVaultMarket'
 import type { VaultUnderlyingMeta } from '@/utils/vaultReader'
@@ -119,8 +120,7 @@ export default function VaultActionsColumn({
       setTxSuccess({ url: transactionUrl, linkLabel: label, outcome })
       setRevertSupplyAddresses(snapshot)
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setLocalError(msg || 'Transaction failed.')
+      setLocalError(toUserErrorMessage(e))
     } finally {
       setBusy(false)
     }

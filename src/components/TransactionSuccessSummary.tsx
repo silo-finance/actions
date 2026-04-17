@@ -13,7 +13,9 @@ export default function TransactionSuccessSummary({ url, linkLabel, outcome }: P
   const summary =
     outcome === 'safe_queue'
       ? 'Signature sent — the proposal is in the queue.'
-      : 'On-chain update sent from your wallet.'
+      : outcome === 'safe_wallet_queue'
+        ? 'Your Safe received the transaction — confirm it with the other owners in the Safe{Wallet} queue.'
+        : 'On-chain update sent from your wallet.'
 
   return (
     <div className="rounded-xl border border-[var(--silo-border)] bg-[var(--silo-surface)] px-3 py-3 space-y-2">

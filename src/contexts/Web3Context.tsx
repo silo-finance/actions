@@ -16,11 +16,13 @@ import {
 import { wagmiConfig } from '@/config/wagmi'
 import type { Eip1193Provider } from '@/utils/clearVaultSupplyQueue'
 import { getWalletAddEthereumChainParameter } from '@/utils/networks'
+import { extractErrorMessage, isUserRejectionError } from '@/utils/rpcErrors'
+import { installWalletConnectCrashGuard } from '@/utils/walletConnectCrashGuard'
 
 function switchFailedBecauseChainNotInWallet(err: unknown): boolean {
   const e = err as { code?: number; message?: string }
   if (e.code === 4902) return true
-  const msg = (e.message ?? '').toLowerCase()
+  const msg = extractErrorMessage(err).toLowerCase()
   return (
     msg.includes('unrecognized chain') ||
     msg.includes('recognize chain') ||
@@ -76,6 +78,8 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
 
   const [browserProvider, setBrowserProvider] = useState<BrowserProvider | null>(null)
   const [eip1193Provider, setEip1193Provider] = useState<Eip1193Provider | null>(null)
+
+  useEffect(() => installWalletConnectCrashGuard(), [])
 
   const walletChainId = walletClient?.chain?.id
 
@@ -176,8 +180,8 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
         await switchChain.mutateAsync({ chainId: targetChainId })
         return
       } catch (error) {
-        const walletError = error as { code?: number; message?: string }
-        if (walletError.code === 4001) return
+        if (isUserRejectionError(error)) return
+        const walletError = error as { code?: number }
         if (walletError.code === -32002) {
           alert('Network switch request is already pending in wallet.')
           return
@@ -199,8 +203,8 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
       try {
         await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: chainIdHex }] })
       } catch (swErr) {
-        const we = swErr as { code?: number; message?: string }
-        if (we.code === 4001) return
+        if (isUserRejectionError(swErr)) return
+        const we = swErr as { code?: number }
         const shouldTryAdd = we.code === 4902 || switchFailedBecauseChainNotInWallet(swErr)
         if (shouldTryAdd) {
           const addParams = getWalletAddEthereumChainParameter(targetChainId)
@@ -214,16 +218,17 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
               }
               return
             } catch (addErr) {
-              const ae = addErr as { code?: number; message?: string }
-              if (ae.code === 4001) return
+              if (isUserRejectionError(addErr)) return
+              const addMsg = extractErrorMessage(addErr)
               alert(
-                `Could not add this network in your wallet.${ae.message ? ` ${ae.message}` : ''} Add chain ${targetChainId} manually, then try again.`
+                `Could not add this network in your wallet.${addMsg ? ` ${addMsg}` : ''} Add chain ${targetChainId} manually, then try again.`
               )
               return
             }
           }
         }
-        alert(`Failed to switch network.${we.message ? ` ${we.message}` : ''}`)
+        const swMsg = extractErrorMessage(swErr)
+        alert(`Failed to switch network.${swMsg ? ` ${swMsg}` : ''}`)
       }
     },
     [connector, switchChain]
