@@ -2,6 +2,7 @@ import { Contract, formatUnits, type Provider, getAddress } from 'ethers'
 import idleVaultArtifact from '@/abis/IdleVault.json'
 import siloArtifact from '@/abis/Silo.json'
 import { loadAbi } from '@/utils/loadAbi'
+import { buildReadMulticallCall, executeReadMulticall } from '@/utils/readMulticall'
 import { resolveMarketLabel, type ResolvedMarket } from '@/utils/resolveVaultMarket'
 import { fetchVaultMarketStates, type WithdrawMarketOnchainState } from '@/utils/withdrawMarketStates'
 import {
@@ -30,24 +31,66 @@ function formatWithVaultDecimals(value: bigint, decimals: number): string {
   return `${intPart}.${fracTrim}`
 }
 
-async function fetchVaultPositionAssets(
+async function fetchVaultPositionAssetsBatch(
   provider: Provider,
-  marketAddress: string,
   vaultAddress: string,
-  kind: 'IdleVault' | 'Silo'
-): Promise<bigint | null> {
-  try {
-    const marketNorm = getAddress(marketAddress)
-    const vaultNorm = getAddress(vaultAddress)
-    const abi = kind === 'IdleVault' ? idleVaultAbi : siloAbi
-    const m = new Contract(marketNorm, abi, provider)
-    const shares = await m.balanceOf(vaultNorm)
-    const preview = m.getFunction('previewRedeem(uint256)')
-    const assets = await preview.staticCall(shares)
-    return BigInt(assets.toString())
-  } catch {
-    return null
+  markets: Array<{ address: string; kind: 'IdleVault' | 'Silo' }>
+): Promise<Map<string, bigint>> {
+  if (markets.length === 0) return new Map()
+  const vaultNorm = getAddress(vaultAddress)
+  const marketContracts = markets.map((market) => {
+    const norm = getAddress(market.address)
+    const abi = market.kind === 'IdleVault' ? idleVaultAbi : siloAbi
+    return {
+      ...market,
+      address: norm,
+      contract: new Contract(norm, abi, provider),
+      abi,
+    }
+  })
+
+  const shareCalls = marketContracts.map((market) =>
+    buildReadMulticallCall({
+      target: market.address,
+      abi: market.abi,
+      functionName: 'balanceOf',
+      args: [vaultNorm],
+      fallback: async () => market.contract.balanceOf(vaultNorm),
+      decodeResult: (value) => BigInt(String(value)),
+    })
+  )
+  const shares = await executeReadMulticall(provider, shareCalls, {
+    debugLabel: 'resolveVaultMarketsBatch:shares',
+  })
+
+  const previewCalls = marketContracts.map((market, index) => {
+    const share = shares[index]
+    if (share == null) {
+      throw new Error(`resolveVaultMarketsBatch: missing share for ${market.address}`)
+    }
+    const previewFn = market.contract.getFunction('previewRedeem(uint256)')
+    return buildReadMulticallCall({
+      target: market.address,
+      abi: market.abi,
+      functionName: 'previewRedeem(uint256)',
+      args: [share],
+      fallback: async () => previewFn.staticCall(share),
+      decodeResult: (value) => BigInt(String(value)),
+    })
+  })
+  const assets = await executeReadMulticall(provider, previewCalls, {
+    debugLabel: 'resolveVaultMarketsBatch:previewRedeem',
+  })
+
+  const out = new Map<string, bigint>()
+  for (let i = 0; i < marketContracts.length; i += 1) {
+    const market = marketContracts[i]!
+    const value = assets[i]
+    if (value != null) {
+      out.set(market.address.toLowerCase(), value as bigint)
+    }
   }
+  return out
 }
 
 /**
@@ -114,15 +157,20 @@ export async function resolveMarketsForQueues(
   }
 
   if (underlying) {
-    await Promise.all(
-      unique.map(async (addr) => {
-        const r = cache.get(addr.toLowerCase())
-        if (!r || (r.kind !== 'IdleVault' && r.kind !== 'Silo')) return
-        const assets = await fetchVaultPositionAssets(provider, r.address, vaultAddress, r.kind)
-        if (assets === null) return
-        r.positionLabel = `${formatWithVaultDecimals(assets, underlying.decimals)} ${underlying.symbol}`
+    const positionCandidates = unique
+      .map((addr) => cache.get(addr.toLowerCase()))
+      .filter((r): r is ResolvedMarket & { kind: 'IdleVault' | 'Silo' } => {
+        return r != null && (r.kind === 'IdleVault' || r.kind === 'Silo')
       })
-    )
+      .map((r) => ({ address: r.address, kind: r.kind }))
+    const assetsByMarket = await fetchVaultPositionAssetsBatch(provider, vaultAddress, positionCandidates)
+    for (const addr of unique) {
+      const r = cache.get(addr.toLowerCase())
+      if (!r || (r.kind !== 'IdleVault' && r.kind !== 'Silo')) continue
+      const assets = assetsByMarket.get(r.address.toLowerCase())
+      if (assets == null) continue
+      r.positionLabel = `${formatWithVaultDecimals(assets, underlying.decimals)} ${underlying.symbol}`
+    }
   }
 
   const withdrawMarketStates: WithdrawMarketOnchainState[] = withdrawAddrs.map((addr) => {
