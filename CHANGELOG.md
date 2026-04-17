@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.11] - 2026-04-17
+
+### Fixed
+- make rendering crash to test rollback
+- Revert "make site crash in console, to test rollback"
+
 ## [0.8.10] - 2026-04-17
 
 ### Fixed
