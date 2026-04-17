@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.14] - 2026-04-17
+
+### Fixed
+- fix: split deployment into 3 jobs to ensure rollback is working
+
 ## [0.8.13] - 2026-04-17
 
 ### Fixed
