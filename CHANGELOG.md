@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.1] - 2026-04-17
+
+### Added
+- improve blockchain switching
+
 ## [0.9.0] - 2026-04-17
 
 ### Added
