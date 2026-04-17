@@ -82,7 +82,7 @@ export default function VaultActionsColumn({
 
   const walletReady = isConnected && provider != null && eip1193Provider != null
 
-  const permissionResolved = perm.active && !perm.loading
+  const permissionResolved = perm.permissionsReady
   const clearAllowed = permissionResolved && perm.canAllocator
   const withdrawAllowed = permissionResolved && (perm.canAllocator || perm.canOwnerOrCurator)
 

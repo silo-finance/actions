@@ -11,7 +11,7 @@ import SupplyQueueColumn from '@/components/SupplyQueueColumn'
 import VaultActionsColumn from '@/components/VaultActionsColumn'
 import VaultSummaryPanel from '@/components/VaultSummaryPanel'
 import ConnectWalletModal from '@/components/ConnectWalletModal'
-import { VaultPermissionsProvider } from '@/contexts/VaultPermissionsContext'
+import { VaultPermissionsNotice, VaultPermissionsProvider } from '@/contexts/VaultPermissionsContext'
 import { useWeb3 } from '@/contexts/Web3Context'
 import { extractHexAddressLike } from '@/utils/addressFromInput'
 import { normalizeAddress } from '@/utils/addressValidation'
@@ -487,6 +487,7 @@ function VaultPageInner() {
               : null
           }
         >
+          <VaultPermissionsNotice />
           {hasLoaded && summary != null && (
             <VaultSummaryPanel
               chainId={chainId}
