@@ -16,6 +16,8 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  # upload-artifact / download-artifact (smoke outcome bridge for rollback)
+  actions: write
 
 concurrency:
   group: "pages"
