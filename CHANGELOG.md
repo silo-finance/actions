@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.7] - 2026-04-17
+
+### Fixed
+- smoke test and rollback
+
 ## [0.8.6] - 2026-04-16
 
 ### Fixed
