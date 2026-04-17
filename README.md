@@ -40,7 +40,7 @@ For WalletConnect on the deployed site, add a **repository variable** (not requi
 
 ### Post-deploy smoke test
 
-After `actions/deploy-pages` publishes the site, the **same** `deploy` workflow job runs a **Playwright** smoke test against the **vault** deep link (full URL example: `https://org.github.io/repo/vault/?chain=1&address=0x5362…`). The test resolves the repo-relative path `./vault/?...` with `SMOKE_BASE_URL` into an absolute URL (Playwright does not reliably combine `./…` with `use.baseURL` alone). It checks that the **Vault** heading appears, the address field is prefilled from the URL, and fails on **uncaught page errors** or **`console.error`**. If smoke fails, that job fails and the workflow run is **failed** (no separate follow-up job). CI installs browsers with `npx playwright install chromium --with-deps` before the test.
+After `actions/deploy-pages` publishes the site in the `deploy` job, a separate `post_deploy_smoke` job runs the **Playwright** smoke test against the **vault** deep link (full URL example: `https://org.github.io/repo/vault/?chain=1&address=0x5362…`). The test resolves the repo-relative path `./vault/?...` with `SMOKE_BASE_URL` into an absolute URL (Playwright does not reliably combine `./…` with `use.baseURL` alone). It checks that the **Vault** heading appears, the address field is prefilled from the URL, and fails on **uncaught page errors** or **`console.error`**. A final `finalize_deployment` job runs only when both previous jobs succeeded and prints an `OK` marker.
 
 **Local smoke against any URL** (install browsers once: `npx playwright install`):
 

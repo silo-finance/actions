@@ -98,12 +98,33 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Install Playwright browser (post-deploy smoke)
+      - name: Capture deployed metadata
+        id: meta
+        run: echo "deployed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  post_deploy_smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Playwright browser
         run: npx playwright install chromium --with-deps
 
       - name: Log smoke URLs
         env:
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
         run: |
           set -euo pipefail
           BASE="${PAGE_URL%/}"
@@ -115,11 +136,11 @@ jobs:
 
       - name: Wait for vault smoke URL
         env:
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
         run: |
           set -euo pipefail
           if [ -z "$PAGE_URL" ]; then
-            echo "::error::Deploy step did not produce page_url"
+            echo "::error::Deploy job did not produce page_url"
             exit 1
           fi
           BASE="${PAGE_URL%/}"
@@ -142,9 +163,12 @@ jobs:
 
       - name: Post-deploy smoke (Playwright)
         env:
-          SMOKE_BASE_URL: ${{ steps.deployment.outputs.page_url }}
+          SMOKE_BASE_URL: ${{ needs.deploy.outputs.page_url }}
         run: npm run test:smoke
 
-      - name: Capture deployed metadata
-        id: meta
-        run: echo "deployed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  finalize_deployment:
+    needs: [deploy, post_deploy_smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Final deployment marker
+        run: echo "OK: deploy + post-deploy smoke succeeded"
