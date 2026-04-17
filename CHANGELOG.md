@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.24] - 2026-04-17
+
+### Fixed
+- fix artifacts conflict
+
 ## [0.8.23] - 2026-04-17
 
 ### Fixed
