@@ -16,7 +16,7 @@ export default function ConnectWalletPanelContent({
     <>
       <p className="wallet-connect-label">Connect with</p>
       <p className={`px-2 -mt-0.5 pb-1 leading-snug ${mutedClassName}`}>
-        Browser extension or WalletConnect. Large targets for quick access.
+        Browser extension or WalletConnect.
       </p>
       <button type="button" className="wallet-connect-item" onClick={() => onPick('injected')}>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -30,11 +30,6 @@ export default function ConnectWalletPanelContent({
           <span className={mutedClassName}>Scan QR with a mobile wallet</span>
         </span>
       </button>
-      <div className="wallet-connect-hint">
-        <button type="button" className="wallet-connect-auto" onClick={() => onPick('auto')}>
-          Auto-detect wallet
-        </button>
-      </div>
     </>
   )
 }

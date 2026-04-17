@@ -1,5 +1,5 @@
 import { createConfig, createStorage, http, noopStorage } from 'wagmi'
-import { injected, walletConnect } from 'wagmi/connectors'
+import { injected, metaMask, walletConnect } from 'wagmi/connectors'
 import { appChains } from '@/config/viemChains'
 
 const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim()
@@ -22,6 +22,8 @@ function transports() {
 }
 
 const connectors = [
+  /** EIP-6963: works when another extension owns a read-only `window.ethereum` (MetaMask inpage would log a conflict otherwise). */
+  metaMask(),
   injected({ shimDisconnect: true }),
   ...(wcProjectId
     ? [

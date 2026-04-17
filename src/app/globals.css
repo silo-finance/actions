@@ -338,32 +338,6 @@ body {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--silo-accent) 35%, transparent);
 }
 
-.wallet-connect-hint {
-  margin-top: 0.5rem;
-  padding: 0.5rem 0.6rem 0.15rem;
-  border-top: 1px solid var(--silo-border);
-}
-
-.wallet-connect-auto {
-  display: block;
-  width: 100%;
-  padding: 0.55rem 0.5rem;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--silo-accent);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  text-align: center;
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.wallet-connect-auto:hover {
-  background: color-mix(in srgb, var(--silo-accent-soft) 55%, var(--silo-surface));
-  color: var(--silo-text);
-}
-
 .wallet-connect-modal-root {
   position: fixed;
   inset: 0;
@@ -467,6 +441,12 @@ body {
   background: color-mix(in srgb, var(--silo-warning) 14%, var(--silo-surface));
   border-color: color-mix(in srgb, var(--silo-warning) 50%, var(--silo-border));
   color: color-mix(in srgb, var(--silo-warning) 55%, var(--silo-text));
+}
+
+.silo-alert-info {
+  background: color-mix(in srgb, var(--silo-accent) 10%, var(--silo-surface));
+  border-color: color-mix(in srgb, var(--silo-accent) 32%, var(--silo-border));
+  color: var(--silo-text-main);
 }
 
 /* Primary action button (e.g. Vault Check) — matches Market Crafter Button primary */

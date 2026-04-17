@@ -36,39 +36,35 @@ export async function classifyAllocatorVaultAction(
   ownerKind: OwnerKind,
   curatorKind: OwnerKind
 ): Promise<VaultActionAuthority> {
-  try {
-    const c = n(connectedAccount)
-    const owner = n(overview.owner)
-    const curator = n(overview.curator)
+  const c = n(connectedAccount)
+  const owner = n(overview.owner)
+  const curator = n(overview.curator)
 
-    /** When the vault role is a Safe, never use `direct` with `connected ===` that role: WC / smart wallets may report the Safe as the connected account. */
-    if (ownerKind === 'safe' && c === owner) {
-      return { mode: 'safe_propose', executingSafeAddress: owner }
-    }
-    if (curatorKind === 'safe' && c === curator) {
-      return { mode: 'safe_propose', executingSafeAddress: curator }
-    }
-
-    if (c === owner || c === curator) {
-      return { mode: 'direct', executingSafeAddress: null }
-    }
-
-    if (await vaultIsAllocator(provider, vaultAddress, connectedAccount)) {
-      return { mode: 'direct', executingSafeAddress: null }
-    }
-
-    if (ownerKind === 'safe' && (await isAddressSafeOwner(provider, overview.owner, connectedAccount))) {
-      return { mode: 'safe_propose', executingSafeAddress: owner }
-    }
-
-    if (curatorKind === 'safe' && (await isAddressSafeOwner(provider, overview.curator, connectedAccount))) {
-      return { mode: 'safe_propose', executingSafeAddress: curator }
-    }
-
-    return { mode: 'denied', executingSafeAddress: null }
-  } catch {
-    return { mode: 'denied', executingSafeAddress: null }
+  /** When the vault role is a Safe, never use `direct` with `connected ===` that role: WC / smart wallets may report the Safe as the connected account. */
+  if (ownerKind === 'safe' && c === owner) {
+    return { mode: 'safe_propose', executingSafeAddress: owner }
   }
+  if (curatorKind === 'safe' && c === curator) {
+    return { mode: 'safe_propose', executingSafeAddress: curator }
+  }
+
+  if (c === owner || c === curator) {
+    return { mode: 'direct', executingSafeAddress: null }
+  }
+
+  if (await vaultIsAllocator(provider, vaultAddress, connectedAccount)) {
+    return { mode: 'direct', executingSafeAddress: null }
+  }
+
+  if (ownerKind === 'safe' && (await isAddressSafeOwner(provider, overview.owner, connectedAccount))) {
+    return { mode: 'safe_propose', executingSafeAddress: owner }
+  }
+
+  if (curatorKind === 'safe' && (await isAddressSafeOwner(provider, overview.curator, connectedAccount))) {
+    return { mode: 'safe_propose', executingSafeAddress: curator }
+  }
+
+  return { mode: 'denied', executingSafeAddress: null }
 }
 
 /**
@@ -83,34 +79,30 @@ export async function classifyOwnerOrCuratorVaultAction(
   ownerKind: OwnerKind,
   curatorKind: OwnerKind
 ): Promise<VaultActionAuthority> {
-  try {
-    const c = n(connectedAccount)
-    const owner = n(overview.owner)
-    const curator = n(overview.curator)
+  const c = n(connectedAccount)
+  const owner = n(overview.owner)
+  const curator = n(overview.curator)
 
-    if (ownerKind === 'safe' && c === owner) {
-      return { mode: 'safe_propose', executingSafeAddress: owner }
-    }
-    if (curatorKind === 'safe' && c === curator) {
-      return { mode: 'safe_propose', executingSafeAddress: curator }
-    }
-
-    if (c === owner || c === curator) {
-      return { mode: 'direct', executingSafeAddress: null }
-    }
-
-    if (ownerKind === 'safe' && (await isAddressSafeOwner(provider, overview.owner, connectedAccount))) {
-      return { mode: 'safe_propose', executingSafeAddress: owner }
-    }
-
-    if (curatorKind === 'safe' && (await isAddressSafeOwner(provider, overview.curator, connectedAccount))) {
-      return { mode: 'safe_propose', executingSafeAddress: curator }
-    }
-
-    return { mode: 'denied', executingSafeAddress: null }
-  } catch {
-    return { mode: 'denied', executingSafeAddress: null }
+  if (ownerKind === 'safe' && c === owner) {
+    return { mode: 'safe_propose', executingSafeAddress: owner }
   }
+  if (curatorKind === 'safe' && c === curator) {
+    return { mode: 'safe_propose', executingSafeAddress: curator }
+  }
+
+  if (c === owner || c === curator) {
+    return { mode: 'direct', executingSafeAddress: null }
+  }
+
+  if (ownerKind === 'safe' && (await isAddressSafeOwner(provider, overview.owner, connectedAccount))) {
+    return { mode: 'safe_propose', executingSafeAddress: owner }
+  }
+
+  if (curatorKind === 'safe' && (await isAddressSafeOwner(provider, overview.curator, connectedAccount))) {
+    return { mode: 'safe_propose', executingSafeAddress: curator }
+  }
+
+  return { mode: 'denied', executingSafeAddress: null }
 }
 
 export const CLEAR_SUPPLY_QUEUE_DENIED_MESSAGE =
