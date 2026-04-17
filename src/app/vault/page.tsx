@@ -117,6 +117,13 @@ function VaultPageInner() {
   const networkIconPath = vaultDisplayChainId != null ? getNetworkIconPath(vaultDisplayChainId) : null
   const networkIconSrc = networkIconPath ? `${basePath}${networkIconPath}` : null
 
+  /** Current wallet chain (for "My vaults" API section only; not the loaded-vault display chain). */
+  const walletChainName = chainId != null ? getNetworkDisplayName(chainId) : null
+  const walletChainIconPath = chainId != null ? getNetworkIconPath(chainId) : null
+  const walletChainIconSrc = walletChainIconPath ? `${basePath}${walletChainIconPath}` : null
+  const accountChecksum = account ? normalizeAddress(account) ?? account : null
+  const accountShort = accountChecksum ? `${accountChecksum.slice(0, 6)}…${accountChecksum.slice(-4)}` : null
+
   /** Canonical link to this vault page (not the raw browser URL). */
   const vaultShareUrl = useMemo(() => {
     if (!hasLoaded || !summary?.vault || !lastSuccessfulCheck || chainId == null || typeof window === 'undefined') {
@@ -518,13 +525,54 @@ function VaultPageInner() {
             !myVaultsError &&
             myVaults.length === 0 ? (
               <p className="mt-3 text-xs silo-alert silo-alert-info m-0 leading-relaxed">
-                No vaults were found where this wallet is owner, curator, or guardian in the Silo v3 indexer. (If you
-                are only an allocator, this list cannot show those vaults — paste the vault contract address above.)
+                We checked{' '}
+                {accountShort ? (
+                  <span
+                    className="text-xs font-mono font-semibold silo-text-main align-middle"
+                    title={accountChecksum ?? undefined}
+                  >
+                    {accountShort}
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold silo-text-main">this wallet</span>
+                )}{' '}
+                on{' '}
+                <span className="inline-flex items-center gap-1 align-middle">
+                  {walletChainIconSrc && walletChainName ? (
+                    <Image
+                      src={walletChainIconSrc}
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="rounded-full shrink-0"
+                    />
+                  ) : null}
+                  <span className="text-xs font-semibold silo-text-main">
+                    {walletChainName ?? 'the current network'}
+                  </span>
+                </span>
+                . No vaults were found where this wallet is owner, curator, or guardian in the Silo v3 indexer. (If
+                you are only an allocator, this list cannot show those vaults — paste the vault contract address
+                above.)
               </p>
             ) : null}
             {showMyVaultsPicker && myVaults.length > 0 ? (
               <div className="mt-3 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft m-0">Your vaults</p>
+                <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft m-0 flex flex-wrap items-center gap-1.5">
+                  <span>Your vaults on</span>
+                  {walletChainIconSrc && walletChainName ? (
+                    <>
+                      <Image
+                        src={walletChainIconSrc}
+                        alt=""
+                        width={16}
+                        height={16}
+                        className="rounded-full shrink-0"
+                      />
+                      <span className="normal-case silo-text-main">{walletChainName}</span>
+                    </>
+                  ) : null}
+                </p>
                 <ul className="space-y-2 m-0 p-0 list-none">
                   {myVaults.map((v) => (
                     <li key={v.id.toLowerCase()}>
