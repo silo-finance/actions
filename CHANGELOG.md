@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.8] - 2026-04-17
+
+### Fixed
+- make site crash in console, to test rollback
+
 ## [0.8.7] - 2026-04-17
 
 ### Fixed
