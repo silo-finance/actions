@@ -13,7 +13,7 @@ import {
 } from '@/utils/reallocateRemoveWithdrawMarket'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import { classifyAllocatorVaultAction } from '@/utils/vaultActionAuthority'
-import { executeVaultCallsFromSigner } from '@/utils/vaultMulticall'
+import { executeVaultCallsFromSigner, sendSafeWalletBatch } from '@/utils/vaultMulticall'
 
 const siloVaultAbi = loadAbi(siloVaultArtifact)
 const vaultIface = new Interface(siloVaultAbi)
@@ -106,6 +106,21 @@ export async function setSupplyQueueForOwner(params: SetSupplyQueueParams): Prom
       throw new Error('Could not build a block explorer link for this network.')
     }
     return { transactionUrl, successLinkLabel: 'View on explorer', outcome: 'explorer' }
+  }
+
+  if (auth.mode === 'safe_as_wallet' && auth.executingSafeAddress != null) {
+    const safeAddress = getAddress(auth.executingSafeAddress)
+    await sendSafeWalletBatch({
+      ethereum,
+      chainId,
+      from: safeAddress,
+      calls: vaultCalldatasToTargetedCalls(vaultAddress, callDatas),
+    })
+    const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
+    if (!transactionUrl) {
+      throw new Error('Could not build a Safe{Wallet} link for this network.')
+    }
+    return { transactionUrl, successLinkLabel: 'Open queue', outcome: 'safe_wallet_queue' }
   }
 
   if (auth.mode === 'safe_propose' && auth.executingSafeAddress != null) {

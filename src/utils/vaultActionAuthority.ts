@@ -11,12 +11,16 @@ async function vaultIsAllocator(provider: Provider, vaultAddress: string, accoun
   return Boolean(await vault.isAllocator(accountAddress))
 }
 
-export type VaultExecutionMode = 'direct' | 'safe_propose' | 'denied'
+export type VaultExecutionMode = 'direct' | 'safe_as_wallet' | 'safe_propose' | 'denied'
 
 /** How the connected wallet may perform vault actions that require `onlyAllocatorRole`. */
 export type VaultActionAuthority = {
   mode: VaultExecutionMode
-  /** Safe that will be `msg.sender` on the vault when using the Safe Transaction Service. */
+  /**
+   * Safe that will be `msg.sender` on the vault.
+   * - `safe_propose`: Safe the connected EOA is an owner of; target for the Safe Transaction Service proposal.
+   * - `safe_as_wallet`: Safe that IS the connected wallet (WalletConnect from Safe{Wallet} or Safe Apps iframe).
+   */
   executingSafeAddress: string | null
 }
 
@@ -26,7 +30,15 @@ function n(a: string): string {
 
 /**
  * `onlyAllocatorRole`: `msg.sender` is `owner()`, `curator`, or `isAllocator[sender]` (SiloVault).
- * When the vault owner or curator address is a Safe, a Safe owner can propose txs executed as that role.
+ *
+ * Routing:
+ * - `connectedAccount === Safe role` (WC from Safe{Wallet} / Safe Apps iframe / Rabby impersonate):
+ *   → `safe_as_wallet`. Send `eth_sendTransaction` via the Safe wallet — it builds the proposal
+ *   internally. Do NOT `personal_sign(safeTxHash)` here: Safe{Wallet} would create a Safe Message
+ *   (not a tx) and Rabby would try to collect EIP-1271 owner signatures.
+ * - Connected EOA is a Safe owner → `safe_propose`: sign the Safe tx hash off-chain and push to
+ *   the Safe Transaction Service as a pending proposal.
+ * - Connected EOA equals the role (and role is EOA) or is allocator → `direct`.
  */
 export async function classifyAllocatorVaultAction(
   provider: Provider,
@@ -40,12 +52,11 @@ export async function classifyAllocatorVaultAction(
   const owner = n(overview.owner)
   const curator = n(overview.curator)
 
-  /** When the vault role is a Safe, never use `direct` with `connected ===` that role: WC / smart wallets may report the Safe as the connected account. */
   if (ownerKind === 'safe' && c === owner) {
-    return { mode: 'safe_propose', executingSafeAddress: owner }
+    return { mode: 'safe_as_wallet', executingSafeAddress: owner }
   }
   if (curatorKind === 'safe' && c === curator) {
-    return { mode: 'safe_propose', executingSafeAddress: curator }
+    return { mode: 'safe_as_wallet', executingSafeAddress: curator }
   }
 
   if (c === owner || c === curator) {
@@ -70,7 +81,8 @@ export async function classifyAllocatorVaultAction(
 /**
  * Batches that include `submitCap` need `onlyCuratorRole` for those calls: `msg.sender` must be
  * `owner()` or `curator` (SiloVault). Intersection with allocator-only paths is **owner or curator**
- * (directly or via the owner/curator contract wallet).
+ * (directly or via the owner/curator contract wallet). Same `safe_as_wallet` / `safe_propose`
+ * routing as {@link classifyAllocatorVaultAction}.
  */
 export async function classifyOwnerOrCuratorVaultAction(
   provider: Provider,
@@ -84,10 +96,10 @@ export async function classifyOwnerOrCuratorVaultAction(
   const curator = n(overview.curator)
 
   if (ownerKind === 'safe' && c === owner) {
-    return { mode: 'safe_propose', executingSafeAddress: owner }
+    return { mode: 'safe_as_wallet', executingSafeAddress: owner }
   }
   if (curatorKind === 'safe' && c === curator) {
-    return { mode: 'safe_propose', executingSafeAddress: curator }
+    return { mode: 'safe_as_wallet', executingSafeAddress: curator }
   }
 
   if (c === owner || c === curator) {

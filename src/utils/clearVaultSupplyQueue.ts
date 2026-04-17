@@ -11,6 +11,7 @@ import { getExplorerTxUrl } from '@/utils/networks'
 import { getSafeWalletQueueUrl } from '@/utils/safeAppLinks'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import { CLEAR_SUPPLY_QUEUE_DENIED_MESSAGE, classifyAllocatorVaultAction } from '@/utils/vaultActionAuthority'
+import { sendSafeWalletBatch } from '@/utils/vaultMulticall'
 
 const siloVaultAbi = loadAbi(siloVaultArtifact)
 
@@ -137,6 +138,21 @@ export async function clearSupplyQueueForOwner(
       throw new Error('Could not build a block explorer link for this network.')
     }
     return { transactionUrl, successLinkLabel: 'View on explorer', outcome: 'explorer' }
+  }
+
+  if (auth.mode === 'safe_as_wallet' && auth.executingSafeAddress != null) {
+    const safeAddress = getAddress(auth.executingSafeAddress)
+    await sendSafeWalletBatch({
+      ethereum,
+      chainId,
+      from: safeAddress,
+      calls: [{ to: getAddress(vaultAddress), data: encodeSetSupplyQueueEmpty() }],
+    })
+    const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
+    if (!transactionUrl) {
+      throw new Error('Could not build a Safe{Wallet} link for this network.')
+    }
+    return { transactionUrl, successLinkLabel: 'Open queue', outcome: 'safe_wallet_queue' }
   }
 
   if (auth.mode === 'safe_propose' && auth.executingSafeAddress != null) {

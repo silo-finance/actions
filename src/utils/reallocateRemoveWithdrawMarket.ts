@@ -17,6 +17,7 @@ import {
 } from '@/utils/vaultActionAuthority'
 import {
   executeTargetedBatchFromSigner,
+  sendSafeWalletBatch,
   type TargetedCall,
 } from '@/utils/vaultMulticall'
 
@@ -342,6 +343,28 @@ export async function executeReallocateRemoveWithdrawQueue(
       throw new Error('Could not build a block explorer link for this network.')
     }
     return { transactionUrl, successLinkLabel: 'View on explorer', outcome: 'explorer' }
+  }
+
+  if (auth.mode === 'safe_as_wallet' && auth.executingSafeAddress != null) {
+    const safeAddress = getAddress(auth.executingSafeAddress)
+    /**
+     * Safe is the connected wallet. Emit an EIP-5792 `wallet_sendCalls` bundle with every action
+     * as a separate entry (dust-approve, dust-deposit, reallocate, submitCap, updateWithdrawQueue,
+     * setSupplyQueue). Safe{Wallet} / Safe Apps wrap the whole thing in one MultiSend proposal and
+     * decode each entry against its target ABI, so co-signers see the real method names instead of
+     * a single opaque `vault.multicall(bytes[])` blob.
+     */
+    await sendSafeWalletBatch({
+      ethereum,
+      chainId,
+      from: safeAddress,
+      calls: batchCalls,
+    })
+    const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
+    if (!transactionUrl) {
+      throw new Error('Could not build a Safe{Wallet} link for this network.')
+    }
+    return { transactionUrl, successLinkLabel: 'Open queue', outcome: 'safe_wallet_queue' }
   }
 
   if (auth.mode === 'safe_propose' && auth.executingSafeAddress != null) {

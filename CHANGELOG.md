@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0] - 2026-04-17
+
+### Added
+- Support for using the dApp with a Safe multisig: as a Safe App inside Safe{Wallet}, via
+  Safe{Wallet} mobile over WalletConnect, and with Rabby impersonate. Owner, allocator, and
+  curator actions arrive in the Safe queue as a single transaction proposal with every step
+  decoded by its method name, ready for co-signer review.
+
+### Fixed
+- Readable wallet error messages — user-rejected prompts and RPC failures are now shown as short,
+  human-friendly text instead of raw error objects.
+
 ## [0.9.2] - 2026-04-17
 
 ### Added
