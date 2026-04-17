@@ -134,8 +134,10 @@ jobs:
         id: meta
         run: echo "deployed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+  # Only runs after a successful deploy job. If `deploy` fails, this job is skipped (no URL to test).
   post_deploy_smoke:
     needs: deploy
+    if: success()
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -234,43 +236,16 @@ jobs:
           echo "::error::Post-deploy smoke did not pass (see steps above)."
           exit 1
 
-  # Reads smoke outcome even when post_deploy_smoke failed (GitHub does not pass outputs from failed jobs).
-  smoke_outcome:
-    needs: [deploy, post_deploy_smoke]
-    if: always() && needs.deploy.result == 'success'
-    runs-on: ubuntu-latest
-    outputs:
-      smoke_ok: ${{ steps.read_smoke.outputs.ok }}
-    steps:
-      - name: Download smoke outcome
-        id: download_smoke
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: smoke-outcome
-          path: smoke-out
-
-      - name: Read smoke outcome
-        id: read_smoke
-        if: always()
-        shell: bash
-        run: |
-          f="smoke-outcome/smoke-result.txt"
-          if [ ! -f "$f" ]; then
-            echo "::warning::Missing smoke-result artifact (post_deploy may have failed before upload)."
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          v="$(tr -d '\n' < "$f")"
-          if [ "$v" = "true" ]; then
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-          fi
-
+  # Runs when deploy succeeded but smoke did not (failure or cancelled). Uses `always()` so GitHub
+  # still schedules this job after a failed `post_deploy_smoke` (failed needed jobs skip dependents by default).
+  # Smoke outcome must never block rollback: do not add intermediate jobs that `need` post_deploy_smoke.
   rollback_pages:
-    needs: [deploy, smoke_outcome]
-    if: needs.deploy.outputs.rollback_eligible == 'true' && needs.smoke_outcome.outputs.smoke_ok == 'false'
+    needs: [deploy, post_deploy_smoke]
+    if: |
+      always() &&
+      needs.deploy.result == 'success' &&
+      (needs.post_deploy_smoke.result == 'failure' || needs.post_deploy_smoke.result == 'cancelled') &&
+      needs.deploy.outputs.rollback_eligible == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -284,6 +259,21 @@ jobs:
           FAILED_REF: ${{ needs.deploy.outputs.deploy_ref }}
         run: |
           echo "::notice::Post-deploy smoke failed for ref ${FAILED_REF}. Redeploying previous semver tag to GitHub Pages."
+
+      - name: Download smoke outcome (optional sanity check)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: smoke-outcome
+          path: smoke-out
+
+      - name: Verify smoke artifact agrees with failed job
+        shell: bash
+        run: |
+          f="smoke-outcome/smoke-result.txt"
+          if [ -f "$f" ] && [ "$(tr -d '\n' < "$f")" = "true" ]; then
+            echo "::warning::smoke-result.txt says passed but smoke job failed; continuing rollback anyway."
+          fi
 
       - name: Checkout (full history + tags)
         uses: actions/checkout@v4
@@ -418,19 +408,19 @@ jobs:
           fi
 
   smoke_gate:
-    needs: [deploy, post_deploy_smoke, smoke_outcome, rollback_pages]
+    needs: [deploy, post_deploy_smoke, rollback_pages]
     if: always() && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Enforce primary smoke or successful rollback deploy
         shell: bash
         env:
-          PRIMARY_OK: ${{ needs.smoke_outcome.outputs.smoke_ok }}
+          POST_DEPLOY: ${{ needs.post_deploy_smoke.result }}
           RB_RESULT: ${{ needs.rollback_pages.result }}
           RB_ELIG: ${{ needs.deploy.outputs.rollback_eligible }}
         run: |
           set -euo pipefail
-          if [ "$PRIMARY_OK" = "true" ]; then
+          if [ "$POST_DEPLOY" = "success" ]; then
             echo "::notice::Primary post-deploy smoke passed."
             exit 0
           fi
@@ -442,7 +432,7 @@ jobs:
             echo "::error::Post-deploy smoke failed. Automatic rollback is only for GitHub Releases or deploy refs that look like semver (vX.Y.Z or X.Y.Z). Branch pushes (e.g. master) do not roll back; redeploy from a tag or run workflow_dispatch with a tag ref."
             exit 1
           fi
-          echo "::error::Post-deploy smoke failed and rollback job did not succeed (result: ${RB_RESULT})."
+          echo "::error::Post-deploy smoke did not succeed (post_deploy=${POST_DEPLOY}) and rollback did not complete (rollback=${RB_RESULT})."
           exit 1
 
   finalize_deployment:
