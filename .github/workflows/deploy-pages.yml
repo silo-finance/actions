@@ -21,6 +21,10 @@ concurrency:
   group: "pages"
   cancel-in-progress: true
 
+env:
+  # Vault deep-link smoke (VOLTS vault on mainnet) — repo-relative path under SMOKE_BASE_URL
+  SMOKE_PAGE_PATH: ./vault/?chain=1&address=0x5362D5086FDef73450145492a66F8EBF210c5B9C
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -94,53 +98,28 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Capture deployed metadata
-        id: meta
-        run: echo "deployed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-  post_deploy_smoke:
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      # Vault deep-link smoke (VOLTS vault on mainnet) — repo-relative path under SMOKE_BASE_URL
-      SMOKE_PAGE_PATH: ./vault/?chain=1&address=0x5362D5086FDef73450145492a66F8EBF210c5B9C
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: Install Playwright browser
+      - name: Install Playwright browser (post-deploy smoke)
         run: npx playwright install chromium --with-deps
 
       - name: Log smoke URLs
         env:
-          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           set -euo pipefail
           BASE="${PAGE_URL%/}"
           REL="${SMOKE_PAGE_PATH#./}"
           SMOKE_FULL_URL="${BASE}/${REL}"
-          echo "::notice::post_deploy_smoke — GitHub Pages base URL: ${PAGE_URL}"
-          echo "::notice::post_deploy_smoke — Playwright baseURL (trimmed trailing slash): ${BASE}"
-          echo "::notice::post_deploy_smoke — vault smoke path: ${SMOKE_PAGE_PATH}"
-          echo "::notice::post_deploy_smoke — full vault URL under test: ${SMOKE_FULL_URL}"
+          echo "::notice::post-deploy smoke — GitHub Pages base URL: ${PAGE_URL}"
+          echo "::notice::post-deploy smoke — vault smoke path: ${SMOKE_PAGE_PATH}"
+          echo "::notice::post-deploy smoke — full vault URL under test: ${SMOKE_FULL_URL}"
 
       - name: Wait for vault smoke URL
         env:
-          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           set -euo pipefail
           if [ -z "$PAGE_URL" ]; then
-            echo "::error::deploy job did not produce page_url"
+            echo "::error::Deploy step did not produce page_url"
             exit 1
           fi
           BASE="${PAGE_URL%/}"
@@ -163,51 +142,9 @@ jobs:
 
       - name: Post-deploy smoke (Playwright)
         env:
-          SMOKE_BASE_URL: ${{ needs.deploy.outputs.page_url }}
+          SMOKE_BASE_URL: ${{ steps.deployment.outputs.page_url }}
         run: npm run test:smoke
 
-  mark_pages_deployment_failed:
-    needs: [deploy, post_deploy_smoke]
-    if: >-
-      always() &&
-      needs.deploy.result == 'success' &&
-      needs.post_deploy_smoke.result == 'failure'
-    runs-on: ubuntu-latest
-    permissions:
-      deployments: write
-      contents: read
-    steps:
-      - name: Mark current github-pages deployment as failure
-        env:
-          DEPLOYED_SHA: ${{ needs.deploy.outputs.deployed_sha }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          if [ -z "${DEPLOYED_SHA:-}" ]; then
-            echo "::error::Missing deployed SHA from deploy job."
-            exit 1
-          fi
-
-          echo "::notice::Looking up github-pages deployment for SHA: ${DEPLOYED_SHA}"
-          # NOTE: `gh api` with GET must pass filters as query string. `-f` sends a form body and does not apply here.
-          QUERY="environment=github-pages&sha=${DEPLOYED_SHA}&per_page=30"
-          DEPLOYMENT_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/deployments?${QUERY}")"
-          echo "::notice::Deployments response (first 2000 chars): ${DEPLOYMENT_JSON:0:2000}"
-
-          DEPLOYMENT_ID="$(echo "${DEPLOYMENT_JSON}" | jq -r 'if length == 0 then empty else (sort_by(.created_at) | reverse | .[0].id) end')"
-
-          if [ -z "${DEPLOYMENT_ID:-}" ] || [ "${DEPLOYMENT_ID}" = "null" ]; then
-            echo "::error::No github-pages deployment found for SHA ${DEPLOYED_SHA} (empty list or jq parse issue)."
-            exit 1
-          fi
-
-          echo "::notice::Marking deployment ${DEPLOYMENT_ID} as failure (smoke test failed)."
-          gh api \
-            --method POST \
-            "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" \
-            -f state='failure' \
-            -f description='Post-deploy smoke test failed' \
-            -f log_url="${RUN_URL}"
-
-          echo "::notice::Deployment ${DEPLOYMENT_ID} status updated to failure."
+      - name: Capture deployed metadata
+        id: meta
+        run: echo "deployed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.13] - 2026-04-17
+
+### Fixed
+- fix: detect when page is failing + custom error page
+
 ## [0.8.12] - 2026-04-17
 
 ### Fixed
