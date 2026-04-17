@@ -44,15 +44,15 @@ After `actions/deploy-pages` publishes the site in the `deploy` job, a separate 
 
 The `post_deploy_smoke` job runs **only** after a successful **`deploy`** (`if: success()`), so smoke is skipped solely when the first deployment job failed (nothing to verify). The job **fails** (red) when smoke does not pass. GitHub **skips** normal dependents of a failed job, so **`rollback_pages` must not depend on a bridge job** that also `needs` the failed smoke job. `rollback_pages` depends only on **`deploy` + `post_deploy_smoke`** and uses **`if: always()`** (no compound expression on `needs.post_deploy_smoke.result` — that pattern can leave the job **skipped** when smoke is red). The first step in `rollback_pages` decides whether to actually redeploy (smoke failed/cancelled + `rollback_eligible`). A `smoke_gate` job checks smoke success, or that **`rollback_ran`** was true after a failed smoke. When the gate passes, `finalize_deployment` prints an `OK` marker.
 
-#### Automatic rollback (releases and semver refs)
+#### Automatic rollback (tags only)
 
-GitHub Pages does **not** provide a native “revert this deployment” API after a bad publish. Rollback runs when smoke fails **and** the deploy is rollback-eligible: **any published GitHub Release** (`release` event), or **workflow_dispatch** / checkout ref that looks like **`vX.Y.Z`** or **`X.Y.Z`**. Pushes to **`master`** are not rollback-eligible (no tag context). The `rollback_pages` job redeploys the **previous** `vX.Y.Z` git tag (`git tag` sorted by version). There is **no second Playwright run** after rollback.
+GitHub Pages does **not** provide a native “revert this deployment” API after a bad publish. Rollback runs when smoke fails **and** the deploy came from a **published GitHub Release** (`release` event) or a ref matching **`vX.Y.Z`** / **`X.Y.Z`**. The workflow lists matching **`vX.Y.Z`** tags by **tag creation time** (`git tag -l 'v*.*.*' --sort=-creatordate`), finds the failed deploy’s tag, and redeploys the **next tag in that list** — the one created immediately before, not the numerically “next lower” semver. There is **no second Playwright run** after rollback.
 
 The Safe app **`public/manifest.json`** includes a **`version`** field (same semver as `package.json`, without a `v` prefix). `npm run build` runs **`prebuild`** first (`scripts/sync-manifest-version.mjs`) so the built site always ships an up-to-date manifest. The PR automation script [`scripts/update-changelog-from-pr.mjs`](scripts/update-changelog-from-pr.mjs) also keeps that field aligned when it bumps `package.json` / `CHANGELOG.md` on `release/*` and `hotfix/*` branches.
 
 After rollback deploy, the workflow **curl**s `https://…/repo/manifest.json` (with retries), reads **`version`** with `jq`, and prints it in the job log; if the file is not reachable yet, it logs a **warning** only.
 
-Non-tag deploys (for example pushes to `master`) still run smoke, but **no automatic rollback** runs if smoke fails; fix forward or run **Deploy to GitHub Pages** manually with `ref` set to the last known good tag.
+Deploys from a **branch ref** (for example `push` to `master`) are **not** rollback-eligible: there is no failed “current tag” to step back from. Use a **Release** or deploy with a **semver tag** ref if you need automatic rollback.
 
 If rollback itself fails (for example no previous tag), the workflow fails: investigate and redeploy manually.
 
