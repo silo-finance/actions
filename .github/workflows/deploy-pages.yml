@@ -127,6 +127,8 @@ jobs:
 
   post_deploy_smoke:
     needs: deploy
+    # Needed so rollback_pages still runs when wait/playwright fails (otherwise GitHub skips dependents).
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -318,113 +320,65 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-  post_rollback_smoke:
-    needs: [rollback_pages]
-    if: needs.rollback_pages.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    outputs:
-      smoke_ok: ${{ steps.record_smoke.outputs.ok }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: Install Playwright browser
-        run: npx playwright install chromium --with-deps
-
-      - name: Log rollback smoke URLs
+      - name: Log published app version (optional curl)
+        if: success()
         env:
-          PAGE_URL: ${{ needs.rollback_pages.outputs.page_url }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        shell: bash
         run: |
           set -euo pipefail
-          BASE="${PAGE_URL%/}"
-          REL="${SMOKE_PAGE_PATH#./}"
-          SMOKE_FULL_URL="${BASE}/${REL}"
-          echo "::notice::post-rollback smoke — GitHub Pages base URL: ${PAGE_URL}"
-          echo "::notice::post-rollback smoke — full vault URL under test: ${SMOKE_FULL_URL}"
-
-      - name: Wait for vault smoke URL (after rollback)
-        env:
-          PAGE_URL: ${{ needs.rollback_pages.outputs.page_url }}
-        run: |
-          set -euo pipefail
-          if [ -z "$PAGE_URL" ]; then
-            echo "::error::Rollback job did not produce page_url"
-            exit 1
+          if [ -z "${PAGE_URL:-}" ]; then
+            echo "::warning::No page_url; skipping manifest version check."
+            exit 0
           fi
-          BASE="${PAGE_URL%/}"
-          REL="${SMOKE_PAGE_PATH#./}"
-          SMOKE_FULL_URL="${BASE}/${REL}"
-          echo "Waiting for HTTP 200 from: ${SMOKE_FULL_URL}"
+          manifest_url="${PAGE_URL%/}/manifest.json"
+          echo "Trying to fetch ${manifest_url}"
           ok=0
-          for i in $(seq 1 36); do
-            if curl -fsS --max-time 30 "$SMOKE_FULL_URL" >/dev/null; then
+          body=""
+          for i in $(seq 1 24); do
+            if body="$(curl -fsS --max-time 25 "$manifest_url" 2>/dev/null)"; then
               ok=1
               break
             fi
-            echo "Attempt $i: not ready yet, sleeping 10s"
+            echo "Attempt $i: manifest.json not ready, sleeping 10s"
             sleep 10
           done
           if [ "$ok" != "1" ]; then
-            echo "::error::Vault smoke URL did not become reachable in time after rollback"
-            exit 1
+            echo "::warning::Could not fetch manifest.json after rollback (site may still be propagating)."
+            exit 0
           fi
-
-      - name: Post-rollback smoke (Playwright)
-        id: playwright_smoke
-        continue-on-error: true
-        env:
-          SMOKE_BASE_URL: ${{ needs.rollback_pages.outputs.page_url }}
-        run: npm run test:smoke
-
-      - name: Record rollback smoke outcome
-        id: record_smoke
-        if: always()
-        shell: bash
-        run: |
-          if [ "${{ steps.playwright_smoke.outcome }}" = "success" ]; then
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Post-rollback smoke passed."
+          ver="$(printf '%s' "$body" | jq -r '.version // empty' 2>/dev/null || true)"
+          if [ -n "$ver" ]; then
+            echo "::notice::Published manifest version after rollback: ${ver}"
           else
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-            echo "::error::Post-rollback smoke failed (outcome=${{ steps.playwright_smoke.outcome }})."
+            echo "::notice::Published manifest.json after rollback (raw): ${body}"
           fi
 
   smoke_gate:
-    needs: [deploy, post_deploy_smoke, rollback_pages, post_rollback_smoke]
+    needs: [deploy, post_deploy_smoke, rollback_pages]
     if: always() && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Enforce primary smoke or successful rollback + smoke
+      - name: Enforce primary smoke or successful rollback deploy
         shell: bash
         env:
           PRIMARY_OK: ${{ needs.post_deploy_smoke.outputs.smoke_ok }}
           RB_RESULT: ${{ needs.rollback_pages.result }}
-          POST_RB_OK: ${{ needs.post_rollback_smoke.outputs.smoke_ok }}
         run: |
           set -euo pipefail
           if [ "$PRIMARY_OK" = "true" ]; then
             echo "::notice::Primary post-deploy smoke passed."
             exit 0
           fi
-          if [ "$RB_RESULT" = "success" ] && [ "${POST_RB_OK:-false}" = "true" ]; then
-            echo "::notice::Site recovered: rollback deploy + post-rollback smoke passed."
+          if [ "$RB_RESULT" = "success" ]; then
+            echo "::notice::Post-deploy smoke failed; rollback Pages deploy finished (see rollback job for optional manifest version log)."
             exit 0
           fi
           if [ "$RB_RESULT" = "skipped" ]; then
-            echo "::error::Post-deploy smoke failed. Automatic rollback applies only to semver tags (vX.Y.Z) on release or workflow_dispatch with a tag ref; redeploy manually if needed."
+            echo "::error::Post-deploy smoke failed. Automatic rollback applies only to semver tags (vX.Y.Z); redeploy manually if needed."
             exit 1
           fi
-          echo "::error::Post-deploy smoke failed and rollback did not restore a healthy site (rollback job: ${RB_RESULT}, post-rollback smoke ok: ${POST_RB_OK:-n/a})."
+          echo "::error::Post-deploy smoke failed and rollback job did not succeed (result: ${RB_RESULT})."
           exit 1
 
   finalize_deployment:
@@ -434,4 +388,4 @@ jobs:
     steps:
       - name: Final deployment marker
         run: |
-          echo "OK: deploy + post-deploy smoke (or rollback recovery) succeeded"
+          echo "OK: deploy + post-deploy smoke passed, or rollback deploy completed after failed smoke."

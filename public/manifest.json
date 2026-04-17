@@ -1,5 +1,6 @@
 {
   "name": "Silo Actions",
+  "version": "0.8.16",
   "description": "Admin actions for silos and vaults.",
   "iconPath": "safe-app-icon.svg",
   "icons": [
