@@ -106,6 +106,9 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Vault deep-link smoke (VOLTS vault on mainnet) — repo-relative path under SMOKE_BASE_URL
+      SMOKE_PAGE_PATH: ./vault/?chain=1&address=0x5362D5086FDef73450145492a66F8EBF210c5B9C
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -122,18 +125,37 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install chromium --with-deps
 
-      - name: Wait for Pages URL
+      - name: Log smoke URLs
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          DEPLOYED_SHA: ${{ needs.deploy.outputs.deployed_sha }}
+        run: |
+          set -euo pipefail
+          BASE="${PAGE_URL%/}"
+          REL="${SMOKE_PAGE_PATH#./}"
+          SMOKE_FULL_URL="${BASE}/${REL}"
+          echo "::notice::post_deploy_smoke — GitHub Pages base URL: ${PAGE_URL}"
+          echo "::notice::post_deploy_smoke — Playwright baseURL (trimmed trailing slash): ${BASE}"
+          echo "::notice::post_deploy_smoke — vault smoke path: ${SMOKE_PAGE_PATH}"
+          echo "::notice::post_deploy_smoke — full vault URL under test: ${SMOKE_FULL_URL}"
+          echo "::notice::post_deploy_smoke — deployed commit (this run): ${DEPLOYED_SHA}"
+
+      - name: Wait for vault smoke URL
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
         run: |
+          set -euo pipefail
           if [ -z "$PAGE_URL" ]; then
             echo "::error::deploy job did not produce page_url"
             exit 1
           fi
-          echo "Waiting for $PAGE_URL ..."
+          BASE="${PAGE_URL%/}"
+          REL="${SMOKE_PAGE_PATH#./}"
+          SMOKE_FULL_URL="${BASE}/${REL}"
+          echo "Waiting for HTTP 200 from: ${SMOKE_FULL_URL}"
           ok=0
           for i in $(seq 1 36); do
-            if curl -fsS --max-time 30 "$PAGE_URL" >/dev/null; then
+            if curl -fsS --max-time 30 "$SMOKE_FULL_URL" >/dev/null; then
               ok=1
               break
             fi
@@ -141,7 +163,7 @@ jobs:
             sleep 10
           done
           if [ "$ok" != "1" ]; then
-            echo "::error::Site did not become reachable in time"
+            echo "::error::Vault smoke URL did not become reachable in time"
             exit 1
           fi
 
@@ -158,10 +180,26 @@ jobs:
       needs.post_deploy_smoke.result == 'failure' &&
       github.event.inputs.is_rollback != 'true'
     runs-on: ubuntu-latest
+    env:
+      SMOKE_PAGE_PATH: ./vault/?chain=1&address=0x5362D5086FDef73450145492a66F8EBF210c5B9C
     permissions:
       actions: write
       contents: read
     steps:
+      - name: Log rollback context (failed deploy)
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          DEPLOYED_SHA: ${{ needs.deploy.outputs.deployed_sha }}
+        run: |
+          set -euo pipefail
+          BASE="${PAGE_URL%/}"
+          REL="${SMOKE_PAGE_PATH#./}"
+          SMOKE_FULL_URL="${BASE}/${REL}"
+          echo "::notice::auto_rollback — post-deploy smoke failed after a successful Pages deploy."
+          echo "::notice::auto_rollback — failed deployment commit: ${DEPLOYED_SHA}"
+          echo "::notice::auto_rollback — Pages URL from deploy job: ${PAGE_URL}"
+          echo "::notice::auto_rollback — vault URL that smoke tested: ${SMOKE_FULL_URL}"
+
       - name: Checkout (history for rollback SHA)
         uses: actions/checkout@v4
         with:
@@ -176,13 +214,21 @@ jobs:
         run: |
           set -euo pipefail
           ZERO=0000000000000000000000000000000000000000
+          echo "::notice::auto_rollback — event: ${EVENT_NAME}"
+          echo "::notice::auto_rollback — github.event.before (push only): ${BEFORE:-<empty>}"
+          echo "::notice::auto_rollback — deployed SHA to roll back from: ${DEPLOYED_SHA}"
           if [ "$EVENT_NAME" = "push" ] && [ -n "$BEFORE" ] && [ "$BEFORE" != "$ZERO" ]; then
             SHA="$BEFORE"
-            echo "Using push event before: $SHA"
+            echo "::notice::auto_rollback — strategy: previous branch tip (push before)"
+            echo "::notice::auto_rollback — rollback target SHA: $SHA"
           else
             SHA=$(git rev-parse "${DEPLOYED_SHA}^")
-            echo "Using parent of deployed commit: $SHA"
+            echo "::notice::auto_rollback — strategy: parent commit of deployed SHA (^)"
+            echo "::notice::auto_rollback — rollback target SHA: $SHA"
           fi
+          RB_SHORT=$(git rev-parse --short "$SHA")
+          RB_SUBJECT=$(git show -s --format=%s "$SHA")
+          echo "::notice::auto_rollback — rollback target ${RB_SHORT} (${SHA}): ${RB_SUBJECT}"
           if [ "$SHA" = "$DEPLOYED_SHA" ]; then
             echo "::error::Rollback SHA equals deployed SHA; aborting."
             exit 1
@@ -200,7 +246,9 @@ jobs:
               core.setFailed(`Invalid ROLLBACK_SHA: ${sha}`)
               return
             }
-            core.info(`Dispatching deploy workflow for rollback ref: ${sha}`)
+            core.notice(
+              `auto_rollback — dispatching workflow deploy-pages.yml on ref master with inputs.ref=${sha} and inputs.is_rollback=true`,
+            )
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -211,3 +259,4 @@ jobs:
                 is_rollback: 'true',
               },
             })
+            core.notice(`auto_rollback — workflow_dispatch sent for rollback commit ${sha}`)
