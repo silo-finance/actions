@@ -67,8 +67,10 @@ jobs:
             eligible=true
           elif [[ "$ref" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             eligible=true
-          elif { [ "$EVENT_NAME" = "push" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; } \
-            && { [ "$ref" = "$DEFAULT_BRANCH" ] || [ "$ref_branch" = "$DEFAULT_BRANCH" ]; }; then
+          elif [ "$EVENT_NAME" = "push" ]; then
+            # This workflow is configured for push on master; allow rollback on push runs.
+            eligible=true
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ] && { [ "$ref" = "$DEFAULT_BRANCH" ] || [ "$ref_branch" = "$DEFAULT_BRANCH" ] || [ "$ref" = "master" ] || [ "$ref_branch" = "master" ]; }; then
             eligible=true
           fi
           echo "rollback_eligible=$eligible" >> "$GITHUB_OUTPUT"
@@ -348,22 +350,25 @@ jobs:
           raw="${CURRENT#refs/tags/}"
           raw="${raw#refs/heads/}"
           current="$raw"
-          if [[ "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            current="v${current}"
-          fi
 
           tags=()
           while IFS= read -r t; do
             [[ -n "$t" ]] && tags+=("$t")
-          done < <(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-creatordate)
+          done < <(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' '[0-9]*.[0-9]*.[0-9]*' --sort=-creatordate)
 
           if [ "${#tags[@]}" -eq 0 ]; then
-            echo "::error::No vX.Y.Z tags in repo; cannot roll back (deploy ref: ${CURRENT})."
+            echo "::error::No semver tags (X.Y.Z or vX.Y.Z) in repo; cannot roll back (deploy ref: ${CURRENT})."
             exit 1
           fi
 
           PREV=""
-          if [[ "$current" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ "$current" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            current_alt=""
+            if [[ "$current" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              current_alt="${current#v}"
+            else
+              current_alt="v${current}"
+            fi
             seen_current=false
             found=false
             for t in "${tags[@]}"; do
@@ -371,7 +376,7 @@ jobs:
                 PREV="$t"
                 break
               fi
-              if [ "$t" = "$current" ]; then
+              if [ "$t" = "$current" ] || [ "$t" = "$current_alt" ]; then
                 seen_current=true
                 found=true
               fi

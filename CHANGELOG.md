@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.23] - 2026-04-17
+
+### Fixed
+- fix: try to find correct tag
+
 ## [0.8.22] - 2026-04-17
 
 ### Fixed
