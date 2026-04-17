@@ -30,11 +30,6 @@ export default function ConnectWalletPanelContent({
           <span className={mutedClassName}>Scan QR with a mobile wallet</span>
         </span>
       </button>
-      <div className="wallet-connect-hint">
-        <button type="button" className="wallet-connect-auto" onClick={() => onPick('auto')}>
-          Auto-detect wallet
-        </button>
-      </div>
     </>
   )
 }

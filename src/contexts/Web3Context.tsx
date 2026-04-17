@@ -34,7 +34,7 @@ function switchFailedBecauseChainNotInWallet(err: unknown): boolean {
   )
 }
 
-export type ConnectMethod = 'auto' | 'injected' | 'walletConnect'
+export type ConnectMethod = 'injected' | 'walletConnect'
 
 type Web3ContextValue = {
   account: string
@@ -43,7 +43,7 @@ type Web3ContextValue = {
   /** EIP-1193 provider for Safe SDK and `wallet_*` calls (injected or WalletConnect). */
   eip1193Provider: Eip1193Provider | null
   isConnected: boolean
-  connect: (method?: ConnectMethod) => Promise<void>
+  connect: (method: ConnectMethod) => Promise<void>
   disconnect: () => void
   switchNetwork: (targetChainId: number) => Promise<void>
   refreshChainId: () => Promise<void>
@@ -104,10 +104,15 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
   }, [connector])
 
   const connect = useCallback(
-    async (method: ConnectMethod = 'auto') => {
+    async (method: ConnectMethod) => {
+      const metaMaskC = connectors.find((c) => c.type === 'metaMask')
       const injectedC = connectors.find((c) => c.type === 'injected')
       const wcC = connectors.find((c) => c.type === 'walletConnect')
 
+      const tryMetaMask = async () => {
+        if (!metaMaskC) throw new Error('no_metamask')
+        await connectMutation.mutateAsync({ connector: metaMaskC })
+      }
       const tryInjected = async () => {
         if (!injectedC) throw new Error('no_injected')
         await connectMutation.mutateAsync({ connector: injectedC })
@@ -124,26 +129,18 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
 
       try {
         if (method === 'injected') {
+          if (metaMaskC) {
+            try {
+              await tryMetaMask()
+              return
+            } catch {
+              /* No MetaMask / user dismissed — fall back to generic injected (Rabby, etc.). */
+            }
+          }
           await tryInjected()
           return
         }
-        if (method === 'walletConnect') {
-          await tryWc()
-          return
-        }
-        if (injectedC) {
-          try {
-            await tryInjected()
-            return
-          } catch {
-            /* try WC */
-          }
-        }
-        if (wcC) {
-          await tryWc()
-          return
-        }
-        alert('No wallet connector is available. Install a browser wallet or configure WalletConnect.')
+        await tryWc()
       } catch (e) {
         console.error('connect', e)
       }
