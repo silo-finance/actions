@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.10.0] - 2026-04-17
 
 ### Added
 - Support for using the dApp with a Safe multisig: as a Safe App inside Safe{Wallet}, via
