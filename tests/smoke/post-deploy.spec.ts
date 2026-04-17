@@ -107,6 +107,10 @@ test('vault page (VOLTS deep link) loads and no uncaught runtime errors', async 
     issues.push(`pageerror: ${err.message}`)
   })
 
+  page.on('crash', () => {
+    issues.push('pageerror: Browser tab crashed')
+  })
+
   page.on('console', (msg) => {
     if (msg.type() === 'error') {
       const loc = msg.location()
