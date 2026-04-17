@@ -77,8 +77,17 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
   const [browserProvider, setBrowserProvider] = useState<BrowserProvider | null>(null)
   const [eip1193Provider, setEip1193Provider] = useState<Eip1193Provider | null>(null)
 
+  const walletChainId = walletClient?.chain?.id
+
   useEffect(() => {
-    if (!walletClient?.account || !walletClient.chain) {
+    if (!isConnected || !address || !walletClient?.chain) {
+      setBrowserProvider(null)
+      setEip1193Provider(null)
+      return
+    }
+    const acc = walletClient.account
+    const accAddr = acc && 'address' in acc ? acc.address : undefined
+    if (!accAddr || accAddr.toLowerCase() !== address.toLowerCase()) {
       setBrowserProvider(null)
       setEip1193Provider(null)
       return
@@ -91,7 +100,8 @@ function Web3StateProvider({ children }: { children: React.ReactNode }) {
     }
     setBrowserProvider(new BrowserProvider(transport, network))
     setEip1193Provider(transport)
-  }, [walletClient])
+    /* `walletClient` from `useWalletClient()` often gets a new object reference each render; stable deps avoid a setState loop. */
+  }, [isConnected, address, walletChainId])
 
   const refreshChainId = useCallback(async () => {
     try {
