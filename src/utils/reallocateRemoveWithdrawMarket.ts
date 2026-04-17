@@ -17,6 +17,7 @@ import {
 } from '@/utils/vaultActionAuthority'
 import {
   executeTargetedBatchFromSigner,
+  sendTargetedBatchFromSigner,
   type TargetedCall,
 } from '@/utils/vaultMulticall'
 
@@ -342,6 +343,22 @@ export async function executeReallocateRemoveWithdrawQueue(
       throw new Error('Could not build a block explorer link for this network.')
     }
     return { transactionUrl, successLinkLabel: 'View on explorer', outcome: 'explorer' }
+  }
+
+  if (auth.mode === 'safe_as_wallet' && auth.executingSafeAddress != null) {
+    const safeAddress = getAddress(auth.executingSafeAddress)
+    /**
+     * Safe is the connected wallet: each `eth_sendTransaction` becomes its own Safe proposal in the
+     * queue. Contiguous vault calls still get packed into `vault.multicall`, so a no-dust flow is one
+     * proposal; with dust top-up (ERC-20 approve + ERC-4626 deposit + vault batch) the Safe receives
+     * three separate pending transactions in the queue.
+     */
+    await sendTargetedBatchFromSigner(signer, vaultAddress, batchCalls)
+    const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
+    if (!transactionUrl) {
+      throw new Error('Could not build a Safe{Wallet} link for this network.')
+    }
+    return { transactionUrl, successLinkLabel: 'Open queue', outcome: 'safe_wallet_queue' }
   }
 
   if (auth.mode === 'safe_propose' && auth.executingSafeAddress != null) {

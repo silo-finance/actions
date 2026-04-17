@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- WalletConnect + Safe{Wallet} / Rabby impersonate flow: when the connected wallet is the Safe
+  itself, actions now `eth_sendTransaction` through that wallet (Safe queues a proposal internally)
+  instead of `personal_sign(safeTxHash) + apiKit.proposeTransaction`, which used to land in the Safe
+  as a plain "message sign" or, with Rabby, block waiting for extra EIP-1271 signatures.
+- Dedupe `wagmiConfig` across Fast Refresh / React StrictMode with a `globalThis` cache to stop the
+  "WalletConnect Core is already initialized" dev warning.
+
+### Added
+- `safe_as_wallet` execution mode in `vaultActionAuthority` for the `connectedAccount === Safe role`
+  case, with `safe_wallet_queue` success outcome and dedicated copy in `TransactionSuccessSummary`.
+- `wagmi/connectors` `safe()` connector so the dApp also works inside a Safe Apps iframe.
+
 ## [0.9.2] - 2026-04-17
 
 ### Added

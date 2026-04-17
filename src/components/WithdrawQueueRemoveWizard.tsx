@@ -541,8 +541,10 @@ export default function WithdrawQueueRemoveWizard({
         setExecErr('Wallet cannot execute dust top-up for this batch.')
         return
       }
+      /** Whoever is `msg.sender` on the vault: Safe (safe_propose / safe_as_wallet) or connected EOA (direct). */
       const approver =
-        auth.mode === 'safe_propose' && auth.executingSafeAddress != null
+        (auth.mode === 'safe_propose' || auth.mode === 'safe_as_wallet') &&
+        auth.executingSafeAddress != null
           ? getAddress(auth.executingSafeAddress)
           : getAddress(account)
       const token = new Contract(underlyingMeta.address, erc20Abi, provider)

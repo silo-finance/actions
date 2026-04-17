@@ -67,3 +67,55 @@ export async function executeTargetedBatchFromSigner(
   }
   return lastHash
 }
+
+/**
+ * Like {@link executeVaultCallsFromSigner} but fires `eth_sendTransaction` without waiting for a receipt.
+ * Suitable when the connected wallet is a Safe (WalletConnect from Safe{Wallet}, Safe Apps iframe): the
+ * returned hash is a synthetic Safe proposal id, not a real on-chain tx hash, so `tx.wait()` would hang.
+ */
+export async function sendVaultCallsFromSigner(
+  signer: Signer,
+  vaultAddress: string,
+  callDatas: `0x${string}`[]
+): Promise<void> {
+  const to = getAddress(vaultAddress)
+  if (callDatas.length === 0) {
+    throw new Error('No vault calls to execute.')
+  }
+  if (callDatas.length === 1) {
+    await signer.sendTransaction({ to, data: callDatas[0] })
+    return
+  }
+  const data = vaultIface.encodeFunctionData('multicall', [callDatas]) as `0x${string}`
+  await signer.sendTransaction({ to, data })
+}
+
+/**
+ * Like {@link executeTargetedBatchFromSigner} but does not await receipts. Contiguous vault calls are still
+ * packed into `multicall`; non-vault calls become one proposal each in the Safe queue.
+ */
+export async function sendTargetedBatchFromSigner(
+  signer: Signer,
+  vaultAddress: string,
+  calls: TargetedCall[]
+): Promise<void> {
+  if (calls.length === 0) {
+    throw new Error('No calls to execute.')
+  }
+  const vaultNorm = getAddress(vaultAddress)
+  let i = 0
+  while (i < calls.length) {
+    const to = getAddress(calls[i]!.to)
+    if (to !== vaultNorm) {
+      await signer.sendTransaction({ to, data: calls[i]!.data })
+      i += 1
+      continue
+    }
+    const vaultChunk: `0x${string}`[] = []
+    while (i < calls.length && getAddress(calls[i]!.to) === vaultNorm) {
+      vaultChunk.push(calls[i]!.data)
+      i += 1
+    }
+    await sendVaultCallsFromSigner(signer, vaultAddress, vaultChunk)
+  }
+}
