@@ -1,30 +1,29 @@
 ---
-description: Enforce the senior coding standard for any programming task in the `actions` repo. Attach whenever the task involves writing, refactoring, or debugging code, editing package.json, or touching RPC/UI logic.
-globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.mjs", "**/*.cjs", "**/*.css", "**/*.scss", "package.json", "CHANGELOG.md"]
+description: Route programming tasks in `actions` to the `senior-coding-actions` skill and enforce a small set of hard safety gates.
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.mjs", "**/*.cjs", "**/*.css", "**/*.scss"]
 alwaysApply: false
 ---
 
 # Programming Standards — `actions`
 
-For any programming task in this repo, follow the `senior-coding-actions` skill at [.cursor/skills/senior-coding-actions/SKILL.md](mdc:.cursor/skills/senior-coding-actions/SKILL.md). Read that skill before making code changes and apply every section.
+Use this rule as a lightweight gate. The detailed operating standard lives in:
+[.cursor/skills/senior-coding-actions/SKILL.md](mdc:.cursor/skills/senior-coding-actions/SKILL.md)
 
-## Non-negotiable priorities
+This is the umbrella rule. Specialized companion rules cover:
+- web3 transaction and ABI safety,
+- UI/brand consistency,
+- branch-aware changelog/version policy.
 
-When something has to give, apply these in order:
+## How to apply
 
-1. RPC minimization via multicall — new reads in the same flow MUST join an existing multicall batch; standalone calls only for genuinely independent reads.
-2. ABI JSON-first — never author or extend ABIs in TypeScript. If a method / event / full ABI is missing from JSON, STOP and ask the user whether the agent should generate the JSON automatically or whether the user will drop it in themselves.
-3. Transaction preflight — every on-chain write runs `estimateGas` first. On revert: decode the custom error / revert reason and show it to the user before the wallet prompt. On success: reuse the estimated gas for the actual send. Applies to single calls and multicall batches.
-4. Brand-consistent UI — reuse existing components, tokens, spacing, and colors; do not introduce one-off visual styles.
-5. Quality gates — `npm run lint`, `npm run type-check`, and `npm run build` must be clean before the task is done.
-6. Versioning + CHANGELOG — branch-aware:
-   - `release/*` or `hotfix/*` branch: bump `version` in `package.json` (release → minor/major, hotfix → patch; if the branch name encodes the version, use it) AND add a new `## [x.y.z] - YYYY-MM-DD` section with today's date, one-line entry under `Added` / `Updated` / `Fixed`.
-   - any other branch: do NOT change `package.json` version; add a one-line entry only under `## [Unreleased]` in the correct category.
+1. For any code-change task, read and follow the `senior-coding-actions` skill before editing files.
+2. Treat the skill as the single source of truth; do not duplicate or invent a parallel standard.
+3. If this rule and the skill ever diverge, update the rule to match the skill.
 
-## Operational rules
+## Hard stops
 
-- Before running any Node / npm / build / lint / test command, use the Node version from `.nvmrc` (`nvm use`).
-- New dependencies: strict exact versions (no `^`, no `~`) and a quick security check on X/Twitter for recent alerts before choosing the version.
-- Leave a short architectural comment only when the code relies on legacy, carries a non-obvious constraint, or is a workaround — focus on the "why" and future risk. No narrating comments.
-
-Task is done only when all of the above are satisfied. Do not hand off with failing lint, type-check, or build, and do not skip the CHANGELOG entry.
+Stop and ask the user before proceeding if any of these would be violated:
+- ABI is being authored inline in TypeScript instead of JSON.
+- A write transaction skips `estimateGas` preflight without a documented wallet limitation.
+- Lint, type-check, or build is red at handoff.
+- New project content (comments/docs/changelog/UI copy) is written in a language other than English.

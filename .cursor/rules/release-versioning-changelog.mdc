@@ -1,0 +1,17 @@
+---
+description: Enforce branch-aware release/hotfix versioning and changelog policy for `package.json` and `CHANGELOG.md`.
+globs: ["package.json", "CHANGELOG.md"]
+alwaysApply: false
+---
+
+# Release and Changelog Policy — `actions`
+
+Follow the branch-aware policy in `senior-coding-actions`:
+[.cursor/skills/senior-coding-actions/SKILL.md](mdc:.cursor/skills/senior-coding-actions/SKILL.md)
+
+## Required behavior
+
+- On `release/*` or `hotfix/*`: update `package.json` version and matching top version section in `CHANGELOG.md`.
+- On other branches: do not change `package.json` version; add one-line changelog entry under `## [Unreleased]`.
+- Do not finish with missing or inconsistent changelog/version updates.
+- Write changelog entries in English only.
