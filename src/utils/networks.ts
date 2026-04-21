@@ -74,7 +74,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     chainName: 'sonic',
     explorerBaseUrl: 'https://sonicscan.org',
     nativeTokenSymbol: 'S',
-    iconPath: '/network-icons/sonic.svg',
+    iconPath: '/network-icons/sonic.webp',
     walletRpcUrls: ['https://rpc.soniclabs.com'],
   },
   {
@@ -83,7 +83,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     chainName: 'okx',
     explorerBaseUrl: 'https://www.okx.com/web3/explorer/xlayer',
     nativeTokenSymbol: 'OKB',
-    iconPath: '/network-icons/okx.svg',
+    iconPath: '/network-icons/okx.png',
     walletRpcUrls: ['https://rpc.xlayer.tech'],
   },
   {

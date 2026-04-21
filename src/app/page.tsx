@@ -1,8 +1,9 @@
 import Link from 'next/link'
+import GlobalPauseSection from '@/components/GlobalPauseSection'
 
 export default function HomePage() {
   return (
-    <div className="silo-page px-4 py-10 sm:px-6 flex items-center justify-center">
+    <div className="silo-page px-4 py-10 sm:px-6 flex flex-col items-center">
       <div className="max-w-4xl w-full">
         <div className="text-center mb-10">
           <h1 className="text-5xl font-bold silo-text-main mb-3">Control Panel</h1>
@@ -32,6 +33,9 @@ export default function HomePage() {
             </p>
           </Link>
         </div>
+      </div>
+      <div className="max-w-6xl w-full mt-10">
+        <GlobalPauseSection />
       </div>
     </div>
   )
