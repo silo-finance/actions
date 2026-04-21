@@ -274,12 +274,10 @@ export default function GlobalPauseSection() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
         <div className="min-w-0 space-y-5">
           <div>
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
               <span className="text-xs font-semibold silo-text-soft shrink-0">Address:</span>
               <AddressLink chainId={effectiveChainId} address={deployment.address} />
-            </div>
-            <div className="mt-1 flex items-center gap-2 text-xs silo-text-soft">
-              <span className="font-semibold shrink-0">Source:</span>
+              <span className="text-xs silo-text-soft shrink-0">source:</span>
               <a
                 href={deployment.sourceUrl}
                 target="_blank"
