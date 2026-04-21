@@ -141,16 +141,22 @@ export function supplyQueueAfterRemovingMarket(supplyQueue: string[], removedMar
 }
 
 /**
- * Off-chain check matching vault `validateSupplyQueue`: every listed market must have cap &gt; 0 in the map.
- * Missing keys fail (e.g. market only in supply queue and not loaded in withdraw state).
+ * Split a projected supply queue into markets that match vault `validateSupplyQueue` (cap &gt; 0)
+ * and those that would be rejected (cap missing or 0). Missing keys are treated as 0.
  */
-export function newSupplyQueueHasPositiveCaps(newQueue: string[], capByMarket: Map<string, bigint>): boolean {
+export function partitionSupplyQueueByPositiveCap(
+  newQueue: string[],
+  capByMarket: Map<string, bigint>
+): { keep: string[]; pruned: string[] } {
+  const keep: string[] = []
+  const pruned: string[] = []
   for (const a of newQueue) {
     const k = getAddress(a)
     const cap = capByMarket.get(k) ?? Z
-    if (cap <= Z) return false
+    if (cap > Z) keep.push(k)
+    else pruned.push(k)
   }
-  return true
+  return { keep, pruned }
 }
 
 /** New withdraw queue indices after dropping `removedIndex` from the previous queue. */

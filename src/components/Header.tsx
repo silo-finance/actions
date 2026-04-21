@@ -56,7 +56,12 @@ export default function Header() {
               <Image src={unionLogoSrc} alt="Union" width={92} height={32} className="header-logo h-8 w-auto" />
             </Link>
             <div className="flex flex-col leading-tight">
-              <span className="header-text text-[11px] font-semibold uppercase tracking-[0.14em]">Control Panel</span>
+              <Link
+                href="/"
+                className="header-text text-[11px] font-semibold uppercase tracking-[0.14em] hover:opacity-80 transition-opacity"
+              >
+                Control Panel
+              </Link>
               <span className="header-text-soft text-[10px]">&nbsp;</span>
               <span className="header-text-soft text-[10px] font-mono tabular-nums" title="UI version">
                 v{packageJson.version}
