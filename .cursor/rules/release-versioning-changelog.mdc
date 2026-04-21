@@ -15,3 +15,9 @@ Follow the branch-aware policy in `senior-coding-actions`:
 - On other branches: do not change `package.json` version; add one-line changelog entry under `## [Unreleased]`.
 - Do not finish with missing or inconsistent changelog/version updates.
 - Write changelog entries in English only.
+
+## Entry rules
+
+- Exactly one line per entry. Never a paragraph, never multiple sentences, never a sub-bullet list under one entry. If the summary does not fit one line, rewrite it shorter and more user-facing; do not split it across lines.
+- One feature = one entry. While iterating on the same implementation (initial commit + follow-up tweaks / polish / in-progress fixes of issues introduced by that same work), DO NOT add a new `Fixed: ...` bullet for your own in-progress fixes. Update or keep the existing entry. A separate `Fixed` entry is only appropriate for bugs outside the current feature's scope (pre-existing bugs, regressions in unrelated code).
+- Choose the category by the overall intent of the change, not by the latest commit: `Added` for new capability, `Updated` for an improvement of existing behavior, `Fixed` for a standalone bug fix.

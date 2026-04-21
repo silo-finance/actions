@@ -99,6 +99,12 @@ Apply this step for delivered code changes unless the user explicitly asks to sk
 - Do not change `package.json` version.
 - Add one-line entry under `## [Unreleased]` in the correct category.
 
+### Entry rules (apply to every changelog write)
+
+- Exactly one line per entry. No two-line descriptions, no multi-sentence paragraphs, no bullet sub-lists under a single entry. If the change feels too large for one line, the line is wrong, not the rule — rewrite it shorter and more user-facing.
+- One feature = one entry. While you are iterating on the same implementation (first commit adds the feature, follow-up commits tweak / polish / fix issues introduced by that same work), DO NOT append a new `Fixed: ...` bullet for your own in-progress fixes. Update (or leave) the existing entry instead. A separate `Fixed` entry is only appropriate when fixing a bug that lives outside the current feature's scope (a pre-existing bug, or a regression in unrelated code).
+- Choose the section by the nature of the overall change, not by the nature of the latest commit: `Added` for new capability, `Updated` for improvement of existing behavior, `Fixed` for a standalone bug fix.
+
 ## Definition of done
 
 - Request implemented and scoped correctly.
