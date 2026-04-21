@@ -53,6 +53,25 @@ Before any write transaction:
 
 Applies to single-call and multicall-based writes.
 
+### Vault features: consult the contract first
+
+When the task touches vault functionality (reads, writes, roles, queues, allocations, deposits/withdrawals, fees, pausing, or anything else that ends up interacting with the vault contract), read the contract source BEFORE writing UI or call-site logic.
+
+Authoritative source: [`../silo-contracts-v2/silo-vaults/contracts/SiloVault.sol`](../silo-contracts-v2/silo-vaults/contracts/SiloVault.sol) (sibling repo at `neoRacer/silo-contracts-v2/silo-vaults/contracts/SiloVault.sol`). Follow its imports into the dependent libraries/interfaces used by the function you touch.
+
+For every new vault action, extract from the contract and encode in the implementation:
+
+- Access control: which role/caller can invoke it, and under what timelock / pending state.
+- Preconditions: required state (e.g. queues, caps, asset lists, pause flags, pending proposals) that must hold.
+- Custom errors: enumerate the exact `error Name(...)` revert types the function can throw and map each to a short, human-readable UI hint surfaced via the existing error surface.
+- Side effects and ordering: what events fire, what timelock starts, what must be called next.
+
+Use the contract knowledge to:
+
+- Gate the UI (disable / hide actions that cannot succeed in the current state, with a tooltip explaining why).
+- Power the `estimateGas` preflight: known custom errors get specific user-facing messages instead of raw hex.
+- Avoid guessing based on ABI alone — the ABI says what can be called, the contract says when it actually works.
+
 ### UI consistency
 
 - Reuse existing components, tokens, spacing, and typography.

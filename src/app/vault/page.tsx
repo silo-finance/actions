@@ -5,8 +5,8 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import QueueColumn from '@/components/QueueColumn'
 import ShareLinkCopyButton from '@/components/ShareLinkCopyButton'
+import SubmitMarketRemovalSection from '@/components/SubmitMarketRemovalSection'
 import SupplyQueueColumn from '@/components/SupplyQueueColumn'
 import VaultActionsColumn from '@/components/VaultActionsColumn'
 import VaultSummaryPanel from '@/components/VaultSummaryPanel'
@@ -663,7 +663,7 @@ function VaultPageInner() {
               ownerKind={summary?.ownerKind ?? 'eoa'}
               curatorKind={summary?.curatorKind ?? 'eoa'}
             />
-            <QueueColumn
+            <SubmitMarketRemovalSection
               title="Withdraw Queue"
               count={withdrawQueueSize}
               chainId={vaultDisplayChainId}
@@ -673,6 +673,12 @@ function VaultPageInner() {
               emptyMessage={
                 loading ? '…' : hasLoaded ? 'Queue is empty' : 'Run Check to load the queue'
               }
+              hasLoaded={hasLoaded}
+              vaultAddress={summary?.vault ?? ''}
+              ownerAddress={summary?.owner ?? ''}
+              curatorAddress={summary?.curator ?? ''}
+              ownerKind={summary?.ownerKind ?? 'eoa'}
+              curatorKind={summary?.curatorKind ?? 'eoa'}
             />
           </div>
         </VaultPermissionsProvider>
