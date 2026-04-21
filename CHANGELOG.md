@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.11.0] - 2026-04-21
+
+### Added
+- Global Pause action
+
 ## [0.10.0] - 2026-04-17
 
 ### Added

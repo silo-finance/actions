@@ -1,0 +1,29 @@
+---
+description: Route programming tasks in `actions` to the `senior-coding-actions` skill and enforce a small set of hard safety gates.
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.mjs", "**/*.cjs", "**/*.css", "**/*.scss"]
+alwaysApply: false
+---
+
+# Programming Standards — `actions`
+
+Use this rule as a lightweight gate. The detailed operating standard lives in:
+[.cursor/skills/senior-coding-actions/SKILL.md](mdc:.cursor/skills/senior-coding-actions/SKILL.md)
+
+This is the umbrella rule. Specialized companion rules cover:
+- web3 transaction and ABI safety,
+- UI/brand consistency,
+- branch-aware changelog/version policy.
+
+## How to apply
+
+1. For any code-change task, read and follow the `senior-coding-actions` skill before editing files.
+2. Treat the skill as the single source of truth; do not duplicate or invent a parallel standard.
+3. If this rule and the skill ever diverge, update the rule to match the skill.
+
+## Hard stops
+
+Stop and ask the user before proceeding if any of these would be violated:
+- ABI is being authored inline in TypeScript instead of JSON.
+- A write transaction skips `estimateGas` preflight without a documented wallet limitation.
+- Lint, type-check, or build is red at handoff.
+- New project content (comments/docs/changelog/UI copy) is written in a language other than English.

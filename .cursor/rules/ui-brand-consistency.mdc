@@ -1,0 +1,17 @@
+---
+description: Keep UI updates aligned with existing brand system and component patterns in `actions`.
+globs: ["src/**/*.tsx", "src/**/*.css", "src/**/*.scss", "src/app/**/*.tsx"]
+alwaysApply: false
+---
+
+# UI Brand Consistency — `actions`
+
+For UI changes, follow `senior-coding-actions` as the operating standard:
+[.cursor/skills/senior-coding-actions/SKILL.md](mdc:.cursor/skills/senior-coding-actions/SKILL.md)
+
+## Required behavior
+
+- Reuse existing components and design tokens before introducing new patterns.
+- Match current spacing, typography, radii, and color usage.
+- Avoid one-off visual styles unless the user explicitly requests an exception.
+- Keep all new UI copy and labels in English.
