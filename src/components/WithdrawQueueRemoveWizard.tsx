@@ -17,7 +17,7 @@ import {
   buildWithdrawMarketRemovalVaultCallDatas,
   encodeUpdateWithdrawQueueOnly,
   executeReallocateRemoveWithdrawQueue,
-  newSupplyQueueHasPositiveCaps,
+  partitionSupplyQueueByPositiveCap,
   supplyQueueAfterRemovingMarket,
   vaultCalldatasToTargetedCalls,
   vaultMarketSupplyHeadroom,
@@ -308,15 +308,27 @@ export default function WithdrawQueueRemoveWizard({
     removeIndex != null &&
     supplyQueueAddresses.some((a) => addrKey(a) === addrKey(withdrawMarkets[removeIndex]!.address))
 
-  const projectedSupplyQueueAfterRemoval =
-    removeIndex != null
-      ? supplyQueueAfterRemovingMarket(supplyQueueAddresses, withdrawMarkets[removeIndex]!.address)
-      : []
+  const supplyQueuePartition = useMemo(() => {
+    if (removeIndex == null) return { keep: [] as string[], pruned: [] as string[] }
+    const afterRemoval = supplyQueueAfterRemovingMarket(
+      supplyQueueAddresses,
+      withdrawMarkets[removeIndex]!.address
+    )
+    return partitionSupplyQueueByPositiveCap(afterRemoval, capMap)
+  }, [removeIndex, supplyQueueAddresses, withdrawMarkets, capMap])
 
-  const supplyQueueRemovalCapsOk =
-    !alsoRemoveFromSupplyQueue ||
-    !removedMarketInSupplyQueue ||
-    newSupplyQueueHasPositiveCaps(projectedSupplyQueueAfterRemoval, capMap)
+  const projectedSupplyQueueAfterAutoPrune = supplyQueuePartition.keep
+  const autoRemovedCapZeroMarkets = supplyQueuePartition.pruned
+  const showAutoPruneWarning =
+    alsoRemoveFromSupplyQueue && removedMarketInSupplyQueue && autoRemovedCapZeroMarkets.length > 0
+
+  const supplyQueueMarketByAddr = useMemo(() => {
+    const m = new Map<string, ResolvedMarket>()
+    for (const sqm of supplyQueueMarkets) {
+      m.set(addrKey(sqm.address), sqm)
+    }
+    return m
+  }, [supplyQueueMarkets])
 
   const headroomOk =
     routingAmount === Z ||
@@ -364,7 +376,6 @@ export default function WithdrawQueueRemoveWizard({
     destinationsValid &&
     !busy &&
     statesAligned &&
-    supplyQueueRemovalCapsOk &&
     !execAuthorityLoading &&
     effectiveAuth != null &&
     effectiveAuth.mode !== 'denied' &&
@@ -482,9 +493,7 @@ export default function WithdrawQueueRemoveWizard({
       removed.supplyShares > Z && removed.supplyAssets === Z ? DUST_TOP_UP_WEI : removed.supplyAssets
     const inSupply = supplyQueueAddresses.some((a) => addrKey(a) === addrKey(removed.address))
     const newSupplyQueue =
-      alsoRemoveFromSupplyQueue && inSupply
-        ? supplyQueueAfterRemovingMarket(supplyQueueAddresses, removed.address)
-        : undefined
+      alsoRemoveFromSupplyQueue && inSupply ? projectedSupplyQueueAfterAutoPrune : undefined
     const fullyEmpty = removed.supplyShares === Z && removed.supplyAssets === Z
 
     let vaultCallDatas: `0x${string}`[]
@@ -602,6 +611,7 @@ export default function WithdrawQueueRemoveWizard({
     capMap,
     alsoRemoveFromSupplyQueue,
     supplyQueueAddresses,
+    projectedSupplyQueueAfterAutoPrune,
     underlyingMeta,
   ])
 
@@ -621,9 +631,7 @@ export default function WithdrawQueueRemoveWizard({
     const needSubmitCap = removed.cap > Z
     const inSupply = supplyQueueAddresses.some((a) => addrKey(a) === addrKey(removed.address))
     const newSupplyQueue =
-      alsoRemoveFromSupplyQueue && inSupply
-        ? supplyQueueAfterRemovingMarket(supplyQueueAddresses, removed.address)
-        : undefined
+      alsoRemoveFromSupplyQueue && inSupply ? projectedSupplyQueueAfterAutoPrune : undefined
 
     const withdrawIndexes = buildWithdrawQueueIndexesAfterRemoval(removeIndex, withdrawMarkets.length)
 
@@ -697,6 +705,7 @@ export default function WithdrawQueueRemoveWizard({
     withdrawMarketStates,
     supplyQueueAddresses,
     alsoRemoveFromSupplyQueue,
+    projectedSupplyQueueAfterAutoPrune,
     routingAmount,
     effectiveDestinationMarkets,
     supplyMapForAllocations,
@@ -982,11 +991,28 @@ export default function WithdrawQueueRemoveWizard({
                 </label>
               ) : null}
 
-              {alsoRemoveFromSupplyQueue && removedMarketInSupplyQueue && !supplyQueueRemovalCapsOk ? (
-                <p className="text-sm silo-alert silo-alert-error">
-                  Every market left in the supply queue must have a positive cap in vault config. Run <strong>Check</strong>{' '}
-                  again or adjust caps so all remaining supply-queue markets are loaded with cap &gt; 0.
-                </p>
+              {showAutoPruneWarning ? (
+                <div className="text-sm silo-alert silo-alert-warning">
+                  <p className="m-0 font-semibold silo-text-main">Additional supply-queue removals</p>
+                  <p className="mt-2 mb-2 leading-relaxed silo-text-main">
+                    The supply queue also contains market{autoRemovedCapZeroMarkets.length === 1 ? '' : 's'} with{' '}
+                    <strong>cap 0</strong>. Vault <code className="text-xs font-mono silo-text-main">setSupplyQueue</code>{' '}
+                    rejects any entry without a positive cap, so these will be removed together with the selected market:
+                  </p>
+                  <ul className="mt-0 mb-0 pl-5 list-disc space-y-1">
+                    {autoRemovedCapZeroMarkets.map((addr) => {
+                      const info = supplyQueueMarketByAddr.get(addrKey(addr))
+                      const label = info?.label ?? 'Unknown market'
+                      return (
+                        <li key={`auto-prune-${addr}`} className="silo-text-main">
+                          <span className="font-semibold">{label}</span>
+                          <span className="silo-text-soft"> · </span>
+                          <span className="font-mono tabular-nums text-xs silo-text-soft">{shortAddr(addr)}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
               ) : null}
 
               {!headroomOk && routingAmount > Z && effectiveDestinationMarkets.length > 0 ? (

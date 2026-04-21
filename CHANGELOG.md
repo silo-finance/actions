@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Updated
+- Withdraw-queue removal auto-prunes supply-queue markets with cap 0 and warns about the extra removals instead of blocking.
+
 ## [0.11.0] - 2026-04-21
 
 ### Added
