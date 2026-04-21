@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-04-21
 ### Added
 - Submit Market Removal action
 - Global Pause now shows a dedicated `Multisig signers`
