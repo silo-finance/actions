@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
-import { getAddress } from 'ethers'
+import { Contract, getAddress, type Provider } from 'ethers'
 import CopyButton from '@/components/CopyButton'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
+import gnosisSafeArtifact from '@/abis/GnosisSafe.json'
 import { useWeb3 } from '@/contexts/Web3Context'
 import {
   filterAddressesWithoutOverride,
@@ -13,6 +14,7 @@ import {
 import { fetchGlobalPauseContractNames } from '@/utils/globalPauseContractNames'
 import { fetchGlobalPauseAddress, type GlobalPauseDeployment } from '@/utils/globalPauseDeployment'
 import { fetchGlobalPauseOverview, type GlobalPauseOverview } from '@/utils/globalPauseReader'
+import { loadAbi } from '@/utils/loadAbi'
 import {
   getExplorerAddressUrl,
   getNetworkDisplayName,
@@ -31,6 +33,27 @@ function normalizeOrNull(addr: string): string | null {
     return getAddress(addr)
   } catch {
     return null
+  }
+}
+
+const gnosisSafeAbi = loadAbi(gnosisSafeArtifact)
+
+async function fetchSafeOwners(provider: Provider, safeAddress: string): Promise<string[]> {
+  try {
+    const safe = new Contract(safeAddress, gnosisSafeAbi, provider)
+    const rawOwners = (await safe.getOwners()) as unknown
+    if (!Array.isArray(rawOwners)) return []
+    const owners: string[] = []
+    for (const item of rawOwners) {
+      try {
+        owners.push(getAddress(String(item)))
+      } catch {
+        // ignore malformed entries from non-standard wallets
+      }
+    }
+    return owners
+  } catch {
+    return []
   }
 }
 
@@ -91,6 +114,8 @@ export default function GlobalPauseSection() {
   const [txError, setTxError] = useState('')
   const [contractNames, setContractNames] = useState<Map<string, string>>(new Map())
   const [namesLoading, setNamesLoading] = useState(false)
+  const [multisigSigners, setMultisigSigners] = useState<string[]>([])
+  const [multisigSignersLoading, setMultisigSignersLoading] = useState(false)
 
   const effectiveChainId = chainId ?? null
   const chainSupported = effectiveChainId != null && isChainSupported(effectiveChainId)
@@ -165,6 +190,27 @@ export default function GlobalPauseSection() {
       abort.abort()
     }
   }, [state])
+
+  useEffect(() => {
+    if (state.kind !== 'ready' || !provider) {
+      setMultisigSigners([])
+      setMultisigSignersLoading(false)
+      return
+    }
+    let cancelled = false
+    setMultisigSignersLoading(true)
+    ;(async () => {
+      try {
+        const owners = await fetchSafeOwners(provider, state.overview.owner)
+        if (!cancelled) setMultisigSigners(owners)
+      } finally {
+        if (!cancelled) setMultisigSignersLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [state, provider])
 
   const statusByAddress = useMemo(() => {
     if (state.kind !== 'ready') return new Map<string, boolean>()
@@ -303,6 +349,26 @@ export default function GlobalPauseSection() {
             ) : (
               <ul className="space-y-1">
                 {overview.authorizedToPause.map((addr) => (
+                  <li key={addr} className="min-w-0">
+                    <AddressLink chainId={effectiveChainId} address={addr} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">
+              Multisig signers ({multisigSigners.length})
+              {multisigSignersLoading ? (
+                <span className="ml-2 text-[10px] font-normal normal-case silo-text-soft">loading…</span>
+              ) : null}
+            </p>
+            {multisigSigners.length === 0 ? (
+              <p className="text-sm silo-text-soft">No multisig signers detected for the current owner address.</p>
+            ) : (
+              <ul className="space-y-1">
+                {multisigSigners.map((addr) => (
                   <li key={addr} className="min-w-0">
                     <AddressLink chainId={effectiveChainId} address={addr} />
                   </li>

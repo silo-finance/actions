@@ -1,0 +1,35 @@
+---
+description: Require reading the SiloVault contract source (and its dependent libraries) before implementing or changing any vault-related feature in `actions`. Attach for vault code, vault ABIs, and the `/vault` app route.
+globs: ["src/**/*Vault*.ts", "src/**/*Vault*.tsx", "src/abis/SiloVault.json", "src/abis/IdleVault.json", "app/vault/**/*.ts", "app/vault/**/*.tsx"]
+alwaysApply: false
+---
+
+# Vault Contract Context — `actions`
+
+For any vault-related change (new action, permission gate, queue manipulation, deposit/withdraw flow, role copy, error surfacing, or related UI), the ABI is not enough. Read the contract logic first.
+
+Source of truth (sibling repo, read-only): [`../silo-contracts-v2/silo-vaults/contracts/SiloVault.sol`](../silo-contracts-v2/silo-vaults/contracts/SiloVault.sol)
+Follow its imports to dependent libraries and interfaces (`silo-contracts-v2/silo-vaults/contracts/**`) for anything touched by the function you are implementing.
+
+The full operating protocol lives in:
+[.cursor/skills/senior-coding-actions/SKILL.md](mdc:.cursor/skills/senior-coding-actions/SKILL.md)
+
+## Required workflow for vault features
+
+1. Open the target function in `SiloVault.sol` and walk through its modifiers and dependencies.
+2. Extract:
+   - Caller / role that may invoke it (and any timelock or pending state).
+   - Preconditions the vault must satisfy (queues, caps, asset whitelist, pause flags, pending proposals).
+   - All `error Name(...)` types the function can revert with.
+   - Events emitted and any follow-up call the user must make.
+3. Implement UI + call-site logic against those findings:
+   - Disable or hide actions that cannot succeed in the current state, with a short reason.
+   - Map each custom error to a concrete, user-facing message used by the `estimateGas` preflight and by post-revert handling.
+   - Only then wire the actual write (multicall-batched where applicable).
+
+## Hard stops
+
+Stop and ask the user before continuing if any of these would be true:
+- A vault action is being implemented without the corresponding contract function being read first.
+- A new action is shipped without mapped custom-error messages (raw hex would leak into the UI).
+- UI gates (disabled / hidden states, tooltips) do not reflect the contract's actual preconditions.

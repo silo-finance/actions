@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-04-21
+### Added
+- Submit Market Removal action
+- Global Pause now shows a dedicated `Multisig signers`
+
 ## [0.12.0] - 2026-04-21
 ### Updated
 - Withdraw-queue removal auto-prunes supply-queue markets with cap 0 and warns about the extra removals instead of blocking.

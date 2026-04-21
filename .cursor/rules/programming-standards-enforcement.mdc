@@ -12,7 +12,8 @@ Use this rule as a lightweight gate. The detailed operating standard lives in:
 This is the umbrella rule. Specialized companion rules cover:
 - web3 transaction and ABI safety,
 - UI/brand consistency,
-- branch-aware changelog/version policy.
+- branch-aware changelog/version policy,
+- vault contract context (reading `SiloVault.sol` and dependent libraries before implementing vault features).
 
 ## How to apply
 
