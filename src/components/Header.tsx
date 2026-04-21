@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import packageJson from '../../package.json'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useWeb3 } from '@/contexts/Web3Context'
-import { NETWORK_CONFIGS, getNetworkDisplayName } from '@/utils/networks'
+import { NETWORK_CONFIGS, getNetworkDisplayName, getNetworkIconPath } from '@/utils/networks'
 import { normalizeAddress } from '@/utils/addressValidation'
 import CopyButton from '@/components/CopyButton'
 import ConnectWalletPanelContent from '@/components/ConnectWalletPanelContent'
@@ -79,6 +79,15 @@ export default function Header() {
             >
               Silo
             </Link>
+            <a
+              href="https://silo-finance.github.io/silo-market-crafter/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={navLinkClass(false)}
+              title="Open Silo Market Crafter in a new tab"
+            >
+              Market Crafter
+            </a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -110,6 +119,22 @@ export default function Header() {
                   <CopyButton value={normalizeAddress(account) ?? account} iconClassName="w-3.5 h-3.5" className="ml-0" />
                 </div>
                 <div className="flex items-center gap-2">
+                  {(() => {
+                    /** Native `<select>` options cannot render images, so the active network icon sits inline before the picker. */
+                    const iconPath = chainId != null ? getNetworkIconPath(chainId) : null
+                    if (!iconPath) return null
+                    const iconSrc = `${basePath}${iconPath}`
+                    return (
+                      <Image
+                        src={iconSrc}
+                        alt=""
+                        width={16}
+                        height={16}
+                        className="h-4 w-4 rounded-full"
+                        aria-hidden
+                      />
+                    )
+                  })()}
                   <select
                     value={chainId != null ? String(chainId) : ''}
                     onChange={(e) => {

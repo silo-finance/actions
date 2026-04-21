@@ -1,0 +1,18 @@
+---
+description: Enforce web3-specific safety rules (multicall-first reads, JSON ABI source, estimateGas preflight) for contract and RPC related code.
+globs: ["src/utils/**/*.ts", "src/components/**/*.tsx", "src/contexts/**/*.tsx", "src/config/**/*.ts", "src/abis/**/*.json"]
+alwaysApply: false
+---
+
+# Web3 Safety — `actions`
+
+For web3 and contract-integration work, follow `senior-coding-actions` as the source of truth:
+[.cursor/skills/senior-coding-actions/SKILL.md](mdc:.cursor/skills/senior-coding-actions/SKILL.md)
+
+## Hard stops
+
+Stop and ask the user before continuing if any of these would be violated:
+- ABI is authored inline in TypeScript instead of JSON.
+- On-chain write skips `estimateGas` preflight without a documented wallet limitation.
+- New read is added as standalone call even though it belongs in an existing multicall flow.
+- New comments or user-facing web3 copy are written in a language other than English.
