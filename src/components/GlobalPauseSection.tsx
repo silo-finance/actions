@@ -20,6 +20,17 @@ import {
 } from '@/utils/globalPauseAuthority'
 import { fetchGlobalPauseAddress, type GlobalPauseDeployment } from '@/utils/globalPauseDeployment'
 import { fetchGlobalPauseOverview, type GlobalPauseOverview } from '@/utils/globalPauseReader'
+import {
+  executeRemediation,
+  proposeBulkRemediationViaSafe,
+  remediationButtonLabel,
+} from '@/utils/globalPauseRemediation'
+import {
+  fetchGlobalPauseRemediationPlans,
+  groupRemediationForBulk,
+  type RemediationMap,
+  type RemediationPlan,
+} from '@/utils/globalPauseRemediationAuthority'
 import { loadAbi } from '@/utils/loadAbi'
 import {
   getExplorerAddressUrl,
@@ -153,10 +164,12 @@ type LoadState =
   | { kind: 'ready'; deployment: GlobalPauseDeployment; overview: GlobalPauseOverview }
 
 export default function GlobalPauseSection() {
-  const { account, chainId, provider, isConnected } = useWeb3()
+  const { account, chainId, provider, eip1193Provider, isConnected } = useWeb3()
   const [state, setState] = useState<LoadState>({ kind: 'idle' })
   const [refreshTick, setRefreshTick] = useState(0)
-  const [busy, setBusy] = useState<'none' | 'pause' | 'unpause' | 'add' | 'remove' | 'accept'>('none')
+  const [busy, setBusy] = useState<
+    'none' | 'pause' | 'unpause' | 'add' | 'remove' | 'accept' | 'remediate' | 'bulk_remediate'
+  >('none')
   const [txSuccess, setTxSuccess] = useState<GlobalPauseWriteSuccess | null>(null)
   const [txError, setTxError] = useState('')
   const [contractNames, setContractNames] = useState<Map<string, string>>(new Map())
@@ -175,6 +188,8 @@ export default function GlobalPauseSection() {
   const [quickAddPending, setQuickAddPending] = useState<string | null>(null)
   const [authorityByAddress, setAuthorityByAddress] = useState<TargetAuthorityMap>(new Map())
   const [acceptPendingAddress, setAcceptPendingAddress] = useState<string | null>(null)
+  const [remediationByAddress, setRemediationByAddress] = useState<RemediationMap>(new Map())
+  const [remediatePendingAddress, setRemediatePendingAddress] = useState<string | null>(null)
 
   const effectiveChainId = chainId ?? null
   const chainSupported = effectiveChainId != null && isChainSupported(effectiveChainId)
@@ -189,6 +204,7 @@ export default function GlobalPauseSection() {
     setAddNameLookupPending(false)
     setRemovePendingAddress(null)
     setAcceptPendingAddress(null)
+    setRemediatePendingAddress(null)
   }, [effectiveChainId, account])
 
   useEffect(() => {
@@ -299,6 +315,42 @@ export default function GlobalPauseSection() {
     }
   }, [state, provider])
 
+  /**
+   * Remediation plans (Transfer ownership / Grant role) for targets that came back as
+   * `not-owner` or `no-role`. Skipped when `authorityByAddress` has no actionable targets or the
+   * wallet is not connected — we need `account` to decide between `direct` and `safe_propose`.
+   */
+  useEffect(() => {
+    if (state.kind !== 'ready' || !provider || !account) {
+      setRemediationByAddress(new Map())
+      return
+    }
+    const targets: { address: string; status: TargetAuthorityStatus }[] = []
+    for (const addr of state.overview.allContracts) {
+      const status = authorityByAddress.get(addr.toLowerCase())
+      if (!status) continue
+      if (status.kind === 'not-owner' || status.kind === 'no-role') {
+        targets.push({ address: addr, status })
+      }
+    }
+    if (targets.length === 0) {
+      setRemediationByAddress(new Map())
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const plans = await fetchGlobalPauseRemediationPlans(provider, account, targets)
+        if (!cancelled) setRemediationByAddress(plans)
+      } catch {
+        if (!cancelled) setRemediationByAddress(new Map())
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [state, provider, account, authorityByAddress])
+
   useEffect(() => {
     if (!addRowOpen || state.kind !== 'ready' || !provider) {
       setAddCheckStatus('idle')
@@ -394,6 +446,11 @@ export default function GlobalPauseSection() {
     }
   }, [state, provider])
 
+  const bulkRemediation = useMemo(
+    () => groupRemediationForBulk(remediationByAddress),
+    [remediationByAddress]
+  )
+
   const statusByAddress = useMemo(() => {
     if (state.kind !== 'ready') return new Map<string, boolean>()
     const m = new Map<string, boolean>()
@@ -450,6 +507,61 @@ export default function GlobalPauseSection() {
       }
     },
     [state, provider, effectiveChainId]
+  )
+
+  const handleRemediate = useCallback(
+    async (plan: RemediationPlan) => {
+      if (state.kind !== 'ready' || !provider || effectiveChainId == null || !account) return
+      setTxError('')
+      setTxSuccess(null)
+      setBusy('remediate')
+      setRemediatePendingAddress(plan.target)
+      try {
+        const signer = await provider.getSigner()
+        const result = await executeRemediation({
+          signer,
+          ethereum: eip1193Provider,
+          chainId: effectiveChainId,
+          connectedAccount: account,
+          globalPauseAddress: state.deployment.address,
+          plan,
+        })
+        setTxSuccess(result)
+        setRefreshTick((n) => n + 1)
+      } catch (e) {
+        setTxError(toUserErrorMessage(e))
+      } finally {
+        setBusy('none')
+        setRemediatePendingAddress(null)
+      }
+    },
+    [state, provider, eip1193Provider, effectiveChainId, account]
+  )
+
+  const handleBulkRemediate = useCallback(
+    async (safeAddress: string, plans: RemediationPlan[]) => {
+      if (state.kind !== 'ready' || effectiveChainId == null || !account || !eip1193Provider) return
+      setTxError('')
+      setTxSuccess(null)
+      setBusy('bulk_remediate')
+      try {
+        const result = await proposeBulkRemediationViaSafe({
+          ethereum: eip1193Provider,
+          chainId: effectiveChainId,
+          safeAddress,
+          proposerAccount: account,
+          plans,
+          globalPauseAddress: state.deployment.address,
+        })
+        setTxSuccess(result)
+        setRefreshTick((n) => n + 1)
+      } catch (e) {
+        setTxError(toUserErrorMessage(e))
+      } finally {
+        setBusy('none')
+      }
+    },
+    [state, eip1193Provider, effectiveChainId, account]
   )
 
   const handleQuickAddSuggestion = useCallback(
@@ -802,6 +914,16 @@ export default function GlobalPauseSection() {
                 const override = getGlobalPauseContractNameOverride(effectiveChainId, addr)
                 const name = override ?? contractNames.get(addr.toLowerCase())
                 const authority = authorityByAddress.get(addr.toLowerCase())
+                const plan = remediationByAddress.get(addr.toLowerCase())
+                /**
+                 * Show the per-row remediation button only when we're NOT aggregating into a
+                 * single bulk Safe proposal (otherwise the UI would duplicate the CTA). Plans in
+                 * `denied` mode still render the warning triangle with no button.
+                 */
+                const showRowRemediate =
+                  plan != null &&
+                  plan.mode.kind !== 'denied' &&
+                  bulkRemediation.kind !== 'single_safe_batch'
                 return (
                   <li key={addr} className="flex items-center justify-between gap-3 py-2">
                     <div className="flex items-center gap-3 min-w-0">
@@ -824,6 +946,18 @@ export default function GlobalPauseSection() {
                         </button>
                       ) : authority ? (
                         <AuthorityWarning status={authority} />
+                      ) : null}
+                      {showRowRemediate && plan ? (
+                        <button
+                          type="button"
+                          className="silo-btn-remediate"
+                          disabled={busy !== 'none'}
+                          onClick={() => void handleRemediate(plan)}
+                        >
+                          {busy === 'remediate' && remediatePendingAddress === addr
+                            ? '…'
+                            : remediationButtonLabel(plan)}
+                        </button>
                       ) : null}
                       {isPaused == null ? (
                         <span className="text-xs silo-text-soft">status unknown</span>
@@ -917,6 +1051,41 @@ export default function GlobalPauseSection() {
                 {unauthorizedTrackedCount === 1 ? 'it' : 'them'} and still run for the remaining
                 tracked contracts.
               </p>
+            ) : null}
+            {bulkRemediation.kind === 'single_safe_batch' ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  className="silo-btn-remediate-lg w-full"
+                  disabled={busy !== 'none'}
+                  onClick={() =>
+                    void handleBulkRemediate(bulkRemediation.safeAddress, bulkRemediation.items)
+                  }
+                >
+                  {busy === 'bulk_remediate'
+                    ? 'Waiting for wallet…'
+                    : `Fix authority for contracts (${bulkRemediation.items.length})`}
+                </button>
+                <ul className="text-xs silo-text-soft space-y-0.5 pl-1">
+                  {bulkRemediation.items.map((item) => {
+                    const lower = item.target.toLowerCase()
+                    const override = getGlobalPauseContractNameOverride(
+                      effectiveChainId,
+                      item.target
+                    )
+                    const label = override ?? contractNames.get(lower) ?? shortAddr(item.target)
+                    const verb =
+                      item.action.kind === 'grantRole'
+                        ? 'grant pausing role'
+                        : 'transfer ownership of'
+                    return (
+                      <li key={item.target}>
+                        – {verb} <span className="silo-text-main font-medium">{label}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
             ) : null}
             <div>
               <button
