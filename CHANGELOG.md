@@ -1,12 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+## [0.16.0] - 2026-04-22
+### Added
+- Global Pause flags tracked contracts where it lacks authority
+
 ## [0.15.0] - 2026-04-22
 
 ### Added
 - contract names
 - suggests pause-capable contracts
-
-## [Unreleased]
 
 ### Added
 - suggests pause-capable contracts

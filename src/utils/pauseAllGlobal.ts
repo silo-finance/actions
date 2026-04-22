@@ -49,6 +49,17 @@ export async function removeGlobalPauseContract(
   return executeGlobalPauseAddressAction(params, 'removeContract')
 }
 
+/**
+ * Direct EOA broadcast for `GlobalPause.acceptOwnership(address _contract)`. Global Pause
+ * must already be `pendingOwner` on the target — the call makes Global Pause invoke
+ * `_contract.acceptOwnership()` under the hood, completing the Ownable2Step handshake.
+ */
+export async function acceptGlobalPauseContractOwnership(
+  params: GlobalPauseContractWriteParams
+): Promise<GlobalPauseWriteSuccess> {
+  return executeGlobalPauseAddressAction(params, 'acceptOwnership')
+}
+
 async function executeGlobalPauseAction(
   { signer, chainId, globalPauseAddress }: GlobalPauseWriteParams,
   method: 'pauseAll' | 'unpauseAll'
@@ -73,15 +84,27 @@ async function executeGlobalPauseAction(
   }
 }
 
+/**
+ * GlobalPause exposes two `acceptOwnership` overloads (no-arg for itself, `(address)` for the
+ * tracked contract). Use the fully-qualified signature so ethers always picks the one that
+ * takes a target address — otherwise the Contract proxy would have to guess.
+ */
+const ADDRESS_ACTION_SIGNATURE: Record<'addContract' | 'removeContract' | 'acceptOwnership', string> = {
+  addContract: 'addContract',
+  removeContract: 'removeContract',
+  acceptOwnership: 'acceptOwnership(address)',
+}
+
 async function executeGlobalPauseAddressAction(
   { signer, chainId, globalPauseAddress, contractAddress }: GlobalPauseContractWriteParams,
-  method: 'addContract' | 'removeContract'
+  method: 'addContract' | 'removeContract' | 'acceptOwnership'
 ): Promise<GlobalPauseWriteSuccess> {
   const target = getAddress(globalPauseAddress)
   const contractToModify = getAddress(contractAddress)
   const contract = new Contract(target, globalPauseAbi, signer)
-  const estimatedGas = await contract[method].estimateGas(contractToModify)
-  const tx = await contract[method](contractToModify, { gasLimit: estimatedGas })
+  const fn = contract.getFunction(ADDRESS_ACTION_SIGNATURE[method])
+  const estimatedGas = await fn.estimateGas(contractToModify)
+  const tx = await fn(contractToModify, { gasLimit: estimatedGas })
   await tx.wait()
   const transactionUrl = getExplorerTxUrl(chainId, tx.hash)
   if (!transactionUrl) {

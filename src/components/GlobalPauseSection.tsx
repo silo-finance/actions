@@ -13,6 +13,11 @@ import {
   fetchGlobalPauseContractNames,
   type GlobalPauseArtifactRecord,
 } from '@/utils/globalPauseContractNames'
+import {
+  fetchGlobalPauseTargetAuthority,
+  type TargetAuthorityMap,
+  type TargetAuthorityStatus,
+} from '@/utils/globalPauseAuthority'
 import { fetchGlobalPauseAddress, type GlobalPauseDeployment } from '@/utils/globalPauseDeployment'
 import { fetchGlobalPauseOverview, type GlobalPauseOverview } from '@/utils/globalPauseReader'
 import { loadAbi } from '@/utils/loadAbi'
@@ -23,6 +28,7 @@ import {
   isChainSupported,
 } from '@/utils/networks'
 import {
+  acceptGlobalPauseContractOwnership,
   addGlobalPauseContract,
   pauseAllGlobal,
   removeGlobalPauseContract,
@@ -88,6 +94,40 @@ function AddressLink({ chainId, address, mono = true }: AddressLinkProps) {
   )
 }
 
+type AuthorityWarningProps = {
+  status: TargetAuthorityStatus
+}
+
+/**
+ * Red warning triangle shown when Global Pause demonstrably cannot pause a tracked contract.
+ * `authorized` / `pending-ownership` / `unknown` render nothing — the parent handles those.
+ *
+ * Uses a CSS tooltip (not the native `title` attribute) so the hint appears instantly on
+ * hover/focus and follows Silo brand tokens instead of the OS default gray box.
+ */
+function AuthorityWarning({ status }: AuthorityWarningProps) {
+  if (status.kind !== 'no-role' && status.kind !== 'not-owner') return null
+  const message =
+    status.kind === 'no-role'
+      ? 'Global Pause does not have PAUSER_ROLE on this contract.'
+      : 'Global Pause is neither owner nor pending owner of this contract.'
+  return (
+    <span
+      className="silo-inline-warn"
+      role="img"
+      aria-label={message}
+      tabIndex={0}
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden>
+        <path d="M12 3.2 1.5 21.2h21L12 3.2Zm0 5.1 7.8 13.4H4.2L12 8.3Zm-1 5.1v4.2h2v-4.2h-2Zm0 5.2v1.8h2v-1.8h-2Z" />
+      </svg>
+      <span className="silo-tooltip" role="tooltip">
+        {message}
+      </span>
+    </span>
+  )
+}
+
 type StatusBadgeProps = {
   isPaused: boolean
 }
@@ -116,7 +156,7 @@ export default function GlobalPauseSection() {
   const { account, chainId, provider, isConnected } = useWeb3()
   const [state, setState] = useState<LoadState>({ kind: 'idle' })
   const [refreshTick, setRefreshTick] = useState(0)
-  const [busy, setBusy] = useState<'none' | 'pause' | 'unpause' | 'add' | 'remove'>('none')
+  const [busy, setBusy] = useState<'none' | 'pause' | 'unpause' | 'add' | 'remove' | 'accept'>('none')
   const [txSuccess, setTxSuccess] = useState<GlobalPauseWriteSuccess | null>(null)
   const [txError, setTxError] = useState('')
   const [contractNames, setContractNames] = useState<Map<string, string>>(new Map())
@@ -133,6 +173,8 @@ export default function GlobalPauseSection() {
   const [removePendingAddress, setRemovePendingAddress] = useState<string | null>(null)
   const [suggestedContracts, setSuggestedContracts] = useState<GlobalPauseArtifactRecord[]>([])
   const [quickAddPending, setQuickAddPending] = useState<string | null>(null)
+  const [authorityByAddress, setAuthorityByAddress] = useState<TargetAuthorityMap>(new Map())
+  const [acceptPendingAddress, setAcceptPendingAddress] = useState<string | null>(null)
 
   const effectiveChainId = chainId ?? null
   const chainSupported = effectiveChainId != null && isChainSupported(effectiveChainId)
@@ -146,6 +188,7 @@ export default function GlobalPauseSection() {
     setAddResolvedName(null)
     setAddNameLookupPending(false)
     setRemovePendingAddress(null)
+    setAcceptPendingAddress(null)
   }, [effectiveChainId, account])
 
   useEffect(() => {
@@ -226,6 +269,35 @@ export default function GlobalPauseSection() {
       abort.abort()
     }
   }, [state])
+
+  useEffect(() => {
+    if (state.kind !== 'ready' || !provider) {
+      setAuthorityByAddress(new Map())
+      return
+    }
+    const { deployment, overview } = state
+    if (overview.allContracts.length === 0) {
+      setAuthorityByAddress(new Map())
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const map = await fetchGlobalPauseTargetAuthority(
+          provider,
+          deployment.address,
+          overview.allContracts
+        )
+        if (!cancelled) setAuthorityByAddress(map)
+      } catch {
+        /** Best-effort probe: swallow RPC failures so the list still renders without badges. */
+        if (!cancelled) setAuthorityByAddress(new Map())
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [state, provider])
 
   useEffect(() => {
     if (!addRowOpen || state.kind !== 'ready' || !provider) {
@@ -353,6 +425,33 @@ export default function GlobalPauseSection() {
     }
   }, [state, provider, effectiveChainId])
 
+  const handleAcceptOwnership = useCallback(
+    async (contractAddress: string) => {
+      if (state.kind !== 'ready' || !provider || effectiveChainId == null) return
+      setTxError('')
+      setTxSuccess(null)
+      setBusy('accept')
+      setAcceptPendingAddress(contractAddress)
+      try {
+        const signer = await provider.getSigner()
+        const result = await acceptGlobalPauseContractOwnership({
+          signer,
+          chainId: effectiveChainId,
+          globalPauseAddress: state.deployment.address,
+          contractAddress,
+        })
+        setTxSuccess(result)
+        setRefreshTick((n) => n + 1)
+      } catch (e) {
+        setTxError(toUserErrorMessage(e))
+      } finally {
+        setBusy('none')
+        setAcceptPendingAddress(null)
+      }
+    },
+    [state, provider, effectiveChainId]
+  )
+
   const handleQuickAddSuggestion = useCallback(
     async (contractAddress: string) => {
       if (state.kind !== 'ready' || !provider || effectiveChainId == null) return
@@ -457,6 +556,23 @@ export default function GlobalPauseSection() {
   const addSubmitReady = addCheckStatus === 'ready' && addInputNorm != null
   const pauseCanAttempt = canPauseAll && busy === 'none'
   const unpauseCanAttempt = canPauseAll && busy === 'none'
+  /**
+   * Count contracts on the tracked list that lack pause authority (or need an owner handshake).
+   * `pauseAll` on-chain skips failing contracts rather than reverting — surfacing a heads-up
+   * keeps users from assuming the buttons are broken when some rows are flagged.
+   */
+  const unauthorizedTrackedCount = overview.allContracts.reduce((acc, addr) => {
+    const status = authorityByAddress.get(addr.toLowerCase())
+    if (!status) return acc
+    if (
+      status.kind === 'no-role' ||
+      status.kind === 'not-owner' ||
+      status.kind === 'pending-ownership'
+    ) {
+      return acc + 1
+    }
+    return acc
+  }, 0)
 
   return (
     <SectionShell networkLabel={getNetworkDisplayName(effectiveChainId)} networkChainId={effectiveChainId}>
@@ -685,6 +801,7 @@ export default function GlobalPauseSection() {
                 const isPaused = statusByAddress.get(addr)
                 const override = getGlobalPauseContractNameOverride(effectiveChainId, addr)
                 const name = override ?? contractNames.get(addr.toLowerCase())
+                const authority = authorityByAddress.get(addr.toLowerCase())
                 return (
                   <li key={addr} className="flex items-center justify-between gap-3 py-2">
                     <div className="flex items-center gap-3 min-w-0">
@@ -696,6 +813,18 @@ export default function GlobalPauseSection() {
                       ) : null}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {authority?.kind === 'pending-ownership' ? (
+                        <button
+                          type="button"
+                          className="silo-btn-accept-ownership"
+                          disabled={busy !== 'none'}
+                          onClick={() => void handleAcceptOwnership(addr)}
+                        >
+                          {busy === 'accept' && acceptPendingAddress === addr ? '…' : 'Accept Ownership'}
+                        </button>
+                      ) : authority ? (
+                        <AuthorityWarning status={authority} />
+                      ) : null}
                       {isPaused == null ? (
                         <span className="text-xs silo-text-soft">status unknown</span>
                       ) : (
@@ -779,6 +908,16 @@ export default function GlobalPauseSection() {
           ) : null}
 
           <div className="mt-6 space-y-4">
+            {unauthorizedTrackedCount > 0 ? (
+              <p className="silo-alert silo-alert-warning text-sm">
+                {unauthorizedTrackedCount === 1
+                  ? '1 contract above does not currently grant Global Pause authority.'
+                  : `${unauthorizedTrackedCount} contracts above do not currently grant Global Pause authority.`}{' '}
+                Pause all / Unpause all will skip{' '}
+                {unauthorizedTrackedCount === 1 ? 'it' : 'them'} and still run for the remaining
+                tracked contracts.
+              </p>
+            ) : null}
             <div>
               <button
                 type="button"
