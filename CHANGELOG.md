@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.15.0] - 2026-04-22
+
+### Added
+- contract names
+- suggests pause-capable contracts
+
 ## [Unreleased]
 
 ### Added
