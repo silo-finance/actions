@@ -201,3 +201,118 @@ export async function fetchGlobalPauseContractNames(
 export function _resetGlobalPauseContractNamesCache(): void {
   inMemoryCache.clear()
 }
+
+export type GlobalPauseArtifactRecord = {
+  /** EIP-55 checksummed address from the artifact body. */
+  address: string
+  /** Human-readable artifact filename (e.g. `SiloLeverageRouter`). */
+  name: string
+  /** True when the artifact ABI exposes a no-arg, state-mutating `pause()` function (OpenZeppelin Pausable shape). */
+  hasPauseFn: boolean
+}
+
+export type GlobalPauseArtifactDigest = {
+  /** All deployed artifacts for the chain keyed by lower-cased address. */
+  byAddressLc: ReadonlyMap<string, GlobalPauseArtifactRecord>
+  /** Pre-filtered convenience view: artifacts whose ABI declares `pause()`. */
+  pauseCapable: readonly GlobalPauseArtifactRecord[]
+}
+
+const digestCache = new Map<string, Promise<GlobalPauseArtifactDigest>>()
+
+/** Test-only helper: reset the in-memory digest cache between runs. */
+export function _resetGlobalPauseArtifactDigestCache(): void {
+  digestCache.clear()
+}
+
+function artifactHasPauseFunction(body: unknown): boolean {
+  if (!body || typeof body !== 'object') return false
+  const abi = (body as { abi?: unknown }).abi
+  if (!Array.isArray(abi)) return false
+  for (const item of abi) {
+    if (!item || typeof item !== 'object') continue
+    const entry = item as {
+      type?: unknown
+      name?: unknown
+      stateMutability?: unknown
+      inputs?: unknown
+    }
+    if (entry.type !== 'function') continue
+    if (entry.name !== 'pause') continue
+    if (!Array.isArray(entry.inputs) || entry.inputs.length !== 0) continue
+    if (entry.stateMutability === 'view' || entry.stateMutability === 'pure') continue
+    return true
+  }
+  return false
+}
+
+/**
+ * Single-pass walk over every `*.sol.json` artifact for the chain. Returns both a name lookup
+ * by address and the subset of contracts whose ABI declares `pause()`. Cached per chain so the
+ * page never walks the GitHub repo twice in the same session.
+ */
+export async function fetchGlobalPauseArtifactDigest(
+  chainName: string,
+  opts: FetchGlobalPauseContractNamesOptions = {}
+): Promise<GlobalPauseArtifactDigest> {
+  const cached = digestCache.get(chainName)
+  if (cached) return cached
+
+  const fetchImpl = opts.fetchImpl ?? fetch
+  const concurrency = opts.concurrency ?? DEFAULT_CONCURRENCY
+  const signal = opts.signal
+
+  const run = (async (): Promise<GlobalPauseArtifactDigest> => {
+    const entries = await listDeploymentArtifacts(chainName, fetchImpl, signal)
+    const byAddressLc = new Map<string, GlobalPauseArtifactRecord>()
+    const pauseCapable: GlobalPauseArtifactRecord[] = []
+
+    await runWithConcurrency(
+      entries,
+      concurrency,
+      async (entry) => {
+        if (!entry.download_url) return
+        let res: Response
+        try {
+          res = await fetchImpl(entry.download_url, { signal })
+        } catch {
+          return
+        }
+        if (!res.ok) return
+        let body: unknown
+        try {
+          body = await res.json()
+        } catch {
+          return
+        }
+        const addrLc = extractArtifactAddress(body)
+        if (!addrLc) return
+        let addressChecksum: string
+        try {
+          addressChecksum = getAddress(addrLc)
+        } catch {
+          return
+        }
+        const record: GlobalPauseArtifactRecord = {
+          address: addressChecksum,
+          name: humanizeArtifactFilename(entry.name),
+          hasPauseFn: artifactHasPauseFunction(body),
+        }
+        byAddressLc.set(addressChecksum.toLowerCase(), record)
+        if (record.hasPauseFn) pauseCapable.push(record)
+      },
+      /** Walk every artifact — we need the full set for pause-capable suggestions. */
+      () => false
+    )
+
+    return { byAddressLc, pauseCapable }
+  })()
+
+  digestCache.set(chainName, run)
+  try {
+    return await run
+  } catch (e) {
+    digestCache.delete(chainName)
+    throw e
+  }
+}
