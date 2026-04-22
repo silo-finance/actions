@@ -31,6 +31,24 @@ export async function unpauseAllGlobal(params: GlobalPauseWriteParams): Promise<
   return executeGlobalPauseAction(params, 'unpauseAll')
 }
 
+export type GlobalPauseContractWriteParams = GlobalPauseWriteParams & {
+  contractAddress: string
+}
+
+/** Direct EOA broadcast for `addContract(address)` with estimateGas preflight. */
+export async function addGlobalPauseContract(
+  params: GlobalPauseContractWriteParams
+): Promise<GlobalPauseWriteSuccess> {
+  return executeGlobalPauseAddressAction(params, 'addContract')
+}
+
+/** Direct EOA broadcast for `removeContract(address)` with estimateGas preflight. */
+export async function removeGlobalPauseContract(
+  params: GlobalPauseContractWriteParams
+): Promise<GlobalPauseWriteSuccess> {
+  return executeGlobalPauseAddressAction(params, 'removeContract')
+}
+
 async function executeGlobalPauseAction(
   { signer, chainId, globalPauseAddress }: GlobalPauseWriteParams,
   method: 'pauseAll' | 'unpauseAll'
@@ -43,6 +61,27 @@ async function executeGlobalPauseAction(
    */
   const estimatedGas = await contract[method].estimateGas()
   const tx = await contract[method]({ gasLimit: estimatedGas })
+  await tx.wait()
+  const transactionUrl = getExplorerTxUrl(chainId, tx.hash)
+  if (!transactionUrl) {
+    throw new Error('Could not build a block explorer link for this network.')
+  }
+  return {
+    transactionUrl,
+    successLinkLabel: 'View on explorer',
+    outcome: 'explorer',
+  }
+}
+
+async function executeGlobalPauseAddressAction(
+  { signer, chainId, globalPauseAddress, contractAddress }: GlobalPauseContractWriteParams,
+  method: 'addContract' | 'removeContract'
+): Promise<GlobalPauseWriteSuccess> {
+  const target = getAddress(globalPauseAddress)
+  const contractToModify = getAddress(contractAddress)
+  const contract = new Contract(target, globalPauseAbi, signer)
+  const estimatedGas = await contract[method].estimateGas(contractToModify)
+  const tx = await contract[method](contractToModify, { gasLimit: estimatedGas })
   await tx.wait()
   const transactionUrl = getExplorerTxUrl(chainId, tx.hash)
   if (!transactionUrl) {
