@@ -7,11 +7,12 @@ import CopyButton from '@/components/CopyButton'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
 import gnosisSafeArtifact from '@/abis/GnosisSafe.json'
 import { useWeb3 } from '@/contexts/Web3Context'
+import { getGlobalPauseContractNameOverride } from '@/config/globalPauseContractNameOverrides'
 import {
-  filterAddressesWithoutOverride,
-  getGlobalPauseContractNameOverride,
-} from '@/config/globalPauseContractNameOverrides'
-import { fetchGlobalPauseContractNames } from '@/utils/globalPauseContractNames'
+  fetchGlobalPauseArtifactDigest,
+  fetchGlobalPauseContractNames,
+  type GlobalPauseArtifactRecord,
+} from '@/utils/globalPauseContractNames'
 import { fetchGlobalPauseAddress, type GlobalPauseDeployment } from '@/utils/globalPauseDeployment'
 import { fetchGlobalPauseOverview, type GlobalPauseOverview } from '@/utils/globalPauseReader'
 import { loadAbi } from '@/utils/loadAbi'
@@ -130,6 +131,8 @@ export default function GlobalPauseSection() {
   const [addResolvedName, setAddResolvedName] = useState<string | null>(null)
   const [addNameLookupPending, setAddNameLookupPending] = useState(false)
   const [removePendingAddress, setRemovePendingAddress] = useState<string | null>(null)
+  const [suggestedContracts, setSuggestedContracts] = useState<GlobalPauseArtifactRecord[]>([])
+  const [quickAddPending, setQuickAddPending] = useState<string | null>(null)
 
   const effectiveChainId = chainId ?? null
   const chainSupported = effectiveChainId != null && isChainSupported(effectiveChainId)
@@ -174,33 +177,46 @@ export default function GlobalPauseSection() {
     if (state.kind !== 'ready') {
       setContractNames(new Map())
       setNamesLoading(false)
+      setSuggestedContracts([])
       return
     }
     const { deployment, overview } = state
-    if (overview.allContracts.length === 0) {
-      setContractNames(new Map())
-      setNamesLoading(false)
-      return
-    }
-    /** Skip the GitHub walker entirely for addresses covered by manual overrides — saves API budget. */
-    const toResolve = filterAddressesWithoutOverride(deployment.chainId, overview.allContracts)
-    if (toResolve.length === 0) {
-      setContractNames(new Map())
-      setNamesLoading(false)
-      return
-    }
     const abort = new AbortController()
     let cancelled = false
     setNamesLoading(true)
     ;(async () => {
       try {
-        const names = await fetchGlobalPauseContractNames(deployment.chainName, toResolve, {
+        /**
+         * Single artifact walk per chain/session: the digest feeds both name resolution for
+         * already-tracked contracts and the pause-capable suggestion list below.
+         */
+        const digest = await fetchGlobalPauseArtifactDigest(deployment.chainName, {
           signal: abort.signal,
         })
-        if (!cancelled) setContractNames(names)
+        if (cancelled) return
+
+        const trackedLc = new Set<string>()
+        const names = new Map<string, string>()
+        for (const addr of overview.allContracts) {
+          const lc = addr.toLowerCase()
+          trackedLc.add(lc)
+          /** Manual overrides win over walker-derived names — skip lookup to save allocation. */
+          if (getGlobalPauseContractNameOverride(deployment.chainId, addr)) continue
+          const rec = digest.byAddressLc.get(lc)
+          if (rec) names.set(lc, rec.name)
+        }
+        setContractNames(names)
+
+        const suggestions = digest.pauseCapable.filter(
+          (r) => !trackedLc.has(r.address.toLowerCase())
+        )
+        setSuggestedContracts(suggestions)
       } catch {
-        /** Name lookup is best-effort — falling back to raw addresses is acceptable. */
-        if (!cancelled) setContractNames(new Map())
+        /** Walker is best-effort — surface raw addresses with no suggestions on failure. */
+        if (!cancelled) {
+          setContractNames(new Map())
+          setSuggestedContracts([])
+        }
       } finally {
         if (!cancelled) setNamesLoading(false)
       }
@@ -336,6 +352,33 @@ export default function GlobalPauseSection() {
       setBusy('none')
     }
   }, [state, provider, effectiveChainId])
+
+  const handleQuickAddSuggestion = useCallback(
+    async (contractAddress: string) => {
+      if (state.kind !== 'ready' || !provider || effectiveChainId == null) return
+      setTxError('')
+      setTxSuccess(null)
+      setBusy('add')
+      setQuickAddPending(contractAddress)
+      try {
+        const signer = await provider.getSigner()
+        const result = await addGlobalPauseContract({
+          signer,
+          chainId: effectiveChainId,
+          globalPauseAddress: state.deployment.address,
+          contractAddress,
+        })
+        setTxSuccess(result)
+        setRefreshTick((n) => n + 1)
+      } catch (e) {
+        setTxError(toUserErrorMessage(e))
+      } finally {
+        setBusy('none')
+        setQuickAddPending(null)
+      }
+    },
+    [state, provider, effectiveChainId]
+  )
 
   const handleUnpauseAll = useCallback(async () => {
     if (state.kind !== 'ready' || !provider || effectiveChainId == null) return
@@ -698,6 +741,42 @@ export default function GlobalPauseSection() {
               })}
             </ul>
           )}
+
+          {suggestedContracts.length > 0 ? (
+            <div className="mt-4 pt-3 border-t border-[var(--silo-border)] opacity-90">
+              <p className="text-[11px] font-semibold uppercase tracking-wide silo-text-soft mb-2">
+                Suggested contracts to add ({suggestedContracts.length})
+              </p>
+              <ul className="divide-y divide-[var(--silo-border)]">
+                {suggestedContracts.map((rec) => (
+                  <li key={rec.address} className="flex items-center justify-between gap-3 py-1.5">
+                    <div className="flex items-center gap-3 min-w-0 silo-text-soft">
+                      <AddressLink chainId={effectiveChainId} address={rec.address} mono />
+                      <span className="text-sm truncate" title={rec.name}>
+                        {rec.name}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="silo-btn-icon-success"
+                      aria-label={`Add ${rec.name} to Global Pause`}
+                      title={
+                        canAddContracts
+                          ? 'Add to Global Pause'
+                          : permissionResolved
+                            ? 'Only authorized accounts can add contracts.'
+                            : 'Checking permission…'
+                      }
+                      disabled={busy !== 'none' || !canAddContracts}
+                      onClick={() => void handleQuickAddSuggestion(rec.address)}
+                    >
+                      {busy === 'add' && quickAddPending === rec.address ? '…' : '+'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <div className="mt-6 space-y-4">
             <div>

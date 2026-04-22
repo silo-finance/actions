@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- suggests pause-capable contracts
+
 ## [0.14.0] - 2026-04-22
 ### Added
 - Global Pause: `addContract`, `removeContract` from the UI.
