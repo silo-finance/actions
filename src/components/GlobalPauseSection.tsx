@@ -21,7 +21,13 @@ import {
   getNetworkIconPath,
   isChainSupported,
 } from '@/utils/networks'
-import { pauseAllGlobal, unpauseAllGlobal, type GlobalPauseWriteSuccess } from '@/utils/pauseAllGlobal'
+import {
+  addGlobalPauseContract,
+  pauseAllGlobal,
+  removeGlobalPauseContract,
+  unpauseAllGlobal,
+  type GlobalPauseWriteSuccess,
+} from '@/utils/pauseAllGlobal'
 import { toUserErrorMessage } from '@/utils/rpcErrors'
 
 function shortAddr(addr: string): string {
@@ -109,13 +115,21 @@ export default function GlobalPauseSection() {
   const { account, chainId, provider, isConnected } = useWeb3()
   const [state, setState] = useState<LoadState>({ kind: 'idle' })
   const [refreshTick, setRefreshTick] = useState(0)
-  const [busy, setBusy] = useState<'none' | 'pause' | 'unpause'>('none')
+  const [busy, setBusy] = useState<'none' | 'pause' | 'unpause' | 'add' | 'remove'>('none')
   const [txSuccess, setTxSuccess] = useState<GlobalPauseWriteSuccess | null>(null)
   const [txError, setTxError] = useState('')
   const [contractNames, setContractNames] = useState<Map<string, string>>(new Map())
   const [namesLoading, setNamesLoading] = useState(false)
   const [multisigSigners, setMultisigSigners] = useState<string[]>([])
   const [multisigSignersLoading, setMultisigSignersLoading] = useState(false)
+  const [addRowOpen, setAddRowOpen] = useState(false)
+  const [addContractInput, setAddContractInput] = useState('')
+  const [addCheckStatus, setAddCheckStatus] = useState<
+    'idle' | 'invalid' | 'checking' | 'not_contract' | 'duplicate' | 'ready'
+  >('idle')
+  const [addResolvedName, setAddResolvedName] = useState<string | null>(null)
+  const [addNameLookupPending, setAddNameLookupPending] = useState(false)
+  const [removePendingAddress, setRemovePendingAddress] = useState<string | null>(null)
 
   const effectiveChainId = chainId ?? null
   const chainSupported = effectiveChainId != null && isChainSupported(effectiveChainId)
@@ -123,6 +137,12 @@ export default function GlobalPauseSection() {
   useEffect(() => {
     setTxSuccess(null)
     setTxError('')
+    setAddRowOpen(false)
+    setAddContractInput('')
+    setAddCheckStatus('idle')
+    setAddResolvedName(null)
+    setAddNameLookupPending(false)
+    setRemovePendingAddress(null)
   }, [effectiveChainId, account])
 
   useEffect(() => {
@@ -190,6 +210,80 @@ export default function GlobalPauseSection() {
       abort.abort()
     }
   }, [state])
+
+  useEffect(() => {
+    if (!addRowOpen || state.kind !== 'ready' || !provider) {
+      setAddCheckStatus('idle')
+      setAddResolvedName(null)
+      setAddNameLookupPending(false)
+      return
+    }
+    const raw = addContractInput.trim()
+    if (raw.length === 0) {
+      setAddCheckStatus('idle')
+      setAddResolvedName(null)
+      setAddNameLookupPending(false)
+      return
+    }
+    const norm = normalizeOrNull(raw)
+    if (!norm) {
+      setAddCheckStatus('invalid')
+      setAddResolvedName(null)
+      setAddNameLookupPending(false)
+      return
+    }
+    const isDuplicate = state.overview.allContracts.some((a) => normalizeOrNull(a) === norm)
+    if (isDuplicate) {
+      setAddCheckStatus('duplicate')
+      setAddResolvedName(null)
+      setAddNameLookupPending(false)
+      return
+    }
+
+    const deployment = state.deployment
+    let cancelled = false
+    setAddCheckStatus('checking')
+    setAddResolvedName(null)
+    setAddNameLookupPending(false)
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        let code = '0x'
+        try {
+          code = await provider.getCode(norm)
+        } catch {
+          if (!cancelled) setAddCheckStatus('not_contract')
+          return
+        }
+        if (cancelled) return
+        if (!code || code === '0x') {
+          setAddCheckStatus('not_contract')
+          return
+        }
+        const override = getGlobalPauseContractNameOverride(deployment.chainId, norm)
+        if (override) {
+          setAddCheckStatus('ready')
+          setAddResolvedName(override)
+          return
+        }
+        setAddCheckStatus('ready')
+        setAddNameLookupPending(true)
+        try {
+          const names = await fetchGlobalPauseContractNames(deployment.chainName, [norm])
+          if (cancelled) return
+          const name = names.get(norm.toLowerCase()) ?? null
+          setAddResolvedName(name)
+        } catch {
+          if (!cancelled) setAddResolvedName(null)
+        } finally {
+          if (!cancelled) setAddNameLookupPending(false)
+        }
+      })()
+    }, 400)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [addRowOpen, addContractInput, provider, state])
 
   useEffect(() => {
     if (state.kind !== 'ready' || !provider) {
@@ -312,6 +406,12 @@ export default function GlobalPauseSection() {
   const { deployment, overview } = state
   const canPauseAll = overview.canPauseAll === true
   const permissionResolved = overview.canPauseAll != null
+  const accountNorm = account ? normalizeOrNull(account) : null
+  const ownerNorm = normalizeOrNull(overview.owner)
+  const canRemoveContracts = accountNorm != null && ownerNorm != null && accountNorm === ownerNorm
+  const canAddContracts = canPauseAll
+  const addInputNorm = normalizeOrNull(addContractInput.trim())
+  const addSubmitReady = addCheckStatus === 'ready' && addInputNorm != null
   const pauseCanAttempt = canPauseAll && busy === 'none'
   const unpauseCanAttempt = canPauseAll && busy === 'none'
 
@@ -416,10 +516,124 @@ export default function GlobalPauseSection() {
         </div>
 
         <div className="min-w-0 lg:border-l lg:border-[var(--silo-border)] lg:pl-10 pt-6 lg:pt-0 border-t lg:border-t-0 border-[var(--silo-border)]">
-          <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-2">
-            Contracts tracked by Global Pause ({overview.allContracts.length})
-            {namesLoading ? <span className="ml-2 text-[10px] font-normal normal-case silo-text-soft">resolving names…</span> : null}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft">
+              Contracts tracked by Global Pause ({overview.allContracts.length})
+              {namesLoading ? (
+                <span className="ml-2 text-[10px] font-normal normal-case silo-text-soft">resolving names…</span>
+              ) : null}
+            </p>
+            <button
+              type="button"
+              className="silo-btn-icon"
+              aria-label="Add contract to Global Pause"
+              title={
+                canAddContracts
+                  ? 'Add contract'
+                  : permissionResolved
+                    ? 'Only authorized accounts can add contracts.'
+                    : 'Checking permission…'
+              }
+              disabled={!canAddContracts || busy !== 'none'}
+              onClick={() => {
+                setTxError('')
+                setTxSuccess(null)
+                setAddRowOpen((open) => !open)
+              }}
+            >
+              +
+            </button>
+          </div>
+
+          {addRowOpen ? (
+            <div className="mb-3 space-y-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="relative flex-1 min-w-0">
+                  <input
+                    type="text"
+                    value={addContractInput}
+                    onChange={(e) => setAddContractInput(e.target.value)}
+                    placeholder="0x… contract address"
+                    className="w-full silo-input silo-input--md pr-10 font-mono text-sm focus:outline-none focus:ring-0"
+                    aria-label="Contract address to add"
+                  />
+                  <button
+                    type="button"
+                    className="silo-inline-dismiss absolute right-1 top-1/2 -translate-y-1/2"
+                    aria-label="Close add contract"
+                    title="Close"
+                    onClick={() => {
+                      setAddRowOpen(false)
+                      setAddContractInput('')
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="silo-btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={busy !== 'none' || !addSubmitReady}
+                  onClick={() => {
+                    void (async () => {
+                      if (state.kind !== 'ready' || !provider || effectiveChainId == null || !addSubmitReady || addInputNorm == null) return
+                      setTxError('')
+                      setTxSuccess(null)
+                      setBusy('add')
+                      try {
+                        const signer = await provider.getSigner()
+                        const result = await addGlobalPauseContract({
+                          signer,
+                          chainId: effectiveChainId,
+                          globalPauseAddress: state.deployment.address,
+                          contractAddress: addInputNorm,
+                        })
+                        setTxSuccess(result)
+                        setAddContractInput('')
+                        setAddRowOpen(false)
+                        setRefreshTick((n) => n + 1)
+                      } catch (e) {
+                        setTxError(toUserErrorMessage(e))
+                      } finally {
+                        setBusy('none')
+                      }
+                    })()
+                  }}
+                >
+                  {busy === 'add' ? 'Waiting…' : 'Add'}
+                </button>
+              </div>
+              {addCheckStatus === 'checking' ? (
+                <p className="text-xs silo-text-soft">Checking address…</p>
+              ) : null}
+              {addCheckStatus === 'invalid' ? (
+                <p className="text-xs silo-alert silo-alert-error">Enter a valid contract address.</p>
+              ) : null}
+              {addCheckStatus === 'duplicate' ? (
+                <p className="text-xs silo-alert silo-alert-error">This contract is already tracked by Global Pause.</p>
+              ) : null}
+              {addCheckStatus === 'not_contract' ? (
+                <p className="text-xs silo-alert silo-alert-error">
+                  This address has no deployed code on the current network.
+                </p>
+              ) : null}
+              {addCheckStatus === 'ready' ? (
+                addNameLookupPending ? (
+                  <p className="text-xs silo-text-soft">Looking up name in Silo deployments…</p>
+                ) : addResolvedName ? (
+                  <p className="text-xs silo-text-main">
+                    <span className="silo-text-soft">Matched Silo deployment: </span>
+                    <span className="font-medium">{addResolvedName}</span>
+                  </p>
+                ) : (
+                  <p className="text-xs silo-text-soft">
+                    Not found in Silo deployments — you can still add it.
+                  </p>
+                )
+              ) : null}
+            </div>
+          ) : null}
+
           {overview.allContracts.length === 0 ? (
             <p className="text-sm silo-text-soft">No contracts registered yet.</p>
           ) : (
@@ -438,11 +652,47 @@ export default function GlobalPauseSection() {
                         </span>
                       ) : null}
                     </div>
-                    {isPaused == null ? (
-                      <span className="text-xs silo-text-soft shrink-0">status unknown</span>
-                    ) : (
-                      <StatusBadge isPaused={isPaused} />
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isPaused == null ? (
+                        <span className="text-xs silo-text-soft">status unknown</span>
+                      ) : (
+                        <StatusBadge isPaused={isPaused} />
+                      )}
+                      <button
+                        type="button"
+                        className="silo-inline-dismiss"
+                        aria-label={`Remove ${addr} from Global Pause`}
+                        title={canRemoveContracts ? 'Remove contract' : 'Only Global Pause owner can remove contracts.'}
+                        disabled={busy !== 'none' || !canRemoveContracts}
+                        onClick={() => {
+                          void (async () => {
+                            if (state.kind !== 'ready' || !provider || effectiveChainId == null) return
+                            setTxError('')
+                            setTxSuccess(null)
+                            setBusy('remove')
+                            setRemovePendingAddress(addr)
+                            try {
+                              const signer = await provider.getSigner()
+                              const result = await removeGlobalPauseContract({
+                                signer,
+                                chainId: effectiveChainId,
+                                globalPauseAddress: state.deployment.address,
+                                contractAddress: addr,
+                              })
+                              setTxSuccess(result)
+                              setRefreshTick((n) => n + 1)
+                            } catch (e) {
+                              setTxError(toUserErrorMessage(e))
+                            } finally {
+                              setBusy('none')
+                              setRemovePendingAddress(null)
+                            }
+                          })()
+                        }}
+                      >
+                        {busy === 'remove' && removePendingAddress === addr ? '…' : '×'}
+                      </button>
+                    </div>
                   </li>
                 )
               })}
