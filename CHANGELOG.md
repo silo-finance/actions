@@ -1,6 +1,14 @@
 # Changelog
 
+## [0.17.0] - 2026-04-22
+
+### Added
+- add option to fix unauthorized contracts for pausing
+
 ## [Unreleased]
+
+### Added
+- add option to fix unauthorized contracts for pausing
 
 ## [0.16.0] - 2026-04-22
 ### Added

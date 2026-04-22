@@ -651,3 +651,63 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/**
+ * Small inline CTA for "Transfer ownership" / "Grant role" rows where Global Pause lacks
+ * authority. Warning-toned (orange) so it reads as remediation next to the red warning triangle,
+ * distinct from the accent-blue "Accept Ownership" button used for pending handshakes.
+ */
+.silo-btn-remediate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--silo-warning) 55%, var(--silo-border));
+  background: color-mix(in srgb, var(--silo-warning) 12%, var(--silo-surface-2));
+  color: var(--silo-text);
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+.silo-btn-remediate:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--silo-warning) 78%, var(--silo-border));
+  background: color-mix(in srgb, var(--silo-warning) 22%, var(--silo-surface-2));
+}
+
+.silo-btn-remediate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/**
+ * Full-width warning-toned CTA for the bulk authority-fix batch. Matches `silo-btn-primary`
+ * geometry (padding / font-size / font-weight / radius) but swaps the accent palette for the
+ * warning palette so it reads as remediation alongside the yellow banner and red warnings.
+ */
+.silo-btn-remediate-lg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease, color 0.2s ease;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  background-color: color-mix(in srgb, var(--silo-warning) 22%, var(--silo-surface-2));
+  color: var(--silo-text);
+  border: 1px solid color-mix(in srgb, var(--silo-warning) 60%, var(--silo-border));
+}
+
+.silo-btn-remediate-lg:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--silo-warning) 34%, var(--silo-surface-2));
+  border-color: color-mix(in srgb, var(--silo-warning) 80%, var(--silo-border));
+}
+
+.silo-btn-remediate-lg:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
