@@ -22,10 +22,14 @@ type Props = {
   chainId: number
   /** `null` when the input was a single Silo (no index label needed). `0` / `1` for SiloConfig. */
   siloIndex: number | null
-  siloAddress: string
-  siloConfig: string
+  /** Underlying asset symbol resolved from `ERC20.symbol()` via `readSiloConfigEntries`. */
+  siloSymbol: string | null
   oracleState: ManageableOracleState | null
   ownerKind: OwnerKind | null
+  /** `true` while the parent is still fetching the solvency oracle state for this silo. */
+  loading: boolean
+  /** Human-readable error from the parent's lazy oracle-state fetch (or null on success). */
+  errorMessage: string | null
   provider: BrowserProvider | null
   eip1193Provider: Eip1193Provider | null
   connectedAccount: string
@@ -40,15 +44,15 @@ function shortAddr(addr: string): string {
 function AddressLine({ chainId, address }: { chainId: number; address: string }) {
   const url = getExplorerAddressUrl(chainId, address)
   return (
-    <span className="inline-flex items-center gap-1.5 min-w-0">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
       <a
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-mono text-sm silo-text-main hover:underline break-all min-w-0"
+        className="font-mono text-sm silo-text-main hover:underline"
         title={address}
       >
-        {address}
+        {shortAddr(address)}
       </a>
       <CopyButton value={address} />
     </span>
@@ -69,9 +73,11 @@ type Busy = 'idle' | 'propose' | 'cancel'
 export default function SiloOracleChangeSection({
   chainId,
   siloIndex,
-  siloAddress,
+  siloSymbol,
   oracleState,
   ownerKind,
+  loading,
+  errorMessage,
   provider,
   eip1193Provider,
   connectedAccount,
@@ -161,16 +167,19 @@ export default function SiloOracleChangeSection({
     [provider, eip1193Provider, connectedAccount, oracleState, ownerKind, chainId, revertingOracleAddress, onActionSuccess]
   )
 
-  const title =
-    siloIndex == null ? 'Silo — solvency oracle' : siloIndex === 0 ? 'silo0 — solvency oracle' : 'silo1 — solvency oracle'
+  const siloName = siloIndex == null ? 'Silo' : `Silo${siloIndex}`
+  const symbolSuffix = siloSymbol ? ` · ${siloSymbol}` : ''
+  const title = `${siloName}${symbolSuffix} — solvency oracle`
 
-  if (!oracleState) {
+  if (loading || !oracleState) {
     return (
       <section className="silo-panel p-5">
-        <h2 className="text-lg font-semibold silo-text-main mb-2">{title}</h2>
-        <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">Silo</p>
-        <AddressLine chainId={chainId} address={siloAddress} />
-        <p className="text-sm silo-text-soft mt-3">Loading solvency oracle…</p>
+        <h2 className="text-lg font-semibold silo-text-main m-0">{title}</h2>
+        {errorMessage ? (
+          <p className="text-sm silo-alert silo-alert-error mt-3 m-0">{errorMessage}</p>
+        ) : (
+          <p className="text-sm silo-text-soft mt-3 m-0">Loading solvency oracle…</p>
+        )}
       </section>
     )
   }
@@ -178,9 +187,7 @@ export default function SiloOracleChangeSection({
   if (!oracleState.oracleAddress || oracleState.oracleAddress === '0x0000000000000000000000000000000000000000') {
     return (
       <section className="silo-panel p-5">
-        <h2 className="text-lg font-semibold silo-text-main mb-2">{title}</h2>
-        <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">Silo</p>
-        <AddressLine chainId={chainId} address={siloAddress} />
+        <h2 className="text-lg font-semibold silo-text-main m-0">{title}</h2>
         <p className="text-sm silo-alert silo-alert-warning mt-3 m-0">
           This silo has no solvency oracle configured — nothing to update.
         </p>
@@ -192,30 +199,21 @@ export default function SiloOracleChangeSection({
 
   return (
     <section className="silo-panel p-5 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold silo-text-main m-0">{title}</h2>
-        <span className="text-xs silo-text-soft">
-          Silo: <span className="font-mono">{shortAddr(siloAddress)}</span>
-        </span>
-      </div>
+      <h2 className="text-lg font-semibold silo-text-main m-0">{title}</h2>
 
       {/* Row 4: oracle card */}
       <div className="space-y-1">
         <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-0.5">Solvency oracle</p>
-        <AddressLine chainId={chainId} address={oracleState.oracleAddress} />
-        <p className="text-xs silo-text-soft m-0">
-          VERSION:{' '}
-          <span className="font-mono silo-text-main">
-            {oracleState.versionString ?? '(no VERSION() method)'}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <AddressLine chainId={chainId} address={oracleState.oracleAddress} />
+          <span className="text-xs">
+            <span className="silo-text-soft">·</span>{' '}
+            <span className="font-mono silo-text-main">
+              {oracleState.versionString ?? '(no VERSION() method)'}
+            </span>
           </span>
-        </p>
-        {oracleState.isManageable ? (
-          <p className="text-xs silo-text-main m-0">
-            <span className="silo-text-soft">Contract:</span>{' '}
-            <span className="font-medium">{oracleState.contractName ?? 'ManageableOracle'}</span>
-            {oracleState.version ? <span className="silo-text-soft"> · {oracleState.version}</span> : null}
-          </p>
-        ) : (
+        </div>
+        {oracleState.isManageable ? null : (
           <p className="text-sm silo-alert silo-alert-error m-0 mt-1">
             Solvency oracle is not a ManageableOracle — cannot change it here.
           </p>
@@ -229,13 +227,15 @@ export default function SiloOracleChangeSection({
             <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-0.5">Owner</p>
             {oracleState.owner ? (
               <>
-                <AddressLine chainId={chainId} address={oracleState.owner} />
-                <p className="text-xs silo-text-main m-0">
-                  Type:{' '}
-                  <span className="font-medium">
-                    {ownerKind === 'safe' ? 'Safe (multisig)' : ownerKind === 'eoa' ? 'EOA' : ownerKind === 'contract' ? 'Contract' : '—'}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <AddressLine chainId={chainId} address={oracleState.owner} />
+                  <span className="text-xs silo-text-main">
+                    <span className="silo-text-soft">·</span>{' '}
+                    <span className="font-medium">
+                      {ownerKind === 'safe' ? 'Safe (multisig)' : ownerKind === 'eoa' ? 'EOA' : ownerKind === 'contract' ? 'Contract' : '—'}
+                    </span>
                   </span>
-                </p>
+                </div>
                 {ownerKind === 'safe' && connectedAccount ? (
                   <p className="text-xs m-0">
                     {authorityLoading ? (

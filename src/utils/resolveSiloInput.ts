@@ -15,27 +15,26 @@ const multicall3Abi = [
 ] as const
 const multicall3Iface = new Interface(multicall3Abi)
 
-export type ResolvedSiloInput =
-  | {
-      kind: 'silo'
-      siloConfig: string
-      silos: [string]
-    }
-  | {
-      kind: 'silo_config'
-      siloConfig: string
-      silos: [string, string]
-    }
+/**
+ * Unified shape — whether the user entered a `Silo` or a `SiloConfig` address, downstream code
+ * always receives the parent `SiloConfig` plus both silos. A silo input just triggers one extra
+ * read (parent's `getSilos()`) so the UI can lift both `Silo0` / `Silo1` immediately.
+ */
+export type ResolvedSiloInput = {
+  siloConfig: string
+  silos: [string, string]
+}
 
 type MulticallEntry = { success: boolean; returnData: `0x${string}` }
 
 /**
- * One multicall determines whether `address` is a Silo or a SiloConfig:
- *  - `Silo.config()` returns the SiloConfig (non-zero when `address` is a silo).
- *  - `SiloConfig.getSilos()` returns `(silo0, silo1)` (non-zero when `address` is a SiloConfig).
+ * Two-phase resolve, kept as cheap as possible:
  *
- * The first call that cleanly decodes to non-zero address(es) wins. Neither call existing =>
- * throw a friendly "neither Silo nor SiloConfig" error.
+ *  1. A single multicall on `address` tries both `Silo.config()` and `SiloConfig.getSilos()`.
+ *  2. If the input looked like a `Silo` (non-zero `config()` return), a second multicall on that
+ *     parent `SiloConfig` fetches `getSilos()` so we always return the pair.
+ *
+ * Neither branch resolving => "neither Silo nor SiloConfig" error.
  */
 export async function resolveSiloInput(
   provider: Provider,
@@ -76,17 +75,50 @@ export async function resolveSiloInput(
 
   const siloConfigFromSilo = decodeAddress(siloIface, 'config', configReturn)
   if (siloConfigFromSilo && siloConfigFromSilo !== ZeroAddress) {
-    return { kind: 'silo', siloConfig: siloConfigFromSilo, silos: [target] }
+    const pair = await fetchSiloPair(provider, siloConfigFromSilo, multicall)
+    if (pair && pair[0] !== ZeroAddress && pair[1] !== ZeroAddress) {
+      return { siloConfig: siloConfigFromSilo, silos: pair }
+    }
+    throw new Error(
+      'Silo resolved to a SiloConfig, but getSilos() did not return a valid pair. The market may be misconfigured.'
+    )
   }
 
   const pair = decodeSiloPair(getSilosReturn)
   if (pair && pair[0] !== ZeroAddress && pair[1] !== ZeroAddress) {
-    return { kind: 'silo_config', siloConfig: target, silos: pair }
+    return { siloConfig: target, silos: pair }
   }
 
   throw new Error(
     'Address is neither a Silo nor a SiloConfig on this network. Double-check the address and the selected chain.'
   )
+}
+
+/**
+ * Fetches `getSilos()` on the parent `SiloConfig`. Uses multicall when available for parity with
+ * the first-phase call (keeps the RPC call shape uniform), falling back to a plain `eth_call`.
+ */
+async function fetchSiloPair(
+  provider: Provider,
+  siloConfig: string,
+  multicall: ReturnType<typeof getMulticall3Config>
+): Promise<[string, string] | null> {
+  const callData = siloConfigIface.encodeFunctionData('getSilos', []) as `0x${string}`
+  let returnData: `0x${string}` | null = null
+  if (multicall) {
+    const payload = [{ target: siloConfig, allowFailure: true, callData }]
+    const encoded = multicall3Iface.encodeFunctionData('aggregate3', [payload]) as `0x${string}`
+    try {
+      const raw = (await provider.call({ to: multicall.address, data: encoded })) as `0x${string}`
+      const decoded = multicall3Iface.decodeFunctionResult('aggregate3', raw)[0] as MulticallEntry[]
+      returnData = decoded[0]?.success ? decoded[0].returnData : null
+    } catch {
+      returnData = null
+    }
+  } else {
+    returnData = await safeEthCall(provider, siloConfig, callData)
+  }
+  return decodeSiloPair(returnData)
 }
 
 async function safeEthCall(

@@ -1,4 +1,5 @@
 import { getAddress, ZeroAddress, type Provider } from 'ethers'
+import erc20Artifact from '@/abis/ERC20.json'
 import manageableOracleArtifact from '@/abis/ManageableOracle.json'
 import siloConfigArtifact from '@/abis/SiloConfig.json'
 import { loadAbi } from '@/utils/loadAbi'
@@ -6,6 +7,7 @@ import { buildReadMulticallCall, executeReadMulticall, type ReadMulticallCall } 
 
 const manageableOracleAbi = loadAbi(manageableOracleArtifact)
 const siloConfigAbi = loadAbi(siloConfigArtifact)
+const erc20Abi = loadAbi(erc20Artifact)
 
 export type ManageableOracleState = {
   oracleAddress: string
@@ -167,5 +169,130 @@ export async function readSolvencyOraclesForSilos(
   return normalizedSilos.map((silo, i) => ({
     silo,
     solvencyOracle: typeof results[i] === 'string' ? (results[i] as string) : ZeroAddress,
+  }))
+}
+
+export type SiloConfigEntry = {
+  silo: string
+  token: string
+  solvencyOracle: string
+  maxLtvOracle: string
+  symbol: string | null
+  /**
+   * `SILO_ID()` on the parent SiloConfig (same for all silos in one market). `null` when the
+   * multicall slot failed — UI then just omits the `#id` prefix.
+   */
+  siloId: number | null
+}
+
+/**
+ * One-shot batched read of `SiloConfig.getConfig(silo)` for every silo + the token `symbol()` for
+ * every distinct underlying asset — one multicall each. Giving the UI the full ConfigData up front
+ * (not just `solvencyOracle`) lets future actions (collateral share token, LTV oracle, hook
+ * receiver, ...) reuse the same cached shape without re-reading on-chain.
+ */
+export async function readSiloConfigEntries(
+  provider: Provider,
+  siloConfig: string,
+  silos: readonly string[]
+): Promise<SiloConfigEntry[]> {
+  const target = getAddress(siloConfig)
+  const normalizedSilos = silos.map((s) => getAddress(s))
+
+  /**
+   * Batch `getConfig(silo)` for every silo plus a single `SILO_ID()` on the parent config, all in
+   * one multicall. The extra id slot is cheap and avoids a second round-trip for a value the
+   * market UI prefixes everywhere (e.g. `#3006 · Silo0 · USDC`).
+   */
+  type ConfigRow = {
+    token: string | null
+    solvencyOracle: string | null
+    maxLtvOracle: string | null
+  } | null
+  const configCalls = normalizedSilos.map((silo) =>
+    buildReadMulticallCall<ConfigRow>({
+      target,
+      abi: siloConfigAbi,
+      functionName: 'getConfig',
+      args: [silo],
+      allowFailure: true,
+      fallback: async () => null,
+      decodeResult: (value) => {
+        const cfg = value as Record<string, unknown>
+        const token = typeof cfg?.token === 'string' ? getAddress(cfg.token) : null
+        const solvencyOracle =
+          typeof cfg?.solvencyOracle === 'string' ? getAddress(cfg.solvencyOracle) : null
+        const maxLtvOracle =
+          typeof cfg?.maxLtvOracle === 'string' ? getAddress(cfg.maxLtvOracle) : null
+        return { token, solvencyOracle, maxLtvOracle }
+      },
+    })
+  )
+  const siloIdCall = buildReadMulticallCall<number | null>({
+    target,
+    abi: siloConfigAbi,
+    functionName: 'SILO_ID',
+    allowFailure: true,
+    fallback: async () => null,
+    decodeResult: (value) => {
+      if (value == null) return null
+      try {
+        const n = Number(value as bigint | number | string)
+        return Number.isFinite(n) ? n : null
+      } catch {
+        return null
+      }
+    },
+  })
+  const rawResults = (await executeReadMulticall(
+    provider,
+    [...configCalls, siloIdCall] as unknown as ReadMulticallCall<unknown>[],
+    { debugLabel: 'readSiloConfigEntries.getConfig' }
+  )) as [...ConfigRow[], number | null]
+  const configResults = rawResults.slice(0, normalizedSilos.length) as ConfigRow[]
+  const siloId = rawResults[normalizedSilos.length] as number | null
+
+  const partials = normalizedSilos.map((silo, i) => {
+    const row = configResults[i] ?? null
+    return {
+      silo,
+      token: row?.token ?? ZeroAddress,
+      solvencyOracle: row?.solvencyOracle ?? ZeroAddress,
+      maxLtvOracle: row?.maxLtvOracle ?? ZeroAddress,
+    }
+  })
+
+  /**
+   * Deduplicate tokens before calling `symbol()` — both silos in a market never share an asset
+   * today, but the reader is cheap and stays correct if that ever changes.
+   */
+  const uniqueTokens = Array.from(
+    new Set(partials.map((p) => p.token).filter((t) => t !== ZeroAddress))
+  )
+  const symbolResults = uniqueTokens.length
+    ? await executeReadMulticall(
+        provider,
+        uniqueTokens.map((token) =>
+          buildReadMulticallCall<string | null>({
+            target: token,
+            abi: erc20Abi,
+            functionName: 'symbol',
+            allowFailure: true,
+            fallback: async () => null,
+            decodeResult: (value) => (typeof value === 'string' ? value : null),
+          })
+        ),
+        { debugLabel: 'readSiloConfigEntries.symbol' }
+      )
+    : []
+  const symbolByToken = new Map<string, string | null>()
+  uniqueTokens.forEach((token, i) => {
+    symbolByToken.set(token, symbolResults[i] ?? null)
+  })
+
+  return partials.map((p) => ({
+    ...p,
+    symbol: p.token === ZeroAddress ? null : (symbolByToken.get(p.token) ?? null),
+    siloId,
   }))
 }

@@ -3,9 +3,11 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import ShareLinkCopyButton from '@/components/ShareLinkCopyButton'
 import ConnectWalletModal from '@/components/ConnectWalletModal'
+import CopyButton from '@/components/CopyButton'
+import SiloDeploymentsList from '@/components/SiloDeploymentsList'
 import SiloOracleChangeSection from '@/components/SiloOracleChangeSection'
 import SiloOracleChangeBothSilosSection from '@/components/SiloOracleChangeBothSilosSection'
 import { useWeb3 } from '@/contexts/Web3Context'
@@ -15,20 +17,20 @@ import { normalizeAddress } from '@/utils/addressValidation'
 import { classifyVaultInput } from '@/utils/explorerInput'
 import {
   readManageableOracleState,
-  readSolvencyOraclesForSilos,
+  readSiloConfigEntries,
   type ManageableOracleState,
-  type SiloSolvencyOracle,
+  type SiloConfigEntry,
 } from '@/utils/manageableOracleReader'
-import { getNetworkDisplayName, getNetworkIconPath, isChainSupported } from '@/utils/networks'
+import { getExplorerAddressUrl, getNetworkDisplayName, getNetworkIconPath, isChainSupported } from '@/utils/networks'
 import { analyzeOwnerKind, type OwnerKind } from '@/utils/ownerKind'
 import { resolveSiloInput, type ResolvedSiloInput } from '@/utils/resolveSiloInput'
 import { toUserErrorMessage } from '@/utils/rpcErrors'
 
-type SiloPicker = 'silo0' | 'silo1' | 'both'
-
-type LoadedSiloOracle = SiloSolvencyOracle & {
-  oracleState: ManageableOracleState | null
+type OracleStateEntry = {
+  loading: boolean
+  state: ManageableOracleState | null
   ownerKind: OwnerKind | null
+  error: string | null
 }
 
 function parseChainFromSearchParam(raw: string | null): number | null {
@@ -40,9 +42,20 @@ function parseChainFromSearchParam(raw: string | null): number | null {
   return isChainSupported(n) ? n : null
 }
 
+function siloLabel(index: number): string {
+  return `Silo${index}`
+}
+
+/** `0xabc123…ef01` — same shape we use in other market cards (MarketItem, VaultSummaryPanel). */
+function shortAddress(addr: string): string {
+  if (!addr || addr.length < 12) return addr
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
+}
+
 function SiloPageInner() {
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { provider, chainId, isConnected, switchNetwork, account, eip1193Provider } = useWeb3()
   const [connectModalOpen, setConnectModalOpen] = useState(false)
   const closeConnectModal = useCallback(() => setConnectModalOpen(false), [])
@@ -51,13 +64,28 @@ function SiloPageInner() {
   const [loading, setLoading] = useState(false)
 
   const [resolved, setResolved] = useState<ResolvedSiloInput | null>(null)
-  /** Chain on which `resolved` was read (used for display + deep-link). */
   const [resolvedChainId, setResolvedChainId] = useState<number | null>(null)
   const [resolvedAddress, setResolvedAddress] = useState<string | null>(null)
-  const [siloOracles, setSiloOracles] = useState<SiloSolvencyOracle[] | null>(null)
-  const [siloOracleStates, setSiloOracleStates] = useState<LoadedSiloOracle[] | null>(null)
-  const [oracleStatesLoading, setOracleStatesLoading] = useState(false)
-  const [selection, setSelection] = useState<SiloPicker>('silo0')
+  const [siloEntries, setSiloEntries] = useState<SiloConfigEntry[] | null>(null)
+  const [siloEntriesLoading, setSiloEntriesLoading] = useState(false)
+  const [siloEntriesError, setSiloEntriesError] = useState<string | null>(null)
+
+  /** Set to `true` only after the user clicks the "Set Reverting Oracle" action button. */
+  const [actionOpen, setActionOpen] = useState(false)
+  /** Lower-cased silo addresses the user has ticked in the picker — checkbox semantics, no default. */
+  const [checkedSilos, setCheckedSilos] = useState<Set<string>>(new Set())
+  /** Lazy per-silo oracle state keyed by the silo address (lowercase). Populated on checkbox tick. */
+  const [oracleStates, setOracleStates] = useState<Record<string, OracleStateEntry>>({})
+  /**
+   * Mirror of `oracleStates` that the lazy-load effect reads *without* subscribing to it. Keeping
+   * `oracleStates` in that effect's deps caused a self-cancelling loop: the effect set
+   * `loading: true` → deps changed → cleanup fired `cancelled = true` → re-run found nothing to
+   * load → the original async returned early and never wrote the result, so the UI stayed stuck
+   * on "Loading solvency oracle…". Updating the ref synchronously during render keeps it current
+   * when effects run, without creating that loop.
+   */
+  const oracleStatesRef = useRef(oracleStates)
+  oracleStatesRef.current = oracleStates
   const [refreshTick, setRefreshTick] = useState(0)
 
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
@@ -102,15 +130,36 @@ function SiloPageInner() {
     setResolved(null)
     setResolvedChainId(null)
     setResolvedAddress(null)
-    setSiloOracles(null)
-    setSiloOracleStates(null)
-    setOracleStatesLoading(false)
-    setSelection('silo0')
+    setSiloEntries(null)
+    setSiloEntriesLoading(false)
+    setSiloEntriesError(null)
+    setActionOpen(false)
+    setCheckedSilos(new Set())
+    setOracleStates({})
   }, [])
 
   useEffect(() => {
     if (addressFromUrl) setInput(addressFromUrl)
   }, [addressFromUrl])
+
+  /**
+   * Client-side navigation to `/silo` (e.g. clicking "Silo" in the header while already on the
+   * page) keeps this component mounted, so state would otherwise survive. Whenever the URL query
+   * string is empty — no `address` and no `chain` — clear input + all resolved state so the page
+   * behaves like a fresh load. Deps are *only* `searchParams` + `resetResolvedState`: reacting to
+   * state changes too (input/resolved/loading/error) was trampling `performCheck`'s in-flight
+   * updates whenever the user clicked a predefined-silo button from the base URL, because the
+   * effect fired mid-await and clobbered `input`/`resolved` before the URL had a chance to update.
+   */
+  useEffect(() => {
+    const hasAddress = !!searchParams.get('address')
+    const hasChain = !!searchParams.get('chain')
+    if (hasAddress || hasChain) return
+    setInput('')
+    setError('')
+    setLoading(false)
+    resetResolvedState()
+  }, [searchParams, resetResolvedState])
 
   /** Apply deep-link `chain` param once after connect. */
   useEffect(() => {
@@ -186,8 +235,6 @@ function SiloPageInner() {
         setResolved(result)
         setResolvedChainId(effectiveChainId)
         setResolvedAddress(target)
-        /** Default silo picker to silo0 for SiloConfig (single-silo kind never reads `selection`). */
-        setSelection('silo0')
 
         /** Canonicalize URL (?address=&chain=) on successful resolve. */
         if (pathname && typeof window !== 'undefined') {
@@ -214,6 +261,18 @@ function SiloPageInner() {
   const handleCheck = useCallback(() => {
     void performCheck(input)
   }, [performCheck, input])
+
+  /**
+   * Predefined silo selector: clicking a button fills the input and runs the same `performCheck`
+   * flow as pressing Enter, so the resolved address + `?address=&chain=` URL update naturally.
+   */
+  const handlePredefinedSiloSelect = useCallback(
+    (siloConfig: string) => {
+      setInput(siloConfig)
+      void performCheck(siloConfig)
+    },
+    [performCheck]
+  )
 
   /** Auto-run the initial deep-link check once the wallet is connected on the right chain. */
   useEffect(() => {
@@ -243,19 +302,32 @@ function SiloPageInner() {
     performCheck,
   ])
 
-  /** Step 2 complete → fetch solvency oracles for all silos in the resolved package. */
+  /**
+   * Row 2 complete → fetch full `SiloConfig.getConfig(silo)` + ERC20 `symbol()` for each silo in a
+   * single pair of multicalls. This gives the UI silo IDs + asset symbols up front without having
+   * to read the solvency oracle yet — we keep that lazy until the user ticks a checkbox.
+   */
   useEffect(() => {
     if (!resolved || !provider || resolvedChainId == null) {
-      setSiloOracles(null)
+      setSiloEntries(null)
+      setSiloEntriesLoading(false)
+      setSiloEntriesError(null)
       return
     }
     let cancelled = false
+    setSiloEntriesLoading(true)
+    setSiloEntriesError(null)
     void (async () => {
       try {
-        const results = await readSolvencyOraclesForSilos(provider, resolved.siloConfig, resolved.silos)
-        if (!cancelled) setSiloOracles(results)
+        const entries = await readSiloConfigEntries(provider, resolved.siloConfig, resolved.silos)
+        if (!cancelled) setSiloEntries(entries)
       } catch (e) {
-        if (!cancelled) setError(toUserErrorMessage(e, 'Failed to read silo configuration.'))
+        if (!cancelled) {
+          setSiloEntries(null)
+          setSiloEntriesError(toUserErrorMessage(e, 'Failed to read silo configuration.'))
+        }
+      } finally {
+        if (!cancelled) setSiloEntriesLoading(false)
       }
     })()
     return () => {
@@ -263,64 +335,128 @@ function SiloPageInner() {
     }
   }, [resolved, provider, resolvedChainId, refreshTick])
 
-  /** Step 3 complete → read each solvency oracle's state in parallel. */
+  /**
+   * Lazy per-silo oracle state: whenever `checkedSilos` grows (or after a refresh) load the
+   * ManageableOracle state + owner kind for each ticked silo. Unticking does not clear the cache —
+   * re-ticking returns the cached state instantly while a refresh still reloads everything.
+   */
   useEffect(() => {
-    if (!siloOracles || !provider) {
-      setSiloOracleStates(null)
-      setOracleStatesLoading(false)
-      return
-    }
+    if (!provider || !siloEntries || checkedSilos.size === 0) return
+    const currentStates = oracleStatesRef.current
+    const entriesToLoad = siloEntries.filter((entry) => {
+      const key = entry.silo.toLowerCase()
+      if (!checkedSilos.has(key)) return false
+      const current = currentStates[key]
+      /** Refresh when there is no entry yet, or when the silo is no longer loading and no state. */
+      return !current || (!current.loading && !current.state && !current.error)
+    })
+    if (entriesToLoad.length === 0) return
     let cancelled = false
-    setOracleStatesLoading(true)
+    setOracleStates((prev) => {
+      const next = { ...prev }
+      for (const entry of entriesToLoad) {
+        next[entry.silo.toLowerCase()] = { loading: true, state: null, ownerKind: null, error: null }
+      }
+      return next
+    })
     void (async () => {
-      try {
-        const loaded: LoadedSiloOracle[] = await Promise.all(
-          siloOracles.map(async (entry) => {
-            if (!entry.solvencyOracle || entry.solvencyOracle === '0x0000000000000000000000000000000000000000') {
-              return { ...entry, oracleState: null, ownerKind: null }
+      await Promise.all(
+        entriesToLoad.map(async (entry) => {
+          const key = entry.silo.toLowerCase()
+          try {
+            if (
+              !entry.solvencyOracle ||
+              entry.solvencyOracle === '0x0000000000000000000000000000000000000000'
+            ) {
+              if (cancelled) return
+              /**
+               * The silo has no solvency oracle configured. We still need a non-null `state` so the
+               * child component's "no solvency oracle configured" branch renders — passing `null`
+               * used to leave the UI stuck on "Loading solvency oracle…" because `!oracleState`
+               * is the same check that covers the in-flight case.
+               */
+              const emptyState: ManageableOracleState = {
+                oracleAddress: '0x0000000000000000000000000000000000000000',
+                versionString: null,
+                contractName: null,
+                version: null,
+                isManageable: false,
+                currentOracle: null,
+                pendingOracle: null,
+                owner: null,
+              }
+              setOracleStates((prev) => ({
+                ...prev,
+                [key]: { loading: false, state: emptyState, ownerKind: null, error: null },
+              }))
+              return
             }
             const state = await readManageableOracleState(provider, entry.solvencyOracle)
             let ownerKind: OwnerKind | null = null
             if (state.isManageable && state.owner) {
               ownerKind = await analyzeOwnerKind(provider, state.owner)
             }
-            return { ...entry, oracleState: state, ownerKind }
-          })
-        )
-        if (!cancelled) setSiloOracleStates(loaded)
-      } catch (e) {
-        if (!cancelled) setError(toUserErrorMessage(e, 'Failed to read the solvency oracle state.'))
-      } finally {
-        if (!cancelled) setOracleStatesLoading(false)
-      }
+            if (cancelled) return
+            setOracleStates((prev) => ({
+              ...prev,
+              [key]: { loading: false, state, ownerKind, error: null },
+            }))
+          } catch (e) {
+            if (cancelled) return
+            setOracleStates((prev) => ({
+              ...prev,
+              [key]: {
+                loading: false,
+                state: null,
+                ownerKind: null,
+                error: toUserErrorMessage(e, 'Failed to read the solvency oracle state.'),
+              },
+            }))
+          }
+        })
+      )
     })()
     return () => {
       cancelled = true
     }
-  }, [siloOracles, provider])
+  }, [provider, siloEntries, checkedSilos, refreshTick])
 
-  const selectedEntries = useMemo(() => {
-    if (!siloOracleStates) return []
-    if (!resolved) return []
-    if (resolved.kind === 'silo') return siloOracleStates
-    if (selection === 'silo0') return siloOracleStates.slice(0, 1)
-    if (selection === 'silo1') return siloOracleStates.slice(1, 2)
-    return siloOracleStates
-  }, [siloOracleStates, selection, resolved])
+  /** Bumped by child components after a successful write so reads re-run and reveal the new state. */
+  const triggerRefresh = useCallback(() => {
+    setOracleStates({})
+    setRefreshTick((n) => n + 1)
+  }, [])
+
+  const toggleSilo = useCallback((siloAddress: string) => {
+    const key = siloAddress.toLowerCase()
+    setCheckedSilos((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   const revertingOracleAddress = resolvedChainId != null ? getRevertingOracleAddress(resolvedChainId) : null
-  const triggerRefresh = useCallback(() => setRefreshTick((n) => n + 1), [])
 
-  /**
-   * Row 7b: aggregate "Submit for both silos" appears only when the user actually picked both
-   * silos in a SiloConfig AND every precondition is satisfied. The Both-section itself validates
-   * shared-owner + no-pending + ManageableOracle; the page only gates visibility on selection.
-   */
-  const showBothSection =
-    resolved?.kind === 'silo_config' &&
-    selection === 'both' &&
-    siloOracleStates != null &&
-    siloOracleStates.length === 2
+  /** SiloOracleChangeBothSilosSection only when BOTH silos of a SiloConfig are ticked and loaded. */
+  const bothSilosLoadedEntries = useMemo(() => {
+    if (!resolved) return null
+    if (!siloEntries || siloEntries.length !== 2) return null
+    const loaded = siloEntries.map((entry) => {
+      const st = oracleStates[entry.silo.toLowerCase()]
+      return {
+        silo: entry.silo,
+        solvencyOracle: entry.solvencyOracle,
+        oracleState: st?.state ?? null,
+        ownerKind: st?.ownerKind ?? null,
+      }
+    })
+    const bothChecked = siloEntries.every((entry) => checkedSilos.has(entry.silo.toLowerCase()))
+    if (!bothChecked) return null
+    if (loaded.some((row) => row.oracleState == null)) return null
+    return loaded
+  }, [resolved, siloEntries, oracleStates, checkedSilos])
 
   return (
     <div className="silo-page px-4 py-8 sm:px-6 max-w-4xl mx-auto">
@@ -367,6 +503,15 @@ function SiloPageInner() {
         </div>
       )}
 
+      {/* Row 0 — Predefined silos on the currently connected chain. */}
+      {isConnected && chainId != null ? (
+        <SiloDeploymentsList
+          chainId={chainId}
+          onSelect={handlePredefinedSiloSelect}
+          disabled={loading}
+        />
+      ) : null}
+
       {/* Row 1 — Input (always visible) */}
       <div className="silo-panel silo-top-card p-6 mb-6">
         <label htmlFor="silo-input" className="block text-sm font-medium silo-text-main mb-2">
@@ -396,119 +541,189 @@ function SiloPageInner() {
           </button>
         </div>
         {error ? <p className="mt-3 text-sm silo-alert silo-alert-error">{error}</p> : null}
+
+        {/* Inline silo summary (Silo / Silo0 / Silo1) shown right under the input as validation. */}
+        {resolved && displayChainId != null ? (
+          <div className="mt-4">
+            {siloEntriesError ? (
+              <p className="text-sm silo-alert silo-alert-error m-0">{siloEntriesError}</p>
+            ) : siloEntriesLoading && !siloEntries ? (
+              <p className="text-sm silo-text-soft m-0">Loading silo configuration…</p>
+            ) : siloEntries ? (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  {siloEntries[0]?.siloId != null ? (
+                    <span className="text-sm font-bold silo-text-main shrink-0">
+                      #{siloEntries[0].siloId}
+                    </span>
+                  ) : null}
+                  {siloEntries.map((entry, idx) => (
+                    <SiloSummaryRow
+                      key={entry.silo}
+                      chainId={displayChainId}
+                      label={siloLabel(idx)}
+                      siloAddress={entry.silo}
+                      symbol={entry.symbol}
+                    />
+                  ))}
+                </div>
+                {revertingOracleAddress == null && resolvedChainId != null ? (
+                  <p className="text-xs silo-alert silo-alert-warning m-0">
+                    RevertingOracle is not deployed on{' '}
+                    {getNetworkDisplayName(resolvedChainId) ?? `chain ${resolvedChainId}`}. Submitting is disabled.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
-      {/* Row 2 — Detected kind + resolved addresses */}
-      {resolved ? (
-        <div className="silo-panel p-5 mb-6 space-y-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">Detected</p>
-            <p className="text-sm silo-text-main m-0">
-              {resolved.kind === 'silo' ? 'Silo contract' : 'SiloConfig contract'}
-            </p>
+      {/* Row 3 — Action buttons. Only "Set Reverting Oracle" for now. */}
+      {resolved && siloEntries && siloEntries.length > 0 ? (
+        <div className="silo-panel p-5 mb-6">
+          <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-2">Actions</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="silo-btn-primary"
+              data-selected={actionOpen ? 'true' : 'false'}
+              disabled={actionOpen}
+              onClick={() => setActionOpen(true)}
+            >
+              Set Reverting Oracle
+            </button>
           </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">SiloConfig</p>
-            <p className="text-sm font-mono silo-text-main m-0 break-all">{resolved.siloConfig}</p>
-          </div>
-          {resolved.kind === 'silo_config' ? (
-            <>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">silo0</p>
-                <p className="text-sm font-mono silo-text-main m-0 break-all">{resolved.silos[0]}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">silo1</p>
-                <p className="text-sm font-mono silo-text-main m-0 break-all">{resolved.silos[1]}</p>
-              </div>
-            </>
-          ) : (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">Silo</p>
-              <p className="text-sm font-mono silo-text-main m-0 break-all">{resolved.silos[0]}</p>
-            </div>
-          )}
-          {revertingOracleAddress == null && resolvedChainId != null ? (
-            <p className="text-xs silo-alert silo-alert-warning m-0">
-              RevertingOracle is not deployed on {getNetworkDisplayName(resolvedChainId) ?? `chain ${resolvedChainId}`}. Submitting is disabled.
-            </p>
-          ) : null}
         </div>
       ) : null}
 
-      {/* Row 3 — Silo picker (SiloConfig only) */}
-      {resolved?.kind === 'silo_config' && siloOracles ? (
+      {/* Row 4 — Silo checkboxes (appear after clicking the action). */}
+      {actionOpen && resolved && siloEntries ? (
         <div className="silo-panel p-5 mb-6">
           <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-2">
             Which silo(s) should we update?
           </p>
           <div className="flex flex-wrap gap-2">
-            {(['silo0', 'silo1', 'both'] as SiloPicker[]).map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                className="silo-choice-option text-sm"
-                data-selected={selection === opt ? 'true' : 'false'}
-                onClick={() => setSelection(opt)}
-              >
-                <span className="block min-w-0 flex-1">
-                  <span className="block text-sm font-semibold silo-text-main">
-                    {opt === 'both' ? 'Both silos' : opt === 'silo0' ? 'silo0' : 'silo1'}
+            {siloEntries.map((entry, idx) => {
+              const key = entry.silo.toLowerCase()
+              const checked = checkedSilos.has(key)
+              const symbolText = entry.symbol ? ` · ${entry.symbol}` : ''
+              return (
+                <label
+                  key={entry.silo}
+                  className="flex flex-1 min-w-[16rem] items-center gap-3 cursor-pointer rounded-md border border-[var(--silo-border)] bg-[var(--silo-surface)] px-3 py-2 hover:border-[var(--silo-border-strong,var(--silo-border))]"
+                  data-selected={checked ? 'true' : 'false'}
+                >
+                  <input
+                    type="checkbox"
+                    className="accent-[var(--silo-accent,currentColor)]"
+                    checked={checked}
+                    onChange={() => toggleSilo(entry.silo)}
+                  />
+                  <span className="text-sm font-semibold silo-text-main">
+                    {siloLabel(idx)}
+                    {symbolText}
                   </span>
-                  {opt !== 'both' ? (
-                    <span className="block text-xs font-mono silo-text-soft mt-0.5 break-all">
-                      {opt === 'silo0' ? siloOracles[0]?.silo : siloOracles[1]?.silo}
-                    </span>
-                  ) : (
-                    <span className="block text-xs silo-text-soft mt-0.5">
-                      Propose on both solvency oracles
-                    </span>
-                  )}
-                </span>
-              </button>
-            ))}
+                  <span className="text-xs font-mono silo-text-soft" title={entry.silo}>
+                    {shortAddress(entry.silo)}
+                  </span>
+                </label>
+              )
+            })}
           </div>
         </div>
       ) : null}
 
-      {/* Rows 4–7 — one SiloOracleChangeSection per selected silo */}
-      {resolved && displayChainId != null ? (
-        <div className="space-y-6">
-          {oracleStatesLoading && !siloOracleStates ? (
-            <p className="text-sm silo-text-soft m-0">Loading solvency oracle state…</p>
-          ) : null}
-          {selectedEntries.map((entry, idx) => (
-            <SiloOracleChangeSection
-              key={`${entry.silo}-${idx}`}
-              chainId={displayChainId}
-              siloIndex={
-                resolved.kind === 'silo' ? null : siloOracleStates?.[0]?.silo === entry.silo ? 0 : 1
-              }
-              siloAddress={entry.silo}
-              siloConfig={resolved.siloConfig}
-              oracleState={entry.oracleState}
-              ownerKind={entry.ownerKind}
-              provider={provider}
-              eip1193Provider={eip1193Provider}
-              connectedAccount={account}
-              revertingOracleAddress={revertingOracleAddress}
-              onActionSuccess={triggerRefresh}
-            />
-          ))}
+      {/* Row 5+ — One per-silo section for each ticked silo, plus the aggregate "both" row.
+          When two silos are ticked the per-silo sections lay out side-by-side on md+ screens
+          (Silo0 left, Silo1 right). Single-silo mode keeps the original full-width behaviour.
+          We carry the *original* index into the child so `Silo0` / `Silo1` labels stay correct
+          even if the user ticks them out of order. */}
+      {actionOpen && resolved && siloEntries && displayChainId != null
+        ? (() => {
+            const tickedEntries = siloEntries
+              .map((entry, idx) => ({ entry, idx }))
+              .filter(({ entry }) => checkedSilos.has(entry.silo.toLowerCase()))
+            const sideBySide = tickedEntries.length >= 2
+            return (
+              <div className="space-y-6">
+                <div
+                  className={`grid gap-6 grid-cols-1 ${sideBySide ? 'md:grid-cols-2' : ''}`}
+                >
+                  {tickedEntries.map(({ entry, idx }) => {
+                    const key = entry.silo.toLowerCase()
+                    const st = oracleStates[key]
+                    return (
+                      <SiloOracleChangeSection
+                        key={entry.silo}
+                        chainId={displayChainId}
+                        siloIndex={idx}
+                        siloSymbol={entry.symbol}
+                        oracleState={st?.state ?? null}
+                        ownerKind={st?.ownerKind ?? null}
+                        loading={st?.loading ?? true}
+                        errorMessage={st?.error ?? null}
+                        provider={provider}
+                        eip1193Provider={eip1193Provider}
+                        connectedAccount={account}
+                        revertingOracleAddress={revertingOracleAddress}
+                        onActionSuccess={triggerRefresh}
+                      />
+                    )
+                  })}
+                </div>
 
-          {showBothSection ? (
-            <SiloOracleChangeBothSilosSection
-              chainId={displayChainId}
-              silos={siloOracleStates!}
-              provider={provider}
-              eip1193Provider={eip1193Provider}
-              connectedAccount={account}
-              revertingOracleAddress={revertingOracleAddress}
-              onActionSuccess={triggerRefresh}
-            />
-          ) : null}
-        </div>
+                {bothSilosLoadedEntries ? (
+                  <SiloOracleChangeBothSilosSection
+                    chainId={displayChainId}
+                    silos={bothSilosLoadedEntries}
+                    provider={provider}
+                    eip1193Provider={eip1193Provider}
+                    connectedAccount={account}
+                    revertingOracleAddress={revertingOracleAddress}
+                    onActionSuccess={triggerRefresh}
+                  />
+                ) : null}
+              </div>
+            )
+          })()
+        : null}
+    </div>
+  )
+}
+
+function SiloSummaryRow({
+  chainId,
+  label,
+  siloAddress,
+  symbol,
+}: {
+  chainId: number
+  label: string
+  siloAddress: string
+  symbol: string | null
+}) {
+  const url = getExplorerAddressUrl(chainId, siloAddress)
+  return (
+    <div className="flex items-center flex-nowrap gap-x-3 whitespace-nowrap">
+      <span className="text-sm font-semibold silo-text-main shrink-0">{label}</span>
+      {symbol ? (
+        <span className="inline-flex items-center rounded-full border border-[var(--silo-border)] bg-[var(--silo-surface)] px-2 py-0.5 text-xs font-semibold silo-text-main shrink-0">
+          {symbol}
+        </span>
       ) : null}
+      <span className="inline-flex items-center gap-1.5 shrink-0">
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-sm silo-text-main hover:underline"
+          title={siloAddress}
+        >
+          {shortAddress(siloAddress)}
+        </a>
+        <CopyButton value={siloAddress} />
+      </span>
     </div>
   )
 }

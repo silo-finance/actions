@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { BrowserProvider } from 'ethers'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
 import ActionPermissionHint from '@/components/ActionPermissionHint'
@@ -72,7 +72,17 @@ export default function SiloOracleChangeBothSilosSection({
   const [authority, setAuthority] = useState<ManageableOracleAuthority | null>(null)
   const [authorityLoading, setAuthorityLoading] = useState(false)
 
-  const eligibility = computeEligibility(silos, revertingOracleAddress)
+  /**
+   * `computeEligibility` returns a *new* object every render, so if we kept it inline the
+   * downstream `useEffect([eligibility, ...])` would treat every render as a dependency change —
+   * setting `authorityLoading: true`, awaiting the classifier, flipping back to `false`, which
+   * triggers the next render and the cycle repeats. Memoising stabilises the reference so the
+   * effect only runs when the underlying silos / oracle / revertingOracle actually change.
+   */
+  const eligibility = useMemo(
+    () => computeEligibility(silos, revertingOracleAddress),
+    [silos, revertingOracleAddress]
+  )
   const oracle0Address = silos[0]?.oracleState?.oracleAddress ?? null
   const oracle1Address = silos[1]?.oracleState?.oracleAddress ?? null
 
