@@ -71,18 +71,25 @@ export default function Header() {
 
           <nav className="hidden md:flex items-center gap-2" aria-label="Sections">
             <Link
-              href="/vault"
-              className={navLinkClass(isNavActive('/vault'))}
-              aria-current={isNavActive('/vault') ? 'page' : undefined}
-            >
-              Vault
-            </Link>
-            <Link
               href="/silo"
               className={navLinkClass(isNavActive('/silo'))}
               aria-current={isNavActive('/silo') ? 'page' : undefined}
             >
-              Silo
+              Markets
+            </Link>
+            <Link
+              href="/vault"
+              className={navLinkClass(isNavActive('/vault'))}
+              aria-current={isNavActive('/vault') ? 'page' : undefined}
+            >
+              Vaults
+            </Link>
+            <Link
+              href="/pause"
+              className={navLinkClass(isNavActive('/pause'))}
+              aria-current={isNavActive('/pause') ? 'page' : undefined}
+            >
+              Pause
             </Link>
             <a
               href="https://silo-finance.github.io/silo-market-crafter/"
