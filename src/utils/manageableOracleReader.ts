@@ -190,11 +190,17 @@ export type SiloConfigEntry = {
  * every distinct underlying asset — one multicall each. Giving the UI the full ConfigData up front
  * (not just `solvencyOracle`) lets future actions (collateral share token, LTV oracle, hook
  * receiver, ...) reuse the same cached shape without re-reading on-chain.
+ *
+ * `symbolOverrides` (keys are lower-cased silo addresses) lets callers with pre-fetched asset
+ * symbols — currently the predefined-silos picker, which gets them straight from the Silo v3
+ * GraphQL indexer — skip the on-chain `ERC20.symbol()` multicall entirely when every requested
+ * silo is covered. Partial overrides fall back to the chain for the missing ones.
  */
 export async function readSiloConfigEntries(
   provider: Provider,
   siloConfig: string,
-  silos: readonly string[]
+  silos: readonly string[],
+  symbolOverrides?: Record<string, string>
 ): Promise<SiloConfigEntry[]> {
   const target = getAddress(siloConfig)
   const normalizedSilos = silos.map((s) => getAddress(s))
@@ -263,12 +269,29 @@ export async function readSiloConfigEntries(
   })
 
   /**
+   * Fast path: if caller supplied a symbol for every silo with a real token, we skip the ERC20
+   * symbol multicall entirely. Silos whose `getConfig` returned `ZeroAddress` as the token never
+   * had a symbol to begin with and don't count as "missing".
+   */
+  const overrideSymbols = new Map<string, string>()
+  if (symbolOverrides) {
+    for (const p of partials) {
+      if (p.token === ZeroAddress) continue
+      const sym = symbolOverrides[p.silo.toLowerCase()]
+      if (sym) overrideSymbols.set(p.silo.toLowerCase(), sym)
+    }
+  }
+  const needsOnChainSymbols = partials.some(
+    (p) => p.token !== ZeroAddress && !overrideSymbols.has(p.silo.toLowerCase())
+  )
+
+  /**
    * Deduplicate tokens before calling `symbol()` — both silos in a market never share an asset
    * today, but the reader is cheap and stays correct if that ever changes.
    */
-  const uniqueTokens = Array.from(
-    new Set(partials.map((p) => p.token).filter((t) => t !== ZeroAddress))
-  )
+  const uniqueTokens = needsOnChainSymbols
+    ? Array.from(new Set(partials.map((p) => p.token).filter((t) => t !== ZeroAddress)))
+    : []
   const symbolResults = uniqueTokens.length
     ? await executeReadMulticall(
         provider,
@@ -290,9 +313,13 @@ export async function readSiloConfigEntries(
     symbolByToken.set(token, symbolResults[i] ?? null)
   })
 
-  return partials.map((p) => ({
-    ...p,
-    symbol: p.token === ZeroAddress ? null : (symbolByToken.get(p.token) ?? null),
-    siloId,
-  }))
+  return partials.map((p) => {
+    const override = overrideSymbols.get(p.silo.toLowerCase()) ?? null
+    const onChain = p.token === ZeroAddress ? null : (symbolByToken.get(p.token) ?? null)
+    return {
+      ...p,
+      symbol: override ?? onChain,
+      siloId,
+    }
+  })
 }

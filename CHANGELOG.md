@@ -4,6 +4,7 @@
 
 ### Updated
 - moved Global Pause to a dedicated "Pause" page and added it to the main menu
+- predefined silos list now sourced from the Silo v3 GraphQL API (live data, both asset symbols, numeric siloId)
 
 ## [0.18.0] - 2026-04-23
 
