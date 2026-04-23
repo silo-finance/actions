@@ -9,6 +9,7 @@
 
 ### Added
 - add option to fix unauthorized contracts for pausing
+- Silo oracle change action: swap a silo's solvency ManageableOracle to RevertingOracle or cancel a pending proposal
 
 ## [0.16.0] - 2026-04-22
 ### Added
