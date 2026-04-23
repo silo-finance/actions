@@ -1,11 +1,11 @@
 # Changelog
 
-## [0.17.0] - 2026-04-22
+## [0.18.0] - 2026-04-23
 
 ### Added
-- add option to fix unauthorized contracts for pausing
+- reverting oracle (#55)
 
-## [Unreleased]
+## [0.17.0] - 2026-04-22
 
 ### Added
 - add option to fix unauthorized contracts for pausing
