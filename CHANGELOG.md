@@ -1,16 +1,13 @@
 # Changelog
 
+## [Unreleased]
+### Added
+- set RevertingOracle for silo
+
 ## [0.17.0] - 2026-04-22
 
 ### Added
 - add option to fix unauthorized contracts for pausing
-
-## [Unreleased]
-
-### Added
-- add option to fix unauthorized contracts for pausing
-- Silo oracle change action: swap a silo's solvency ManageableOracle to RevertingOracle or cancel a pending proposal
-- Silo page: predefined SiloConfig buttons (grouped V3/V2) filtered by connected chain — click fills the input and runs the check
 
 ## [0.16.0] - 2026-04-22
 ### Added
