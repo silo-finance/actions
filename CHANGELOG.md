@@ -1,8 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [0.18.0] - 2026-04-23
+
 ### Added
-- set RevertingOracle for silo
+- reverting oracle (#55)
 
 ## [0.17.0] - 2026-04-22
 
