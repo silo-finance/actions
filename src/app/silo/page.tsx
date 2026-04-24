@@ -69,6 +69,15 @@ function SiloPageInner() {
   const [siloEntries, setSiloEntries] = useState<SiloConfigEntry[] | null>(null)
   const [siloEntriesLoading, setSiloEntriesLoading] = useState(false)
   const [siloEntriesError, setSiloEntriesError] = useState<string | null>(null)
+  /**
+   * Symbol overrides supplied by the predefined-silos picker, which has both token symbols from
+   * the `/api/earn-silos` response. The outer map is keyed by lower-cased SiloConfig address so
+   * stale entries never leak into unrelated markets; the inner map is keyed by lower-cased
+   * *token* address (reader contract) and lets us skip on-chain `ERC20.symbol()` calls.
+   */
+  const [predefinedSymbols, setPredefinedSymbols] = useState<
+    Record<string, Record<string, string>>
+  >({})
 
   /** Set to `true` only after the user clicks the "Set Reverting Oracle" action button. */
   const [actionOpen, setActionOpen] = useState(false)
@@ -267,8 +276,12 @@ function SiloPageInner() {
    * flow as pressing Enter, so the resolved address + `?address=&chain=` URL update naturally.
    */
   const handlePredefinedSiloSelect = useCallback(
-    (siloConfig: string) => {
+    (siloConfig: string, symbolOverrides: Record<string, string>) => {
       setInput(siloConfig)
+      setPredefinedSymbols((prev) => ({
+        ...prev,
+        [siloConfig.toLowerCase()]: symbolOverrides,
+      }))
       void performCheck(siloConfig)
     },
     [performCheck]
@@ -319,7 +332,13 @@ function SiloPageInner() {
     setSiloEntriesError(null)
     void (async () => {
       try {
-        const entries = await readSiloConfigEntries(provider, resolved.siloConfig, resolved.silos)
+        const overrides = predefinedSymbols[resolved.siloConfig.toLowerCase()]
+        const entries = await readSiloConfigEntries(
+          provider,
+          resolved.siloConfig,
+          resolved.silos,
+          overrides
+        )
         if (!cancelled) setSiloEntries(entries)
       } catch (e) {
         if (!cancelled) {
@@ -333,7 +352,16 @@ function SiloPageInner() {
     return () => {
       cancelled = true
     }
-  }, [resolved, provider, resolvedChainId, refreshTick])
+  }, [resolved, provider, resolvedChainId, refreshTick, predefinedSymbols])
+
+  /**
+   * Drop cached symbol overrides on chain change so a stale entry from chain A never bleeds into a
+   * SiloConfig on chain B that happens to share the same address (extremely unlikely, but trivial
+   * to be strict about). Only the picker repopulates them, so typed inputs remain unaffected.
+   */
+  useEffect(() => {
+    setPredefinedSymbols({})
+  }, [chainId])
 
   /**
    * Lazy per-silo oracle state: whenever `checkedSilos` grows (or after a refresh) load the

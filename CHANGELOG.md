@@ -1,9 +1,7 @@
 # Changelog
 
-## [0.19.0] - 2026-04-23
-
 ### Updated
-- moved Global Pause to a dedicated "Pause" page and added it to the main menu
+- predefined silos: pull from api
 
 ## [0.18.0] - 2026-04-23
 
