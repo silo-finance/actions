@@ -7,6 +7,7 @@ import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
 import ActionPermissionHint from '@/components/ActionPermissionHint'
 import {
   executeDynamicKinkIrmAction,
+  executeDynamicKinkIrmCancel,
   DYNAMIC_KINK_IRM_DENIED_MESSAGE,
   type DynamicKinkIrmActionSuccess,
 } from '@/utils/dynamicKinkIrmAction'
@@ -65,7 +66,20 @@ function AddressLine({ chainId, address }: { chainId: number; address: string })
   )
 }
 
-type Busy = 'idle' | 'updating'
+type Busy = 'idle' | 'updating' | 'cancelling'
+
+function formatActivateAtUnix(seconds: bigint): { iso: string; unix: string } {
+  const n = Number(seconds)
+  if (!Number.isFinite(n) || n <= 0 || n > 1e12) {
+    return { iso: '—', unix: String(seconds) }
+  }
+  try {
+    const iso = new Date(n * 1000).toISOString().replace('T', ' ').replace('.000Z', 'Z')
+    return { iso, unix: String(n) }
+  } catch {
+    return { iso: '—', unix: String(seconds) }
+  }
+}
 
 export default function SiloIrmUpdateSection({
   chainId,
@@ -116,6 +130,12 @@ export default function SiloIrmUpdateSection({
     if (flatMode) return
     setFlatPercentInput('')
   }, [flatMode])
+
+  useEffect(() => {
+    if (irmState?.pendingConfigExists) {
+      onConfigChange(siloKey, null)
+    }
+  }, [irmState?.pendingConfigExists, siloKey, onConfigChange])
 
   useEffect(() => {
     let cancelled = false
@@ -204,6 +224,34 @@ export default function SiloIrmUpdateSection({
     }
   }, [provider, irmState, ownerKind, connectedAccount])
 
+  const runCancel = useCallback(async () => {
+    if (!provider || !eip1193Provider || !connectedAccount || !irmState?.owner || !ownerKind) return
+    if (!irmState.pendingConfigExists) return
+    if (!irmState.isDynamicKinkModel) return
+    setTxError('')
+    setTxSuccess(null)
+    setBusy('cancelling')
+    try {
+      const signer = await provider.getSigner()
+      const result = await executeDynamicKinkIrmCancel({
+        ethereum: eip1193Provider,
+        provider,
+        signer,
+        chainId,
+        connectedAccount,
+        irmAddress: interestRateModel,
+        ownerAddress: irmState.owner,
+        ownerKind,
+      })
+      setTxSuccess(result)
+      onActionSuccess()
+    } catch (e) {
+      setTxError(toUserErrorMessage(e))
+    } finally {
+      setBusy('idle')
+    }
+  }, [provider, eip1193Provider, connectedAccount, irmState, ownerKind, interestRateModel, chainId, onActionSuccess])
+
   const runUpdate = useCallback(async () => {
     if (!provider || !eip1193Provider || !connectedAccount || !irmState?.owner || !ownerKind) return
     if (!selectedConfig) return
@@ -250,6 +298,12 @@ export default function SiloIrmUpdateSection({
     selectedConfig != null &&
     (authority?.mode === 'direct' || authority?.mode === 'safe_as_wallet' || authority?.mode === 'safe_propose')
 
+  const canCancel =
+    irmState?.isDynamicKinkModel === true &&
+    irmState?.pendingConfigExists === true &&
+    irmState.owner &&
+    (authority?.mode === 'direct' || authority?.mode === 'safe_as_wallet' || authority?.mode === 'safe_propose')
+
   if (loading || !irmState) {
     return (
       <section className="silo-panel p-5">
@@ -285,6 +339,109 @@ export default function SiloIrmUpdateSection({
     )
   }
 
+  if (irmState.pendingConfigExists) {
+    const { iso, unix } = irmState.activateConfigAt != null
+      ? formatActivateAtUnix(irmState.activateConfigAt)
+      : { iso: 'unavailable (read failed)', unix: '—' }
+    return (
+      <section className="silo-panel p-5 space-y-4">
+        <h2 className="text-lg font-semibold silo-text-main m-0">{title}</h2>
+
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-0.5">Dynamic kink IRM</p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <AddressLine chainId={chainId} address={irmState.irmAddress} />
+            <span className="text-xs font-mono silo-text-main">
+              {irmState.versionString ?? '(no VERSION)'}
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-1 rounded-md border border-[var(--silo-border)] bg-[var(--silo-surface)] p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft m-0">Pending config</p>
+          <p className="text-sm silo-text-main m-0">
+            A new config is in the timelock window. It becomes active at:
+          </p>
+          <p className="text-sm font-mono silo-text-main m-0">{iso}</p>
+          {unix !== '—' ? (
+            <p className="text-xs silo-text-soft m-0">
+              Unix: <span className="font-mono">{unix}</span>
+            </p>
+          ) : null}
+          <p className="text-xs silo-text-soft m-0 mt-2">
+            You can submit another update only after the timelock, unless you cancel the pending config below.
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-0.5">Owner</p>
+          {irmState.owner ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <AddressLine chainId={chainId} address={irmState.owner} />
+              <span className="text-xs silo-text-main">
+                <span className="silo-text-soft">·</span>{' '}
+                <span className="font-medium">
+                  {ownerKind === 'safe'
+                    ? 'Safe (multisig)'
+                    : ownerKind === 'eoa'
+                      ? 'EOA'
+                      : ownerKind === 'contract'
+                        ? 'Contract'
+                        : '—'}
+                </span>
+              </span>
+            </div>
+          ) : (
+            <p className="text-sm silo-text-soft m-0">Owner not available.</p>
+          )}
+          {irmState.owner && ownerKind ? (
+            <p className="text-xs m-0">
+              {authorityLoading ? (
+                <span className="silo-text-soft">Checking signer status…</span>
+              ) : authority?.mode === 'safe_as_wallet' ? (
+                <span className="silo-text-main">Connected wallet is this Safe (sends a Safe transaction).</span>
+              ) : authority?.mode === 'safe_propose' ? (
+                <span className="silo-text-main">You are a signer on this Safe.</span>
+              ) : ownerKind === 'safe' && connectedAccount ? (
+                <span className="silo-alert silo-alert-warning inline-block px-2 py-0.5 rounded">
+                  You are not a signer on this Safe.
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+          {authority?.mode === 'denied' && !authorityLoading && irmState.owner && ownerKind ? (
+            <p className="text-xs silo-alert silo-alert-error m-0 mt-1">{DYNAMIC_KINK_IRM_DENIED_MESSAGE}</p>
+          ) : null}
+        </div>
+
+        {txError ? <p className="text-sm silo-alert silo-alert-error m-0">{txError}</p> : null}
+        {txSuccess ? (
+          <TransactionSuccessSummary
+            url={txSuccess.transactionUrl}
+            linkLabel={txSuccess.successLinkLabel}
+            outcome={txSuccess.outcome}
+          />
+        ) : null}
+        <ActionPermissionHint
+          allowed={authority != null && authority.mode !== 'denied'}
+          onlyForLabel="IRM contract owner (directly or as a Safe signer)"
+          className="text-xs"
+        />
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="silo-btn-primary"
+            disabled={!canCancel || busy !== 'idle'}
+            onClick={() => void runCancel()}
+          >
+            {busy === 'cancelling' ? 'Submitting…' : 'Cancel pending config'}
+          </button>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="silo-panel p-5 space-y-4">
       <h2 className="text-lg font-semibold silo-text-main m-0">{title}</h2>
@@ -301,13 +458,6 @@ export default function SiloIrmUpdateSection({
           </span>
         </div>
       </div>
-
-      {irmState.pendingConfigExists ? (
-        <p className="text-sm silo-alert silo-alert-warning m-0">
-          A config update is already pending for this IRM. Wait for it to complete before pushing another
-          change.
-        </p>
-      ) : null}
 
       <div className="space-y-1">
         <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-0.5">Owner</p>
@@ -357,7 +507,6 @@ export default function SiloIrmUpdateSection({
             className="accent-[var(--silo-accent,currentColor)]"
             checked={flatMode}
             onChange={(e) => setFlatMode(e.target.checked)}
-            disabled={!!irmState.pendingConfigExists}
           />
           <span className="silo-text-main font-medium">Flat annual rate (constant borrow APR)</span>
         </label>
@@ -371,7 +520,7 @@ export default function SiloIrmUpdateSection({
               onChange={(e) => setPresetFilter(e.target.value)}
               placeholder="Filter by name…"
               className="w-full silo-input silo-input--sm font-mono"
-              disabled={!!irmState.pendingConfigExists || presetsLoading}
+              disabled={presetsLoading}
             />
             {presetsLoading ? (
               <p className="text-sm silo-text-soft m-0">Loading presets…</p>
@@ -386,7 +535,6 @@ export default function SiloIrmUpdateSection({
                       className="w-full text-left px-3 py-2 text-sm silo-text-main hover:bg-[var(--silo-surface)] data-[sel=true]:font-semibold"
                       data-sel={selectedPreset === p.name ? 'true' : 'false'}
                       onClick={() => setSelectedPreset(p.name)}
-                      disabled={!!irmState.pendingConfigExists}
                     >
                       {p.name}
                     </button>
@@ -403,7 +551,6 @@ export default function SiloIrmUpdateSection({
               onChange={(e) => setFlatPercentInput(e.target.value)}
               placeholder="0–100, e.g. 5.07 or 0,2"
               className="w-full silo-input silo-input--md font-mono"
-              disabled={!!irmState.pendingConfigExists}
             />
             {flatPreview && flatMode ? (
               <p className="text-xs silo-text-soft m-0">
@@ -438,7 +585,7 @@ export default function SiloIrmUpdateSection({
         <button
           type="button"
           className="silo-btn-primary"
-          disabled={!canSubmit || busy !== 'idle' || irmState.pendingConfigExists}
+          disabled={!canSubmit || busy !== 'idle'}
           onClick={() => void runUpdate()}
         >
           {busy === 'updating' ? 'Submitting…' : 'Update IRM config'}

@@ -34,6 +34,11 @@ export type DynamicKinkIrmReadState = {
   /** Non-null if `getModelStateAndConfig(true)` was attempted and pending is meaningful. */
   pendingModelState: DynamicKinkModelState | null
   pendingImmutable: DynamicKinkImmutableConfig | null
+  /**
+   * When `pendingConfigExists`, this is the unix timestamp (seconds) at which the pending config
+   * becomes the active on-chain config (end of timelock). Opaque when the slot fails.
+   */
+  activateConfigAt: bigint | null
   error: string | null
 }
 
@@ -104,6 +109,7 @@ export async function readDynamicKinkIrmState(
       pendingConfig: null,
       pendingModelState: null,
       pendingImmutable: null,
+      activateConfigAt: null,
       error: 'No interest rate model is configured for this silo.',
     }
   }
@@ -185,14 +191,29 @@ export async function readDynamicKinkIrmState(
       return null
     },
   })
+  const activateAtCall = buildReadMulticallCall<bigint | null>({
+    target: irmAddress,
+    abi: dynamicKinkAbi,
+    functionName: 'activateConfigAt',
+    allowFailure: true,
+    fallback: async () => null,
+    decodeResult: (value) => {
+      if (value == null) return null
+      try {
+        return BigInt(String(value))
+      } catch {
+        return null
+      }
+    },
+  })
 
   const results = (await executeReadMulticall(
     provider,
-    [versionCall, ownerCall, pendingFlagCall, currentBundleCall, pendingBundleCall] as unknown as ReadMulticallCall<unknown>[],
+    [versionCall, ownerCall, pendingFlagCall, currentBundleCall, pendingBundleCall, activateAtCall] as unknown as ReadMulticallCall<unknown>[],
     { debugLabel: 'readDynamicKinkIrmState' }
-  )) as [string | null, string | null, boolean | null, unknown, unknown]
+  )) as [string | null, string | null, boolean | null, unknown, unknown, bigint | null]
 
-  const [versionString, owner, pendingExistsRaw, currentRaw, pendingRaw] = results
+  const [versionString, owner, pendingExistsRaw, currentRaw, pendingRaw, activateConfigAt] = results
   const parsed = parseManageableVersion(versionString)
   const isDynamicKinkModel = parsed.contractName === 'DynamicKinkModel'
   const pendingConfigExists = pendingExistsRaw === true
@@ -213,6 +234,7 @@ export async function readDynamicKinkIrmState(
     pendingConfig: pendB && pendingConfigExists ? decodeConfigTuple(pendB.config) : null,
     pendingModelState: pendB && pendingConfigExists ? decodeStateTuple(pendB.state) : null,
     pendingImmutable: pendB && pendingConfigExists ? decodeImmutableTuple(pendB.immutable) : null,
+    activateConfigAt: activateConfigAt,
     error: null,
   }
 }

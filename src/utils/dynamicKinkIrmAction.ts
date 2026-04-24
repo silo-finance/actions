@@ -22,6 +22,7 @@ const dynamicKinkAbi = loadAbi(dynamicKinkArtifact)
 const irmIface = new Interface(dynamicKinkAbi)
 
 const SAFE_TX_ORIGIN = 'Silo Actions: update DynamicKink IRM config'
+const SAFE_TX_ORIGIN_CANCEL = 'Silo Actions: cancel pending DynamicKink IRM config'
 
 export type DynamicKinkIrmCall = {
   irmAddress: string
@@ -50,6 +51,9 @@ export function dynamicKinkIrmErrorHint(err: unknown): string | null {
   if (lower.includes('invalidconfig') || lower.includes('verifyconfig')) {
     return 'The proposed configuration was rejected by verifyConfig (invalid shape or bounds).'
   }
+  if (lower.includes('nopendingupdatetocancel')) {
+    return 'There is no pending IRM config update to cancel (timelock may have already passed).'
+  }
   return null
 }
 
@@ -60,6 +64,11 @@ function encodeUpdateConfig(irmAddress: string, c: DynamicKinkIrmConfig): Target
 
 function encodeVerifyConfig(irmAddress: string, c: DynamicKinkIrmConfig): `0x${string}` {
   return irmIface.encodeFunctionData('verifyConfig', [encodeConfigTuple(c)]) as `0x${string}`
+}
+
+function encodeCancelPending(irmAddress: string): TargetedCall {
+  const data = irmIface.encodeFunctionData('cancelPendingUpdateConfig', []) as `0x${string}`
+  return { to: getAddress(irmAddress), data }
 }
 
 /**
@@ -112,6 +121,7 @@ async function proposeIrmBatchViaSafe(params: {
   safeAddress: string
   proposerAccount: string
   batchCalls: TargetedCall[]
+  origin: string
 }): Promise<void> {
   const baseUrl = getLegacySafeTransactionServiceBaseUrl(params.chainId)
   if (!baseUrl) {
@@ -155,7 +165,7 @@ async function proposeIrmBatchViaSafe(params: {
     safeTxHash,
     senderAddress: sender,
     senderSignature: signature.data,
-    origin: SAFE_TX_ORIGIN,
+    origin: params.origin,
   })
 }
 
@@ -233,6 +243,7 @@ export async function executeDynamicKinkIrmBatch(
       safeAddress,
       proposerAccount: connectedAccount,
       batchCalls: targeted,
+      origin: SAFE_TX_ORIGIN,
     })
     const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
     if (!transactionUrl) {
@@ -263,4 +274,97 @@ export async function executeDynamicKinkIrmAction(
     calls: [params.call],
     sharedOwner: { address: params.ownerAddress, kind: params.ownerKind },
   })
+}
+
+async function preflightCancelDirect(signer: Signer, irmAddress: string): Promise<void> {
+  const { to, data } = encodeCancelPending(irmAddress)
+  try {
+    await signer.estimateGas({ to, data })
+  } catch (e) {
+    const hint = dynamicKinkIrmErrorHint(e)
+    const base = toUserErrorMessage(e, 'Could not simulate cancel pending IRM config.')
+    throw new Error(hint ? `${hint} (${base})` : base)
+  }
+}
+
+async function executeDirectCancel(irmAddress: string, signer: Signer): Promise<string> {
+  await preflightCancelDirect(signer, irmAddress)
+  const { to, data } = encodeCancelPending(irmAddress)
+  const tx = await signer.sendTransaction({ to, data })
+  const receipt = await tx.wait()
+  return receipt?.hash ?? tx.hash
+}
+
+export type ExecuteDynamicKinkIrmCancelParams = {
+  ethereum: Eip1193Provider
+  provider: Provider
+  signer: Signer
+  chainId: number
+  connectedAccount: string
+  irmAddress: string
+  ownerAddress: string
+  ownerKind: OwnerKind
+}
+
+/**
+ * `cancelPendingUpdateConfig` on one IRM, same EOA / Safe routing as `updateConfig` (no EOA
+ * preflight for Safe paths — same as the oracle and update flows).
+ */
+export async function executeDynamicKinkIrmCancel(
+  params: ExecuteDynamicKinkIrmCancelParams
+): Promise<DynamicKinkIrmActionSuccess> {
+  const { ethereum, provider, signer, chainId, connectedAccount, irmAddress, ownerAddress, ownerKind } = params
+  const auth = await classifyManageableOracleAction(
+    provider,
+    connectedAccount,
+    ownerAddress,
+    ownerKind
+  )
+  if (auth.mode === 'denied') {
+    throw new Error(DYNAMIC_KINK_IRM_DENIED_MESSAGE)
+  }
+  const targeted = [encodeCancelPending(irmAddress)]
+
+  if (auth.mode === 'direct') {
+    const lastHash = await executeDirectCancel(irmAddress, signer)
+    const transactionUrl = getExplorerTxUrl(chainId, lastHash)
+    if (!transactionUrl) {
+      throw new Error('Could not build a block explorer link for this network.')
+    }
+    return { transactionUrl, successLinkLabel: 'View on explorer', outcome: 'explorer' }
+  }
+
+  if (auth.mode === 'safe_as_wallet' && auth.executingSafeAddress != null) {
+    const safeAddress = getAddress(auth.executingSafeAddress)
+    await sendSafeWalletBatch({
+      ethereum,
+      chainId,
+      from: safeAddress,
+      calls: targeted,
+    })
+    const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
+    if (!transactionUrl) {
+      throw new Error('Could not build a Safe{Wallet} link for this network.')
+    }
+    return { transactionUrl, successLinkLabel: 'Open queue', outcome: 'safe_wallet_queue' }
+  }
+
+  if (auth.mode === 'safe_propose' && auth.executingSafeAddress != null) {
+    const safeAddress = getAddress(auth.executingSafeAddress)
+    await proposeIrmBatchViaSafe({
+      ethereum,
+      chainId,
+      safeAddress,
+      proposerAccount: connectedAccount,
+      batchCalls: targeted,
+      origin: SAFE_TX_ORIGIN_CANCEL,
+    })
+    const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
+    if (!transactionUrl) {
+      throw new Error('Could not build a Safe{Wallet} link for this network.')
+    }
+    return { transactionUrl, successLinkLabel: 'Open queue', outcome: 'safe_queue' }
+  }
+
+  throw new Error(DYNAMIC_KINK_IRM_DENIED_MESSAGE)
 }
