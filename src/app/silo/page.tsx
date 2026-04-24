@@ -70,9 +70,10 @@ function SiloPageInner() {
   const [siloEntriesLoading, setSiloEntriesLoading] = useState(false)
   const [siloEntriesError, setSiloEntriesError] = useState<string | null>(null)
   /**
-   * Symbol overrides supplied by the predefined-silos picker (already has both asset symbols from
-   * the Silo v3 GraphQL response). Keyed by lowercased SiloConfig address so stale entries never
-   * leak into unrelated markets; the reader uses them to skip on-chain `ERC20.symbol()` calls.
+   * Symbol overrides supplied by the predefined-silos picker, which has both token symbols from
+   * the `/api/earn-silos` response. The outer map is keyed by lower-cased SiloConfig address so
+   * stale entries never leak into unrelated markets; the inner map is keyed by lower-cased
+   * *token* address (reader contract) and lets us skip on-chain `ERC20.symbol()` calls.
    */
   const [predefinedSymbols, setPredefinedSymbols] = useState<
     Record<string, Record<string, string>>

@@ -7,8 +7,9 @@ import { fetchEarnSilosForChain, type EarnSiloEntry } from '@/utils/siloEarnSilo
 type Props = {
   chainId: number
   /**
-   * Called with the SiloConfig address and a `siloAddressLc -> symbol` map (covers silo0 and
-   * silo1 when the API returned both symbols) so downstream code can skip `ERC20.symbol()`.
+   * Called with the SiloConfig address and a `tokenAddressLc -> symbol` map (covers the earn
+   * token + collateral token when both came back from `/api/earn-silos`) so the downstream
+   * reader can resolve symbols without issuing an extra `ERC20.symbol()` multicall.
    */
   onSelect: (siloConfig: string, symbolOverrides: Record<string, string>) => void
   /** Disable clicks while the page is already busy running a check. */
@@ -16,21 +17,29 @@ type Props = {
 }
 
 function buttonLabel(entry: EarnSiloEntry): string {
-  const sym0 = entry.symbol0 ?? '?'
-  const sym1 = entry.symbol1 ?? '?'
+  const sym0 = entry.tokenSymbol ?? '?'
+  const sym1 = entry.collateralTokenSymbol ?? '?'
   /**
-   * Non-breaking spaces (U+00A0) around the slash keep `symbol / symbol #id` on one line —
-   * `flex-wrap` on the container otherwise loves to break `wstETH / WETH` at the slash because
-   * of the regular space.
+   * Non-breaking spaces (U+00A0) around the slash keep `symbol / symbol` on one line —
+   * `flex-wrap` on the container otherwise likes to break `wstETH / WETH` at the slash.
    */
-  const pair = `${sym0}\u00A0/\u00A0${sym1}`
-  return entry.siloId != null ? `${pair} #${entry.siloId}` : pair
+  return `${sym0}\u00A0/\u00A0${sym1}`
 }
 
+/**
+ * Token-keyed (not silo-keyed): `/api/earn-silos` exposes only the earn-side silo address so we
+ * cannot pre-fill both silos by address, but it does give us *both* token addresses + symbols.
+ * `readSiloConfigEntries` dedupes by token when calling `ERC20.symbol()`, so a token map is the
+ * cleanest shortcut and covers both silos of the pair.
+ */
 function buildOverrides(entry: EarnSiloEntry): Record<string, string> {
   const out: Record<string, string> = {}
-  if (entry.symbol0) out[entry.silo0.toLowerCase()] = entry.symbol0
-  if (entry.symbol1) out[entry.silo1.toLowerCase()] = entry.symbol1
+  if (entry.tokenAddress && entry.tokenSymbol) {
+    out[entry.tokenAddress.toLowerCase()] = entry.tokenSymbol
+  }
+  if (entry.collateralTokenAddress && entry.collateralTokenSymbol) {
+    out[entry.collateralTokenAddress.toLowerCase()] = entry.collateralTokenSymbol
+  }
   return out
 }
 
@@ -67,8 +76,7 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
   const [error, setError] = useState<string | null>(null)
   /**
    * Free-text filter — matched case-insensitively against the rendered button label (which
-   * already contains the symbols and the `#id`), so the user can type either a token symbol
-   * (`WETH`), an id fragment (`3006`), or any substring of the full `sym / sym #id` string.
+   * already contains both asset symbols), so the user can type any substring of `sym / sym`.
    */
   const [filter, setFilter] = useState('')
 
@@ -83,18 +91,14 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
       .then((rows) => {
         if (controller.signal.aborted) return
         /**
-         * V3-only picker: `siloId >= 3000` matches the id range used in the old snapshot's
-         * `_id_<N>` suffixes. Sort by id ascending first, then name alphabetically so the
-         * order stays stable across re-renders.
+         * `/api/earn-silos` already returns the curated earn-market list (V3 only), so no id
+         * filter is needed. Sort alphabetically by the pair label so ordering stays stable
+         * across re-renders and is easy to scan.
          */
-        const v3 = rows
-          .filter((r) => r.siloId != null && r.siloId >= 3000)
-          .sort((a, b) => {
-            const byId = (a.siloId ?? 0) - (b.siloId ?? 0)
-            if (byId !== 0) return byId
-            return (a.name ?? '').toLowerCase().localeCompare((b.name ?? '').toLowerCase())
-          })
-        setEntries(v3)
+        const sorted = [...rows].sort((a, b) =>
+          a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+        )
+        setEntries(sorted)
       })
       .catch((e) => {
         if (controller.signal.aborted) return
@@ -141,7 +145,7 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
           Predefined silos
         </p>
         <p className="text-sm silo-text-soft m-0">
-          No predefined V3 silos listed for {chainLabel}.
+          No predefined silos listed for {chainLabel}.
         </p>
       </div>
     )
@@ -149,9 +153,9 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
 
   /**
    * Normalize spacing in the query *and* the label before matching so typing `wstETH/WETH` or
-   * `wsteth / weth` still hits `wstETH\u00A0/\u00A0WETH #3006`. We strip every whitespace run —
-   * including the NBSPs we inject around the slash — so any single/multiple space the user types
-   * is equivalent to no space at all.
+   * `wsteth / weth` still hits `wstETH\u00A0/\u00A0WETH`. We strip every whitespace run —
+   * including the NBSPs we inject around the slash — so single/multiple spaces the user types
+   * are all equivalent.
    */
   const needle = filter.trim().toLowerCase().replace(/\s+/g, '')
   const filtered = needle
@@ -173,7 +177,7 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
           type="search"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter by symbol or #id"
+          placeholder="Filter by symbol"
           aria-label="Filter predefined silos"
           className="silo-input silo-input--md text-sm w-full sm:w-56"
         />

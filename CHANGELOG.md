@@ -4,7 +4,7 @@
 
 ### Updated
 - moved Global Pause to a dedicated "Pause" page and added it to the main menu
-- predefined silos list now sourced from the Silo v3 GraphQL API (live data, both asset symbols, numeric siloId)
+- predefined silos list now sourced from `app.silo.finance/api/earn-silos` so the picker matches the live earn UI exactly
 
 ## [0.18.0] - 2026-04-23
 

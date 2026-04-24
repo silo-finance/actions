@@ -1,142 +1,180 @@
 import { getAddress } from 'ethers'
-import { getSiloV3GraphqlUrl } from '@/utils/siloV3VaultsApi'
 
 /**
- * Predefined list of SiloConfig markets for the current chain.
+ * Predefined list of earn markets for the current chain.
  *
- * Previously sourced from a static snapshot of
- * https://github.com/silo-finance/silo-contracts-v3/blob/master/silo-core/deploy/silo/_siloDeployments.json
- * committed at `src/config/siloDeployments.json`. `POST https://app.silo.finance/api/earn-silos`
- * was also considered (matches the `app.silo.finance` earn page) but that endpoint does not set
- * `Access-Control-Allow-Origin`, so it cannot be called directly from our static GitHub Pages
- * build — it would require a backend proxy we don't ship.
+ * History of sources considered:
+ *   1. `https://github.com/silo-finance/silo-contracts-v3/blob/master/silo-core/deploy/silo/_siloDeployments.json`
+ *      — static snapshot, stale quickly, no symbols or TVL.
+ *   2. `https://api-v3.silo.finance/graphql` — CORS-friendly, rich (numeric `siloId`, both silos,
+ *      both symbols), but returns every indexed silo rather than the curated earn-app list.
+ *   3. `POST https://app.silo.finance/api/earn-silos` (current) — same feed the live earn UI at
+ *      `app.silo.finance` renders, so the picker stays in lockstep with it. Returns one entry per
+ *      market (the "earn side" silo) with both token symbols + addresses; the paired silo address
+ *      and the numeric `SILO_ID()` still need on-chain reads for details.
  *
- * The public Silo v3 GraphQL indexer (already used by the vault page) is CORS-enabled and returns
- * the extra fields we want: the numeric `siloId`, both asset symbols, and each per-silo market
- * address — so the picker can render `symbol0/symbol1 #id` for live deployments without any
- * on-chain round-trip, and the downstream reader can skip ERC20.`symbol()` when it comes from
- * here. If we ever need to fall back, the JSON snapshot URL above is the canonical source.
+ * If this endpoint disappears or starts failing CORS from the static host, the GraphQL indexer
+ * (option 2) is the drop-in fallback — that client lived in git history until 2026-04-23.
+ *
+ * **Local dev without upstream CORS:** run `npm run dev:proxy-earn-silos` in a second terminal and
+ * put `NEXT_PUBLIC_EARN_SILOS_URL=http://127.0.0.1:3041/api/earn-silos` in `.env.local` (see
+ * `scripts/earn-silos-dev-proxy.mjs`). Production stays on `https://app.silo.finance/...` once
+ * `Access-Control-Allow-Origin` is deployed there.
  */
 
 export type EarnSiloEntry = {
+  /** Supported `chainId` resolved from `chainKey` (see `CHAIN_KEY_BY_ID`). */
   chainId: number
-  /** Checksummed `SiloConfig` address — what the input field below the picker accepts. */
+  /** Checksummed SiloConfig — parsed from `link: "/markets/<chainKey>-<SILOCONFIG>"`. */
   siloConfig: string
-  /** Numeric market id from `SILO_ID()` (`null` when the indexer has no value yet). */
-  siloId: number | null
-  /** Human-readable market name, e.g. `"wstETH-WETH"`. */
+  /** Checksummed address of the earn-side silo. The paired silo is resolved on-chain later. */
+  silo: string
+  /** Earn-side token address (checksummed) — what the depositor supplies. */
+  tokenAddress: string | null
+  /** Earn-side token symbol (e.g. `USDC`). */
+  tokenSymbol: string | null
+  /** Other-side (collateral) token address (checksummed). */
+  collateralTokenAddress: string | null
+  /** Other-side token symbol (e.g. `wstETH`). */
+  collateralTokenSymbol: string | null
+  /** Human name used for sorting/filter: `tokenSymbol-collateralTokenSymbol`. */
   name: string
-  /** `asset1.symbol` — maps to silo at `index 0` returned by `SiloConfig.getSilos()`. */
-  symbol0: string | null
-  /** `asset2.symbol` — maps to silo at `index 1`. */
-  symbol1: string | null
-  /** Checksummed silo address for index 0. */
-  silo0: string
-  /** Checksummed silo address for index 1. */
-  silo1: string
+  /** `low` | `medium` | `high` | … — forwarded verbatim for future use. */
+  riskProfile: string | null
 }
 
-const SILOS_BY_CHAIN_QUERY = `
-query silosByChain($chainId: Int!, $limit: Int!) {
-  silos(limit: $limit, where: { chainId: $chainId }) {
-    items {
-      id
-      chainId
-      siloId
-      configAddress
-      name
-      market1 { id index }
-      market2 { id index }
-      asset1 { symbol }
-      asset2 { symbol }
-    }
-  }
+/**
+ * Mapping between our `chainId`s (see `src/utils/networks.ts`) and the `chainKey` slug the earn
+ * endpoint uses. Keys for chains we support but have no known slug yet are omitted; such chains
+ * simply return an empty list. Confirmed slugs as of 2026-04-23 by probing the API:
+ * `ethereum`, `arbitrum`, `avalanche`, `injective`, `sonic`, `xdc`. The rest are best-effort.
+ */
+const CHAIN_KEY_BY_ID: Record<number, string> = {
+  1: 'ethereum',
+  10: 'optimism',
+  50: 'xdc',
+  56: 'bnb',
+  146: 'sonic',
+  196: 'okx',
+  1776: 'injective',
+  42161: 'arbitrum',
+  43114: 'avalanche',
 }
-`
+const CHAIN_ID_BY_KEY: Record<string, number> = Object.fromEntries(
+  Object.entries(CHAIN_KEY_BY_ID).map(([id, key]) => [key, Number(id)])
+)
 
-type RawSilo = {
-  id: string
-  chainId: number
-  /** BigInt serialized as a decimal string. */
-  siloId: string | null
-  configAddress: string | null
-  name: string | null
-  market1: { id: string; index: number } | null
-  market2: { id: string; index: number } | null
-  asset1: { symbol: string | null } | null
-  asset2: { symbol: string | null } | null
+export function getEarnChainKey(chainId: number): string | null {
+  return CHAIN_KEY_BY_ID[chainId] ?? null
 }
 
-type GraphqlSilosResponse = {
-  data?: { silos?: { items?: RawSilo[] } }
-  errors?: Array<{ message?: string }>
+const EARN_SILOS_URL_DEFAULT = 'https://app.silo.finance/api/earn-silos'
+
+/** Production URL or dev proxy (`NEXT_PUBLIC_EARN_SILOS_URL` in `.env.local`). */
+export function getEarnSilosApiUrl(): string {
+  const raw =
+    typeof process !== 'undefined' && process.env.NEXT_PUBLIC_EARN_SILOS_URL
+      ? process.env.NEXT_PUBLIC_EARN_SILOS_URL.trim()
+      : ''
+  return (raw || EARN_SILOS_URL_DEFAULT).replace(/\/$/, '')
 }
 
-function tryChecksum(address: string | null | undefined): string | null {
-  if (!address) return null
+type RawEarnSilo = {
+  _tag?: string
+  siloAddress?: string | null
+  chainKey?: string | null
+  link?: string | null
+  tokenAddress?: string | null
+  tokenSymbol?: string | null
+  collateralTokenAddress?: string | null
+  collateralTokenSymbol?: string | null
+  riskProfile?: string | null
+}
+
+type RawResponse = {
+  total?: number
+  silos?: RawEarnSilo[]
+}
+
+function tryChecksum(addr: string | null | undefined): string | null {
+  if (!addr) return null
   try {
-    return getAddress(address)
+    return getAddress(addr)
   } catch {
     return null
   }
 }
 
 /**
- * Fetches every silo indexed for `chainId`. The indexer caps at `limit` items; 1000 leaves
- * plenty of headroom (mainnet currently < 100 V3 markets) while staying within a single request.
+ * The earn endpoint encodes the SiloConfig inside `link`, shaped as
+ * `/markets/<chainKey>-<0xSILOCONFIG>`. Anchored on the trailing hex so we don't misread future
+ * path segments that happen to contain another address.
  */
+function parseSiloConfigFromLink(link: string | null | undefined): string | null {
+  if (!link) return null
+  const match = /-(0x[a-fA-F0-9]{40})(?:[/?#].*)?$/.exec(link)
+  return match ? tryChecksum(match[1]) : null
+}
+
 export async function fetchEarnSilosForChain(
   chainId: number,
   signal?: AbortSignal,
-  graphqlUrl: string = getSiloV3GraphqlUrl()
+  endpoint: string = getEarnSilosApiUrl()
 ): Promise<EarnSiloEntry[]> {
-  const res = await fetch(graphqlUrl, {
+  const chainKey = CHAIN_KEY_BY_ID[chainId]
+  const body = {
+    siloIds: [],
+    search: null,
+    riskProfiles: [],
+    /**
+     * Server-side chain filter when we know the slug; empty array fetches every chain and we
+     * filter client-side. Either way we defensively re-filter below in case the server ignores
+     * this field.
+     */
+    chainKeys: chainKey ? [chainKey] : [],
+    minTotalSupplyUsd: null,
+    sort: null,
+    limit: 100,
+    offset: 0,
+  }
+
+  const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query: SILOS_BY_CHAIN_QUERY,
-      variables: { chainId, limit: 1000 },
-    }),
+    body: JSON.stringify(body),
     signal,
   })
-
   if (!res.ok) {
-    throw new Error(`Silo v3 GraphQL HTTP ${res.status}`)
+    throw new Error(`earn-silos HTTP ${res.status}`)
   }
 
-  const json = (await res.json()) as GraphqlSilosResponse
-  if (json.errors?.length) {
-    const msg = json.errors.map((e) => e.message ?? '').filter(Boolean).join('; ')
-    throw new Error(msg || 'Silo v3 GraphQL error')
-  }
+  const json = (await res.json()) as RawResponse
+  const rows = json.silos ?? []
 
-  const rows = json.data?.silos?.items ?? []
   const out: EarnSiloEntry[] = []
   for (const row of rows) {
-    const siloConfig = tryChecksum(row.configAddress ?? row.id)
-    const silo0 = tryChecksum(row.market1?.id)
-    const silo1 = tryChecksum(row.market2?.id)
-    if (!siloConfig || !silo0 || !silo1) continue
+    const rowChainId = row.chainKey ? CHAIN_ID_BY_KEY[row.chainKey] : undefined
+    const effectiveChainId = typeof rowChainId === 'number' ? rowChainId : null
+    if (effectiveChainId !== chainId) continue
 
-    /**
-     * `siloId` arrives as a BigInt-as-string. We only render it and use it for a V3 filter
-     * (`>= 3000`), both comfortably in JS's safe-integer range today, so `Number(...)` is fine.
-     */
-    let siloIdNum: number | null = null
-    if (row.siloId != null) {
-      const n = Number(row.siloId)
-      if (Number.isFinite(n) && Number.isInteger(n) && n >= 0) siloIdNum = n
-    }
+    const siloConfig = parseSiloConfigFromLink(row.link)
+    const silo = tryChecksum(row.siloAddress)
+    if (!siloConfig || !silo) continue
+
+    const tokenSymbol = row.tokenSymbol ?? null
+    const collateralTokenSymbol = row.collateralTokenSymbol ?? null
+    const name = [tokenSymbol, collateralTokenSymbol].filter(Boolean).join('-') || siloConfig
 
     out.push({
-      chainId: typeof row.chainId === 'number' ? row.chainId : chainId,
+      chainId: effectiveChainId,
       siloConfig,
-      siloId: siloIdNum,
-      name: row.name ?? '',
-      symbol0: row.asset1?.symbol ?? null,
-      symbol1: row.asset2?.symbol ?? null,
-      silo0,
-      silo1,
+      silo,
+      tokenAddress: tryChecksum(row.tokenAddress),
+      tokenSymbol,
+      collateralTokenAddress: tryChecksum(row.collateralTokenAddress),
+      collateralTokenSymbol,
+      name,
+      riskProfile: row.riskProfile ?? null,
     })
   }
 

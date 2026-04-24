@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "rm -rf .next && NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next dev",
+    "dev:proxy-earn-silos": "node ./scripts/earn-silos-dev-proxy.mjs",
     "prebuild": "node ./scripts/sync-manifest-version.mjs",
     "build": "NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next build",
     "start": "next start",
