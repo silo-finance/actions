@@ -1,0 +1,1381 @@
+[
+    {
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
+        "inputs": [],
+        "name": "AddressZero",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "AlphaDividerZero",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "AlreadyInitialized",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "EmptySilo",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidAlpha",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidC1",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidC2",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidCminus",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidCplus",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidDefaultConfig",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidDmax",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidInitialization",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidKRange",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidKmax",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidKmin",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidRcompCap",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidRcritMax",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidRcritMin",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidRmin",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidSilo",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidT1",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidT2",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidTCrit",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidTLow",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidTMin",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidTimelock",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidTimestamp",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidU1",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidU2",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidUcrit",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "InvalidUlow",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "NegativeRcomp",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "NegativeRcur",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "NoPendingConfig",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "NoPendingUpdateToCancel",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "NotInitializing",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "OnlySilo",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+            }
+        ],
+        "name": "OwnableInvalidOwner",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "OwnableUnauthorizedAccount",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "PendingUpdate",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "int256",
+                "name": "value",
+                "type": "int256"
+            }
+        ],
+        "name": "SafeCastOverflowedIntToUint",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+            }
+        ],
+        "name": "SafeCastOverflowedUintToInt",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "XOverflow",
+        "type": "error"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "uint64",
+                "name": "version",
+                "type": "uint64"
+            }
+        ],
+        "name": "Initialized",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "silo",
+                "type": "address"
+            }
+        ],
+        "name": "Initialized",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "contract IDynamicKinkModelConfig",
+                "name": "config",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "activeAt",
+                "type": "uint256"
+            }
+        ],
+        "name": "NewConfig",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "previousOwner",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+            }
+        ],
+        "name": "OwnershipTransferStarted",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "previousOwner",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+            }
+        ],
+        "name": "OwnershipTransferred",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "contract IDynamicKinkModelConfig",
+                "name": "config",
+                "type": "address"
+            }
+        ],
+        "name": "PendingUpdateConfigCanceled",
+        "type": "event"
+    },
+    {
+        "inputs": [],
+        "name": "MAX_TIMELOCK",
+        "outputs": [
+            {
+                "internalType": "uint32",
+                "name": "",
+                "type": "uint32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "ONE_YEAR",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "RCOMP_CAP_PER_SECOND",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "RCUR_CAP",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "UNIVERSAL_LIMIT",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "VERSION",
+        "outputs": [
+            {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "X_MAX",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "acceptOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "activateConfigAt",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "cancelPendingUpdateConfig",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "int256",
+                        "name": "ulow",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "ucrit",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "rmin",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmin",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmax",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "alpha",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cminus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cplus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "dmax",
+                        "type": "int256"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.Config",
+                "name": "_cfg",
+                "type": "tuple"
+            },
+            {
+                "components": [
+                    {
+                        "internalType": "int96",
+                        "name": "k",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "silo",
+                        "type": "address"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.ModelState",
+                "name": "_state",
+                "type": "tuple"
+            },
+            {
+                "internalType": "int256",
+                "name": "_rcompCapPerSecond",
+                "type": "int256"
+            },
+            {
+                "internalType": "int256",
+                "name": "_t0",
+                "type": "int256"
+            },
+            {
+                "internalType": "int256",
+                "name": "_t1",
+                "type": "int256"
+            },
+            {
+                "internalType": "int256",
+                "name": "_u",
+                "type": "int256"
+            },
+            {
+                "internalType": "int256",
+                "name": "_tba",
+                "type": "int256"
+            }
+        ],
+        "name": "compoundInterestRate",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "rcomp",
+                "type": "int256"
+            },
+            {
+                "internalType": "int256",
+                "name": "k",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "pure",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "contract IDynamicKinkModelConfig",
+                "name": "current",
+                "type": "address"
+            }
+        ],
+        "name": "configsHistory",
+        "outputs": [
+            {
+                "internalType": "int96",
+                "name": "k",
+                "type": "int96"
+            },
+            {
+                "internalType": "contract IDynamicKinkModelConfig",
+                "name": "irmConfig",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "int256",
+                        "name": "ulow",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "ucrit",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "rmin",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmin",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmax",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "alpha",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cminus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cplus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "dmax",
+                        "type": "int256"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.Config",
+                "name": "_cfg",
+                "type": "tuple"
+            },
+            {
+                "components": [
+                    {
+                        "internalType": "int96",
+                        "name": "k",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "silo",
+                        "type": "address"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.ModelState",
+                "name": "_state",
+                "type": "tuple"
+            },
+            {
+                "internalType": "int256",
+                "name": "_t0",
+                "type": "int256"
+            },
+            {
+                "internalType": "int256",
+                "name": "_t1",
+                "type": "int256"
+            },
+            {
+                "internalType": "int256",
+                "name": "_u",
+                "type": "int256"
+            },
+            {
+                "internalType": "int256",
+                "name": "_tba",
+                "type": "int256"
+            }
+        ],
+        "name": "currentInterestRate",
+        "outputs": [
+            {
+                "internalType": "int256",
+                "name": "rcur",
+                "type": "int256"
+            }
+        ],
+        "stateMutability": "pure",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_silo",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "_blockTimestamp",
+                "type": "uint256"
+            }
+        ],
+        "name": "getCompoundInterestRate",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "rcomp",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "_collateralAssets",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "_debtAssets",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "_interestRateTimestamp",
+                "type": "uint256"
+            }
+        ],
+        "name": "getCompoundInterestRateAndUpdate",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "rcomp",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_silo",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "_blockTimestamp",
+                "type": "uint256"
+            }
+        ],
+        "name": "getCurrentInterestRate",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "rcur",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bool",
+                "name": "_usePending",
+                "type": "bool"
+            }
+        ],
+        "name": "getModelStateAndConfig",
+        "outputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "int96",
+                        "name": "k",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "silo",
+                        "type": "address"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.ModelState",
+                "name": "state",
+                "type": "tuple"
+            },
+            {
+                "components": [
+                    {
+                        "internalType": "int256",
+                        "name": "ulow",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "ucrit",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "rmin",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmin",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmax",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "alpha",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cminus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cplus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "dmax",
+                        "type": "int256"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.Config",
+                "name": "config",
+                "type": "tuple"
+            },
+            {
+                "components": [
+                    {
+                        "internalType": "uint32",
+                        "name": "timelock",
+                        "type": "uint32"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "rcompCapPerSecond",
+                        "type": "int96"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.ImmutableConfig",
+                "name": "immutableConfig",
+                "type": "tuple"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_silo",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "_blockTimestamp",
+                "type": "uint256"
+            }
+        ],
+        "name": "getPendingCompoundInterestRate",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "rcomp",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_silo",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "_blockTimestamp",
+                "type": "uint256"
+            }
+        ],
+        "name": "getPendingCurrentInterestRate",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "rcur",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "int256",
+                        "name": "ulow",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "ucrit",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "rmin",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmin",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmax",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "alpha",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cminus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cplus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "dmax",
+                        "type": "int256"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.Config",
+                "name": "_config",
+                "type": "tuple"
+            },
+            {
+                "components": [
+                    {
+                        "internalType": "uint32",
+                        "name": "timelock",
+                        "type": "uint32"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "rcompCap",
+                        "type": "int96"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.ImmutableArgs",
+                "name": "_immutableArgs",
+                "type": "tuple"
+            },
+            {
+                "internalType": "address",
+                "name": "_initialOwner",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "_silo",
+                "type": "address"
+            }
+        ],
+        "name": "initialize",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "irmConfig",
+        "outputs": [
+            {
+                "internalType": "contract IDynamicKinkModelConfig",
+                "name": "config",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "modelState",
+        "outputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "int96",
+                        "name": "k",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "silo",
+                        "type": "address"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.ModelState",
+                "name": "state",
+                "type": "tuple"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "owner",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "pendingConfigExists",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "pendingIrmConfig",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "config",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "pendingOwner",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "renounceOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+            }
+        ],
+        "name": "transferOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+            }
+        ],
+        "name": "transferOwnership1Step",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "int256",
+                        "name": "ulow",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "ucrit",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "rmin",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmin",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmax",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "alpha",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cminus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cplus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "dmax",
+                        "type": "int256"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.Config",
+                "name": "_config",
+                "type": "tuple"
+            }
+        ],
+        "name": "updateConfig",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "int256",
+                        "name": "ulow",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "u2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "ucrit",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "rmin",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmin",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int96",
+                        "name": "kmax",
+                        "type": "int96"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "alpha",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cminus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "cplus",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c1",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "c2",
+                        "type": "int256"
+                    },
+                    {
+                        "internalType": "int256",
+                        "name": "dmax",
+                        "type": "int256"
+                    }
+                ],
+                "internalType": "struct IDynamicKinkModel.Config",
+                "name": "_config",
+                "type": "tuple"
+            }
+        ],
+        "name": "verifyConfig",
+        "outputs": [],
+        "stateMutability": "view",
+        "type": "function"
+    }
+]

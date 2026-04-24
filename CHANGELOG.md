@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Silo page: "Update IRM" action (DynamicKinkModel `updateConfig`, live presets from `silo-contracts-v3`, flat annual %).
+
 ### Updated
 - predefined silos: pull from api
 

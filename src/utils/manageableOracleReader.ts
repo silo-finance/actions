@@ -177,6 +177,7 @@ export type SiloConfigEntry = {
   token: string
   solvencyOracle: string
   maxLtvOracle: string
+  interestRateModel: string
   symbol: string | null
   /**
    * `SILO_ID()` on the parent SiloConfig (same for all silos in one market). `null` when the
@@ -216,6 +217,7 @@ export async function readSiloConfigEntries(
     token: string | null
     solvencyOracle: string | null
     maxLtvOracle: string | null
+    interestRateModel: string | null
   } | null
   const configCalls = normalizedSilos.map((silo) =>
     buildReadMulticallCall<ConfigRow>({
@@ -232,7 +234,9 @@ export async function readSiloConfigEntries(
           typeof cfg?.solvencyOracle === 'string' ? getAddress(cfg.solvencyOracle) : null
         const maxLtvOracle =
           typeof cfg?.maxLtvOracle === 'string' ? getAddress(cfg.maxLtvOracle) : null
-        return { token, solvencyOracle, maxLtvOracle }
+        const interestRateModel =
+          typeof cfg?.interestRateModel === 'string' ? getAddress(cfg.interestRateModel) : null
+        return { token, solvencyOracle, maxLtvOracle, interestRateModel }
       },
     })
   )
@@ -267,6 +271,7 @@ export async function readSiloConfigEntries(
       token: row?.token ?? ZeroAddress,
       solvencyOracle: row?.solvencyOracle ?? ZeroAddress,
       maxLtvOracle: row?.maxLtvOracle ?? ZeroAddress,
+      interestRateModel: row?.interestRateModel ?? ZeroAddress,
     }
   })
 
