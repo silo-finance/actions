@@ -20,10 +20,14 @@ function buttonLabel(entry: EarnSiloEntry): string {
   const sym0 = entry.tokenSymbol ?? '?'
   const sym1 = entry.collateralTokenSymbol ?? '?'
   /**
-   * Non-breaking spaces (U+00A0) around the slash keep `symbol / symbol` on one line —
-   * `flex-wrap` on the container otherwise likes to break `wstETH / WETH` at the slash.
+   * `symbol / symbol, #id` — NBSP around `/` and after the comma so the label stays on one line.
+   * Numeric id from v3 GraphQL (`siloId`); if missing (indexer gap / GQL error), only the pair is shown.
    */
-  return `${sym0}\u00A0/\u00A0${sym1}`
+  const pair = `${sym0}\u00A0/\u00A0${sym1}`
+  if (entry.siloId != null) {
+    return `${pair},\u00A0#${entry.siloId}`
+  }
+  return pair
 }
 
 /**
@@ -90,15 +94,8 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
     fetchEarnSilosForChain(chainId, controller.signal)
       .then((rows) => {
         if (controller.signal.aborted) return
-        /**
-         * `/api/earn-silos` already returns the curated earn-market list (V3 only), so no id
-         * filter is needed. Sort alphabetically by the pair label so ordering stays stable
-         * across re-renders and is easy to scan.
-         */
-        const sorted = [...rows].sort((a, b) =>
-          a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-        )
-        setEntries(sorted)
+        /** `fetchEarnSilosForChain` already sorts by numeric `siloId` then name. */
+        setEntries(rows)
       })
       .catch((e) => {
         if (controller.signal.aborted) return
@@ -177,7 +174,7 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
           type="search"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter by symbol"
+          placeholder="Filter by symbol or #id"
           aria-label="Filter predefined silos"
           className="silo-input silo-input--md text-sm w-full sm:w-56"
         />

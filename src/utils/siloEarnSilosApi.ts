@@ -1,4 +1,5 @@
 import { getAddress } from 'ethers'
+import { getSiloV3GraphqlUrl } from '@/utils/siloV3VaultsApi'
 
 /**
  * Predefined list of earn markets for the current chain.
@@ -8,10 +9,11 @@ import { getAddress } from 'ethers'
  *      — static snapshot, stale quickly, no symbols or TVL.
  *   2. `https://api-v3.silo.finance/graphql` — CORS-friendly, rich (numeric `siloId`, both silos,
  *      both symbols), but returns every indexed silo rather than the curated earn-app list.
- *   3. `POST https://app.silo.finance/api/earn-silos` (current) — same feed the live earn UI at
- *      `app.silo.finance` renders, so the picker stays in lockstep with it. Returns one entry per
- *      market (the "earn side" silo) with both token symbols + addresses; the paired silo address
- *      and the numeric `SILO_ID()` still need on-chain reads for details.
+ *   3. `POST https://app.silo.finance/api/earn-silos` (current) — curated earn list. **SiloConfig**
+ *      is taken only from `link` (`/markets/<chainKey>-<0xCONFIG>`), never inferred from
+ *      `siloAddress`. Rows may repeat the same config; we collapse to a unique set of configs.
+ *      Numeric `siloId` for the picker label comes from a follow-up `silos(where: { chainId })`
+ *      query on the public v3 GraphQL indexer (`configAddress` → `siloId`).
  *
  * If this endpoint disappears or starts failing CORS from the static host, the GraphQL indexer
  * (option 2) is the drop-in fallback — that client lived in git history until 2026-04-23.
@@ -27,8 +29,16 @@ export type EarnSiloEntry = {
   chainId: number
   /** Checksummed SiloConfig — parsed from `link: "/markets/<chainKey>-<SILOCONFIG>"`. */
   siloConfig: string
-  /** Checksummed address of the earn-side silo. The paired silo is resolved on-chain later. */
-  silo: string
+  /**
+   * On-chain numeric market id from the v3 indexer (`SILO_ID()`), matched by `configAddress`.
+   * `null` when GraphQL failed or this config is not indexed yet.
+   */
+  siloId: number | null
+  /**
+   * Earn-side silo from REST `siloAddress` when present; informational only — we do not use it
+   * to derive SiloConfig. The full pair is resolved on-chain after the user runs Check.
+   */
+  silo: string | null
   /** Earn-side token address (checksummed) — what the depositor supplies. */
   tokenAddress: string | null
   /** Earn-side token symbol (e.g. `USDC`). */
@@ -116,10 +126,109 @@ function parseSiloConfigFromLink(link: string | null | undefined): string | null
   return match ? tryChecksum(match[1]) : null
 }
 
+type DedupBucket = {
+  chainId: number
+  siloConfig: string
+  silo: string | null
+  tokenAddress: string | null
+  tokenSymbol: string | null
+  collateralTokenAddress: string | null
+  collateralTokenSymbol: string | null
+  riskProfile: string | null
+}
+
+function mergeEarnRowIntoBucket(bucket: DedupBucket, row: RawEarnSilo, chainId: number): void {
+  const silo = tryChecksum(row.siloAddress)
+  if (!bucket.silo && silo) bucket.silo = silo
+  if (!bucket.tokenSymbol && row.tokenSymbol) bucket.tokenSymbol = row.tokenSymbol
+  if (!bucket.collateralTokenSymbol && row.collateralTokenSymbol) {
+    bucket.collateralTokenSymbol = row.collateralTokenSymbol
+  }
+  if (!bucket.tokenAddress) bucket.tokenAddress = tryChecksum(row.tokenAddress)
+  if (!bucket.collateralTokenAddress) {
+    bucket.collateralTokenAddress = tryChecksum(row.collateralTokenAddress)
+  }
+  if (!bucket.riskProfile && row.riskProfile) bucket.riskProfile = row.riskProfile
+  bucket.chainId = chainId
+}
+
+/**
+ * Ponder returns `INTERNAL_SERVER_ERROR` for large `silos(limit: …)` values (see history: 1500+).
+ * We keep a conservative page size; if a chain ever has more indexed silos than one page, we
+ * advance `offset` (unlikely to exceed ~200 markets per chain in practice).
+ */
+const SILO_ID_PAGE_SIZE = 200
+
+const SILO_ID_BY_CONFIG_QUERY = `
+query siloIdsByChain($chainId: Int!, $limit: Int!, $offset: Int!) {
+  silos(limit: $limit, offset: $offset, where: { chainId: $chainId }) {
+    items {
+      siloId
+      configAddress
+    }
+  }
+}
+`
+
+type GraphqlSiloIdResponse = {
+  data?: { silos?: { items?: Array<{ siloId: string | null; configAddress: string | null }> } }
+  errors?: Array<{ message?: string }>
+}
+
+/**
+ * `configAddress` (lowercase key) → numeric `siloId` from the indexer (matches on-chain `SILO_ID()`).
+ */
+async function fetchSiloIdByConfigAddress(
+  chainId: number,
+  signal: AbortSignal | undefined,
+  graphqlUrl: string
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  let offset = 0
+
+  for (;;) {
+    const res = await fetch(graphqlUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: SILO_ID_BY_CONFIG_QUERY,
+        variables: {
+          chainId,
+          limit: SILO_ID_PAGE_SIZE,
+          offset,
+        },
+      }),
+      signal,
+    })
+    if (!res.ok) {
+      throw new Error(`Silo v3 GraphQL HTTP ${res.status}`)
+    }
+    const json = (await res.json()) as GraphqlSiloIdResponse
+    if (json.errors?.length) {
+      const msg = json.errors.map((e) => e.message ?? '').filter(Boolean).join('; ')
+      throw new Error(msg || 'Silo v3 GraphQL error')
+    }
+    const items = json.data?.silos?.items ?? []
+    for (const item of items) {
+      if (!item.configAddress || item.siloId == null) continue
+      const cfg = tryChecksum(item.configAddress)
+      if (!cfg) continue
+      const n = Number(item.siloId)
+      if (!Number.isFinite(n) || !Number.isInteger(n)) continue
+      map.set(cfg.toLowerCase(), n)
+    }
+    if (items.length < SILO_ID_PAGE_SIZE) break
+    offset += SILO_ID_PAGE_SIZE
+  }
+
+  return map
+}
+
 export async function fetchEarnSilosForChain(
   chainId: number,
   signal?: AbortSignal,
-  endpoint: string = getEarnSilosApiUrl()
+  endpoint: string = getEarnSilosApiUrl(),
+  graphqlUrl: string = getSiloV3GraphqlUrl()
 ): Promise<EarnSiloEntry[]> {
   const chainKey = CHAIN_KEY_BY_ID[chainId]
   const body = {
@@ -134,7 +243,7 @@ export async function fetchEarnSilosForChain(
     chainKeys: chainKey ? [chainKey] : [],
     minTotalSupplyUsd: null,
     sort: null,
-    limit: 100,
+    limit: 200,
     offset: 0,
   }
 
@@ -151,32 +260,69 @@ export async function fetchEarnSilosForChain(
   const json = (await res.json()) as RawResponse
   const rows = json.silos ?? []
 
-  const out: EarnSiloEntry[] = []
+  /** Unique SiloConfig (lowercase key) — derived only from `link`, never from `siloAddress`. */
+  const byConfig = new Map<string, DedupBucket>()
+
   for (const row of rows) {
     const rowChainId = row.chainKey ? CHAIN_ID_BY_KEY[row.chainKey] : undefined
-    const effectiveChainId = typeof rowChainId === 'number' ? rowChainId : null
-    if (effectiveChainId !== chainId) continue
+    if (typeof rowChainId !== 'number' || rowChainId !== chainId) continue
 
     const siloConfig = parseSiloConfigFromLink(row.link)
-    const silo = tryChecksum(row.siloAddress)
-    if (!siloConfig || !silo) continue
+    if (!siloConfig) continue
 
+    const key = siloConfig.toLowerCase()
     const tokenSymbol = row.tokenSymbol ?? null
     const collateralTokenSymbol = row.collateralTokenSymbol ?? null
-    const name = [tokenSymbol, collateralTokenSymbol].filter(Boolean).join('-') || siloConfig
 
+    const existing = byConfig.get(key)
+    if (!existing) {
+      byConfig.set(key, {
+        chainId,
+        siloConfig,
+        silo: tryChecksum(row.siloAddress),
+        tokenAddress: tryChecksum(row.tokenAddress),
+        tokenSymbol,
+        collateralTokenAddress: tryChecksum(row.collateralTokenAddress),
+        collateralTokenSymbol,
+        riskProfile: row.riskProfile ?? null,
+      })
+    } else {
+      mergeEarnRowIntoBucket(existing, row, chainId)
+    }
+  }
+
+  let idByConfig = new Map<string, number>()
+  try {
+    idByConfig = await fetchSiloIdByConfigAddress(chainId, signal, graphqlUrl)
+  } catch {
+    /** Picker still works from earn symbols; `#id` is omitted if GraphQL is down. */
+  }
+
+  const out: EarnSiloEntry[] = []
+  for (const b of Array.from(byConfig.values())) {
+    const tokenSymbol = b.tokenSymbol ?? null
+    const collateralTokenSymbol = b.collateralTokenSymbol ?? null
+    const name = [tokenSymbol, collateralTokenSymbol].filter(Boolean).join('-') || b.siloConfig
     out.push({
-      chainId: effectiveChainId,
-      siloConfig,
-      silo,
-      tokenAddress: tryChecksum(row.tokenAddress),
+      chainId: b.chainId,
+      siloConfig: b.siloConfig,
+      siloId: idByConfig.get(b.siloConfig.toLowerCase()) ?? null,
+      silo: b.silo,
+      tokenAddress: b.tokenAddress,
       tokenSymbol,
-      collateralTokenAddress: tryChecksum(row.collateralTokenAddress),
+      collateralTokenAddress: b.collateralTokenAddress,
       collateralTokenSymbol,
       name,
-      riskProfile: row.riskProfile ?? null,
+      riskProfile: b.riskProfile,
     })
   }
+
+  out.sort((a, b) => {
+    if (a.siloId != null && b.siloId != null && a.siloId !== b.siloId) return a.siloId - b.siloId
+    if (a.siloId != null && b.siloId == null) return -1
+    if (a.siloId == null && b.siloId != null) return 1
+    return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+  })
 
   return out
 }
