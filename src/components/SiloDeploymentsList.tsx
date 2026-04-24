@@ -145,7 +145,7 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
           Predefined silos
         </p>
         {apiWarning ? (
-          <p className="text-sm silo-alert silo-alert-warning m-0">{apiWarning}</p>
+          <p className="text-sm silo-text-warning m-0">{apiWarning}</p>
         ) : null}
         <p className="text-sm silo-text-soft m-0">
           No predefined silos listed for {chainLabel}.
@@ -170,7 +170,7 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
   return (
     <div className="silo-panel p-4 mb-6 space-y-3">
       {apiWarning ? (
-        <p className="text-sm silo-alert silo-alert-warning m-0">{apiWarning}</p>
+        <p className="text-sm silo-text-warning m-0">{apiWarning}</p>
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft m-0">

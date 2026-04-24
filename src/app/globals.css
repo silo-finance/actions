@@ -443,6 +443,11 @@ body {
   color: color-mix(in srgb, var(--silo-warning) 55%, var(--silo-text));
 }
 
+/** Warning hue for inline copy only (no background, border, or padding). */
+.silo-text-warning {
+  color: color-mix(in srgb, var(--silo-warning) 55%, var(--silo-text));
+}
+
 .silo-alert-info {
   background: color-mix(in srgb, var(--silo-accent) 10%, var(--silo-surface));
   border-color: color-mix(in srgb, var(--silo-accent) 32%, var(--silo-border));
