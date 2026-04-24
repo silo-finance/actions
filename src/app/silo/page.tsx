@@ -8,6 +8,8 @@ import ShareLinkCopyButton from '@/components/ShareLinkCopyButton'
 import ConnectWalletModal from '@/components/ConnectWalletModal'
 import CopyButton from '@/components/CopyButton'
 import SiloDeploymentsList from '@/components/SiloDeploymentsList'
+import SiloIrmUpdateBothSilosSection from '@/components/SiloIrmUpdateBothSilosSection'
+import SiloIrmUpdateSection from '@/components/SiloIrmUpdateSection'
 import SiloOracleChangeSection from '@/components/SiloOracleChangeSection'
 import SiloOracleChangeBothSilosSection from '@/components/SiloOracleChangeBothSilosSection'
 import { useWeb3 } from '@/contexts/Web3Context'
@@ -15,6 +17,8 @@ import { getRevertingOracleAddress } from '@/config/revertingOracleDeployments'
 import { extractHexAddressLike } from '@/utils/addressFromInput'
 import { normalizeAddress } from '@/utils/addressValidation'
 import { classifyVaultInput } from '@/utils/explorerInput'
+import type { DynamicKinkIrmConfig } from '@/utils/dynamicKinkIrmConfig'
+import { readDynamicKinkIrmState, type DynamicKinkIrmReadState } from '@/utils/dynamicKinkIrmReader'
 import {
   readManageableOracleState,
   readSiloConfigEntries,
@@ -29,6 +33,13 @@ import { toUserErrorMessage } from '@/utils/rpcErrors'
 type OracleStateEntry = {
   loading: boolean
   state: ManageableOracleState | null
+  ownerKind: OwnerKind | null
+  error: string | null
+}
+
+type IrmStateEntry = {
+  loading: boolean
+  state: DynamicKinkIrmReadState | null
   ownerKind: OwnerKind | null
   error: string | null
 }
@@ -79,8 +90,8 @@ function SiloPageInner() {
     Record<string, Record<string, string>>
   >({})
 
-  /** Set to `true` only after the user clicks the "Set Reverting Oracle" action button. */
-  const [actionOpen, setActionOpen] = useState(false)
+  /** `null` until the user picks a SiloConfig action. */
+  const [siloAction, setSiloAction] = useState<null | 'reverting-oracle' | 'update-irm'>(null)
   /** Lower-cased silo addresses the user has ticked in the picker — checkbox semantics, no default. */
   const [checkedSilos, setCheckedSilos] = useState<Set<string>>(new Set())
   /** Lazy per-silo oracle state keyed by the silo address (lowercase). Populated on checkbox tick. */
@@ -95,6 +106,10 @@ function SiloPageInner() {
    */
   const oracleStatesRef = useRef(oracleStates)
   oracleStatesRef.current = oracleStates
+  const [irmStates, setIrmStates] = useState<Record<string, IrmStateEntry>>({})
+  const irmStatesRef = useRef(irmStates)
+  irmStatesRef.current = irmStates
+  const [irmConfigBySilo, setIrmConfigBySilo] = useState<Record<string, DynamicKinkIrmConfig | null>>({})
   const [refreshTick, setRefreshTick] = useState(0)
 
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
@@ -142,9 +157,11 @@ function SiloPageInner() {
     setSiloEntries(null)
     setSiloEntriesLoading(false)
     setSiloEntriesError(null)
-    setActionOpen(false)
+    setSiloAction(null)
     setCheckedSilos(new Set())
     setOracleStates({})
+    setIrmStates({})
+    setIrmConfigBySilo({})
   }, [])
 
   useEffect(() => {
@@ -369,6 +386,7 @@ function SiloPageInner() {
    * re-ticking returns the cached state instantly while a refresh still reloads everything.
    */
   useEffect(() => {
+    if (siloAction !== 'reverting-oracle') return
     if (!provider || !siloEntries || checkedSilos.size === 0) return
     const currentStates = oracleStatesRef.current
     const entriesToLoad = siloEntries.filter((entry) => {
@@ -447,13 +465,84 @@ function SiloPageInner() {
     return () => {
       cancelled = true
     }
-  }, [provider, siloEntries, checkedSilos, refreshTick])
+  }, [provider, siloEntries, checkedSilos, refreshTick, siloAction])
+
+  useEffect(() => {
+    if (siloAction !== 'update-irm') return
+    if (!provider || !siloEntries || checkedSilos.size === 0) return
+    const currentStates = irmStatesRef.current
+    const entriesToLoad = siloEntries.filter((entry) => {
+      const key = entry.silo.toLowerCase()
+      if (!checkedSilos.has(key)) return false
+      const current = currentStates[key]
+      return !current || (!current.loading && !current.state && !current.error)
+    })
+    if (entriesToLoad.length === 0) return
+    let cancelled = false
+    setIrmStates((prev) => {
+      const next = { ...prev }
+      for (const entry of entriesToLoad) {
+        next[entry.silo.toLowerCase()] = { loading: true, state: null, ownerKind: null, error: null }
+      }
+      return next
+    })
+    void (async () => {
+      await Promise.all(
+        entriesToLoad.map(async (entry) => {
+          const key = entry.silo.toLowerCase()
+          try {
+            const state = await readDynamicKinkIrmState(provider, entry.interestRateModel)
+            let ownerKind: OwnerKind | null = null
+            if (state.owner && !state.error) {
+              ownerKind = await analyzeOwnerKind(provider, state.owner)
+            }
+            if (cancelled) return
+            setIrmStates((prev) => ({
+              ...prev,
+              [key]: { loading: false, state, ownerKind, error: null },
+            }))
+          } catch (e) {
+            if (cancelled) return
+            setIrmStates((prev) => ({
+              ...prev,
+              [key]: {
+                loading: false,
+                state: null,
+                ownerKind: null,
+                error: toUserErrorMessage(e, 'Failed to read the interest rate model state.'),
+              },
+            }))
+          }
+        })
+      )
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [provider, siloEntries, checkedSilos, refreshTick, siloAction])
 
   /** Bumped by child components after a successful write so reads re-run and reveal the new state. */
   const triggerRefresh = useCallback(() => {
     setOracleStates({})
+    setIrmStates({})
     setRefreshTick((n) => n + 1)
   }, [])
+
+  const onIrmConfigChange = useCallback((siloKey: string, config: DynamicKinkIrmConfig | null) => {
+    setIrmConfigBySilo((prev) => ({ ...prev, [siloKey]: config }))
+  }, [])
+
+  useEffect(() => {
+    setIrmConfigBySilo((prev) => {
+      const next: Record<string, DynamicKinkIrmConfig | null> = { ...prev }
+      for (const k of Object.keys(next)) {
+        if (!checkedSilos.has(k)) {
+          delete next[k]
+        }
+      }
+      return next
+    })
+  }, [checkedSilos])
 
   const toggleSilo = useCallback((siloAddress: string) => {
     const key = siloAddress.toLowerCase()
@@ -467,8 +556,9 @@ function SiloPageInner() {
 
   const revertingOracleAddress = resolvedChainId != null ? getRevertingOracleAddress(resolvedChainId) : null
 
-  /** SiloOracleChangeBothSilosSection only when BOTH silos of a SiloConfig are ticked and loaded. */
+  /** `SiloOracleChangeBothSilosSection` when BOTH silos are ticked, oracle data loaded, and the oracle action is active. */
   const bothSilosLoadedEntries = useMemo(() => {
+    if (siloAction !== 'reverting-oracle') return null
     if (!resolved) return null
     if (!siloEntries || siloEntries.length !== 2) return null
     const loaded = siloEntries.map((entry) => {
@@ -484,7 +574,25 @@ function SiloPageInner() {
     if (!bothChecked) return null
     if (loaded.some((row) => row.oracleState == null)) return null
     return loaded
-  }, [resolved, siloEntries, oracleStates, checkedSilos])
+  }, [resolved, siloEntries, oracleStates, checkedSilos, siloAction])
+
+  /** Batched IRM path when the IRM action is active and both ticked IRM states are available. */
+  const bothSilosLoadedIrm = useMemo(() => {
+    if (siloAction !== 'update-irm') return null
+    if (!resolved) return null
+    if (!siloEntries || siloEntries.length !== 2) return null
+    const bothChecked = siloEntries.every((entry) => checkedSilos.has(entry.silo.toLowerCase()))
+    if (!bothChecked) return null
+    const a = siloEntries[0]!
+    const b = siloEntries[1]!
+    const stA = irmStates[a.silo.toLowerCase()]
+    const stB = irmStates[b.silo.toLowerCase()]
+    if (!stA?.state || !stB?.state) return null
+    return [
+      { silo: a.silo, interestRateModel: a.interestRateModel, irm: stA.state, ownerKind: stA.ownerKind },
+      { silo: b.silo, interestRateModel: b.interestRateModel, irm: stB.state, ownerKind: stB.ownerKind },
+    ] as const
+  }, [resolved, siloEntries, checkedSilos, irmStates, siloAction])
 
   return (
     <div className="silo-page px-4 py-8 sm:px-6 max-w-4xl mx-auto">
@@ -607,7 +715,7 @@ function SiloPageInner() {
         ) : null}
       </div>
 
-      {/* Row 3 — Action buttons. Only "Set Reverting Oracle" for now. */}
+      {/* Row 3 — Action buttons. */}
       {resolved && siloEntries && siloEntries.length > 0 ? (
         <div className="silo-panel p-5 mb-6">
           <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-2">Actions</p>
@@ -615,18 +723,25 @@ function SiloPageInner() {
             <button
               type="button"
               className="silo-btn-primary"
-              data-selected={actionOpen ? 'true' : 'false'}
-              disabled={actionOpen}
-              onClick={() => setActionOpen(true)}
+              data-selected={siloAction === 'reverting-oracle' ? 'true' : 'false'}
+              onClick={() => setSiloAction('reverting-oracle')}
             >
               Set Reverting Oracle
+            </button>
+            <button
+              type="button"
+              className="silo-btn-primary"
+              data-selected={siloAction === 'update-irm' ? 'true' : 'false'}
+              onClick={() => setSiloAction('update-irm')}
+            >
+              Update IRM
             </button>
           </div>
         </div>
       ) : null}
 
-      {/* Row 4 — Silo checkboxes (appear after clicking the action). */}
-      {actionOpen && resolved && siloEntries ? (
+      {/* Row 4 — Silo checkboxes (after choosing an action). */}
+      {siloAction && resolved && siloEntries ? (
         <div className="silo-panel p-5 mb-6">
           <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-2">
             Which silo(s) should we update?
@@ -667,53 +782,101 @@ function SiloPageInner() {
           (Silo0 left, Silo1 right). Single-silo mode keeps the original full-width behaviour.
           We carry the *original* index into the child so `Silo0` / `Silo1` labels stay correct
           even if the user ticks them out of order. */}
-      {actionOpen && resolved && siloEntries && displayChainId != null
+      {siloAction && resolved && siloEntries && displayChainId != null
         ? (() => {
             const tickedEntries = siloEntries
               .map((entry, idx) => ({ entry, idx }))
               .filter(({ entry }) => checkedSilos.has(entry.silo.toLowerCase()))
             const sideBySide = tickedEntries.length >= 2
-            return (
-              <div className="space-y-6">
-                <div
-                  className={`grid gap-6 grid-cols-1 ${sideBySide ? 'md:grid-cols-2' : ''}`}
-                >
-                  {tickedEntries.map(({ entry, idx }) => {
-                    const key = entry.silo.toLowerCase()
-                    const st = oracleStates[key]
-                    return (
-                      <SiloOracleChangeSection
-                        key={entry.silo}
-                        chainId={displayChainId}
-                        siloIndex={idx}
-                        siloSymbol={entry.symbol}
-                        oracleState={st?.state ?? null}
-                        ownerKind={st?.ownerKind ?? null}
-                        loading={st?.loading ?? true}
-                        errorMessage={st?.error ?? null}
-                        provider={provider}
-                        eip1193Provider={eip1193Provider}
-                        connectedAccount={account}
-                        revertingOracleAddress={revertingOracleAddress}
-                        onActionSuccess={triggerRefresh}
-                      />
-                    )
-                  })}
-                </div>
+            if (siloAction === 'reverting-oracle') {
+              return (
+                <div className="space-y-6">
+                  <div
+                    className={`grid gap-6 grid-cols-1 ${sideBySide ? 'md:grid-cols-2' : ''}`}
+                  >
+                    {tickedEntries.map(({ entry, idx }) => {
+                      const key = entry.silo.toLowerCase()
+                      const st = oracleStates[key]
+                      return (
+                        <SiloOracleChangeSection
+                          key={entry.silo}
+                          chainId={displayChainId}
+                          siloIndex={idx}
+                          siloSymbol={entry.symbol}
+                          oracleState={st?.state ?? null}
+                          ownerKind={st?.ownerKind ?? null}
+                          loading={st?.loading ?? true}
+                          errorMessage={st?.error ?? null}
+                          provider={provider}
+                          eip1193Provider={eip1193Provider}
+                          connectedAccount={account}
+                          revertingOracleAddress={revertingOracleAddress}
+                          onActionSuccess={triggerRefresh}
+                        />
+                      )
+                    })}
+                  </div>
 
-                {bothSilosLoadedEntries ? (
-                  <SiloOracleChangeBothSilosSection
-                    chainId={displayChainId}
-                    silos={bothSilosLoadedEntries}
-                    provider={provider}
-                    eip1193Provider={eip1193Provider}
-                    connectedAccount={account}
-                    revertingOracleAddress={revertingOracleAddress}
-                    onActionSuccess={triggerRefresh}
-                  />
-                ) : null}
-              </div>
-            )
+                  {bothSilosLoadedEntries ? (
+                    <SiloOracleChangeBothSilosSection
+                      chainId={displayChainId}
+                      silos={bothSilosLoadedEntries}
+                      provider={provider}
+                      eip1193Provider={eip1193Provider}
+                      connectedAccount={account}
+                      revertingOracleAddress={revertingOracleAddress}
+                      onActionSuccess={triggerRefresh}
+                    />
+                  ) : null}
+                </div>
+              )
+            }
+            if (siloAction === 'update-irm') {
+              return (
+                <div className="space-y-6">
+                  <div
+                    className={`grid gap-6 grid-cols-1 ${sideBySide ? 'md:grid-cols-2' : ''}`}
+                  >
+                    {tickedEntries.map(({ entry, idx }) => {
+                      const key = entry.silo.toLowerCase()
+                      const st = irmStates[key]
+                      return (
+                        <SiloIrmUpdateSection
+                          key={entry.silo}
+                          chainId={displayChainId}
+                          siloIndex={idx}
+                          siloSymbol={entry.symbol}
+                          siloAddress={entry.silo}
+                          interestRateModel={entry.interestRateModel}
+                          irmState={st?.state ?? null}
+                          ownerKind={st?.ownerKind ?? null}
+                          loading={st?.loading ?? true}
+                          errorMessage={st?.error ?? null}
+                          provider={provider}
+                          eip1193Provider={eip1193Provider}
+                          connectedAccount={account}
+                          onConfigChange={onIrmConfigChange}
+                          onActionSuccess={triggerRefresh}
+                        />
+                      )
+                    })}
+                  </div>
+
+                  {bothSilosLoadedIrm && account ? (
+                    <SiloIrmUpdateBothSilosSection
+                      chainId={displayChainId}
+                      silos={bothSilosLoadedIrm}
+                      configBySilo={irmConfigBySilo}
+                      provider={provider}
+                      eip1193Provider={eip1193Provider}
+                      connectedAccount={account}
+                      onActionSuccess={triggerRefresh}
+                    />
+                  ) : null}
+                </div>
+              )
+            }
+            return null
           })()
         : null}
     </div>
