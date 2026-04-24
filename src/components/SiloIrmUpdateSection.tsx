@@ -401,7 +401,12 @@ export default function SiloIrmUpdateSection({
               ) : authority?.mode === 'safe_as_wallet' ? (
                 <span className="silo-text-main">Connected wallet is this Safe (sends a Safe transaction).</span>
               ) : authority?.mode === 'safe_propose' ? (
-                <span className="silo-text-main">You are a signer on this Safe.</span>
+                <span className="silo-text-main inline-flex items-center gap-1">
+                  You are a signer on this Safe.
+                  <span className="text-[var(--silo-success)] font-semibold leading-none" aria-hidden>
+                    ✓
+                  </span>
+                </span>
               ) : ownerKind === 'safe' && connectedAccount ? (
                 <span className="silo-alert silo-alert-warning inline-block px-2 py-0.5 rounded">
                   You are not a signer on this Safe.
@@ -409,9 +414,9 @@ export default function SiloIrmUpdateSection({
               ) : null}
             </p>
           ) : null}
-          {authority?.mode === 'denied' && !authorityLoading && irmState.owner && ownerKind ? (
-            <p className="text-xs silo-alert silo-alert-error m-0 mt-1">{DYNAMIC_KINK_IRM_DENIED_MESSAGE}</p>
-          ) : null}
+        {authority?.mode === 'denied' && !authorityLoading && irmState.owner && ownerKind ? (
+          <p className="text-xs silo-alert silo-alert-error m-0 mt-1">{DYNAMIC_KINK_IRM_DENIED_MESSAGE}</p>
+        ) : null}
         </div>
 
         {txError ? <p className="text-sm silo-alert silo-alert-error m-0">{txError}</p> : null}
@@ -487,7 +492,12 @@ export default function SiloIrmUpdateSection({
             ) : authority?.mode === 'safe_as_wallet' ? (
               <span className="silo-text-main">Connected wallet is this Safe (sends a Safe transaction).</span>
             ) : authority?.mode === 'safe_propose' ? (
-              <span className="silo-text-main">You are a signer on this Safe.</span>
+              <span className="silo-text-main inline-flex items-center gap-1">
+                You are a signer on this Safe.
+                <span className="text-[var(--silo-success)] font-semibold leading-none" aria-hidden>
+                  ✓
+                </span>
+              </span>
             ) : ownerKind === 'safe' && connectedAccount ? (
               <span className="silo-alert silo-alert-warning inline-block px-2 py-0.5 rounded">
                 You are not a signer on this Safe.

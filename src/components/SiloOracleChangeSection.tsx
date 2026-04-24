@@ -243,7 +243,12 @@ export default function SiloOracleChangeSection({
                     ) : authority?.mode === 'safe_as_wallet' ? (
                       <span className="silo-text-main">Connected wallet is this Safe (sends a Safe proposal).</span>
                     ) : authority?.mode === 'safe_propose' ? (
-                      <span className="silo-text-main">You are a signer on this Safe.</span>
+                      <span className="silo-text-main inline-flex items-center gap-1">
+                        You are a signer on this Safe.
+                        <span className="text-[var(--silo-success)] font-semibold leading-none" aria-hidden>
+                          ✓
+                        </span>
+                      </span>
                     ) : (
                       <span className="silo-alert silo-alert-warning inline-block px-2 py-0.5 rounded">
                         You are not a signer on this Safe.
