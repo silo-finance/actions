@@ -1,12 +1,13 @@
 {
   "name": "silo-actions",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "private": true,
   "engines": {
     "node": ">=20.19.0"
   },
   "scripts": {
     "dev": "rm -rf .next && NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next dev",
+    "dev:proxy-earn-silos": "node ./scripts/earn-silos-dev-proxy.mjs",
     "prebuild": "node ./scripts/sync-manifest-version.mjs",
     "build": "NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next build",
     "start": "next start",
