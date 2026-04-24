@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { getNetworkDisplayName } from '@/utils/networks'
-import { fetchEarnSilosForChain, type EarnSiloEntry } from '@/utils/siloEarnSilosApi'
+import { fetchPredefinedSilosForChain, type EarnSiloEntry } from '@/utils/siloEarnSilosApi'
 
 type Props = {
   chainId: number
@@ -78,6 +78,8 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
   const [entries, setEntries] = useState<EarnSiloEntry[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** Non-null when earn API failed but the silo-contracts-v3 JSON fallback succeeded. */
+  const [apiWarning, setApiWarning] = useState<string | null>(null)
   /**
    * Free-text filter — matched case-insensitively against the rendered button label (which
    * already contains both asset symbols), so the user can type any substring of `sym / sym`.
@@ -88,14 +90,15 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
     const controller = new AbortController()
     setLoading(true)
     setError(null)
+    setApiWarning(null)
     setEntries(null)
     setFilter('')
 
-    fetchEarnSilosForChain(chainId, controller.signal)
-      .then((rows) => {
+    fetchPredefinedSilosForChain(chainId, controller.signal)
+      .then(({ entries: rows, apiWarning: warn }) => {
         if (controller.signal.aborted) return
-        /** `fetchEarnSilosForChain` already sorts by numeric `siloId` then name. */
         setEntries(rows)
+        setApiWarning(warn)
       })
       .catch((e) => {
         if (controller.signal.aborted) return
@@ -137,10 +140,13 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
 
   if (!entries || entries.length === 0) {
     return (
-      <div className="silo-panel p-4 mb-6">
+      <div className="silo-panel p-4 mb-6 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">
           Predefined silos
         </p>
+        {apiWarning ? (
+          <p className="text-sm silo-alert silo-alert-warning m-0">{apiWarning}</p>
+        ) : null}
         <p className="text-sm silo-text-soft m-0">
           No predefined silos listed for {chainLabel}.
         </p>
@@ -163,6 +169,9 @@ export default function SiloDeploymentsList({ chainId, onSelect, disabled }: Pro
 
   return (
     <div className="silo-panel p-4 mb-6 space-y-3">
+      {apiWarning ? (
+        <p className="text-sm silo-alert silo-alert-warning m-0">{apiWarning}</p>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft m-0">
           Predefined silos on {chainLabel}

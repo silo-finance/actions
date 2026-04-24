@@ -1,27 +1,18 @@
 import { getAddress } from 'ethers'
+import { fetchSiloDeploymentsFromRepo } from '@/utils/siloDeploymentsRepo'
+import { getNetworkDisplayName } from '@/utils/networks'
 import { getSiloV3GraphqlUrl } from '@/utils/siloV3VaultsApi'
 
 /**
- * Predefined list of earn markets for the current chain.
+ * Predefined silos for the Markets page picker.
  *
- * History of sources considered:
- *   1. `https://github.com/silo-finance/silo-contracts-v3/blob/master/silo-core/deploy/silo/_siloDeployments.json`
- *      — static snapshot, stale quickly, no symbols or TVL.
- *   2. `https://api-v3.silo.finance/graphql` — CORS-friendly, rich (numeric `siloId`, both silos,
- *      both symbols), but returns every indexed silo rather than the curated earn-app list.
- *   3. `POST https://app.silo.finance/api/earn-silos` (current) — curated earn list. **SiloConfig**
- *      is taken only from `link` (`/markets/<chainKey>-<0xCONFIG>`), never inferred from
- *      `siloAddress`. Rows may repeat the same config; we collapse to a unique set of configs.
- *      Numeric `siloId` for the picker label comes from a follow-up `silos(where: { chainId })`
- *      query on the public v3 GraphQL indexer (`configAddress` → `siloId`).
+ * **Primary:** `POST https://app.silo.finance/api/earn-silos` (curated earn UI list). SiloConfig
+ * only from `link`; dedupe by config; enrich `siloId` via v3 GraphQL (`configAddress` → `siloId`).
  *
- * If this endpoint disappears or starts failing CORS from the static host, the GraphQL indexer
- * (option 2) is the drop-in fallback — that client lived in git history until 2026-04-23.
+ * **Fallback:** public raw JSON from silo-contracts-v3 (`_siloDeployments.json`) when the earn API
+ * errors (e.g. HTTP 400). See `fetchSiloDeploymentsFromRepo` and `NEXT_PUBLIC_SILO_DEPLOYMENTS_JSON_URL`.
  *
- * **Local dev without upstream CORS:** run `npm run dev:proxy-earn-silos` in a second terminal and
- * put `NEXT_PUBLIC_EARN_SILOS_URL=http://127.0.0.1:3041/api/earn-silos` in `.env.local` (see
- * `scripts/earn-silos-dev-proxy.mjs`). Production stays on `https://app.silo.finance/...` once
- * `Access-Control-Allow-Origin` is deployed there.
+ * **Local dev CORS on earn:** `npm run dev:proxy-earn-silos` + `NEXT_PUBLIC_EARN_SILOS_URL` in `.env.local`.
  */
 
 export type EarnSiloEntry = {
@@ -224,7 +215,7 @@ async function fetchSiloIdByConfigAddress(
   return map
 }
 
-export async function fetchEarnSilosForChain(
+async function fetchEarnSilosFromApi(
   chainId: number,
   signal?: AbortSignal,
   endpoint: string = getEarnSilosApiUrl(),
@@ -325,4 +316,39 @@ export async function fetchEarnSilosForChain(
   })
 
   return out
+}
+
+export type PredefinedSilosResult = {
+  entries: EarnSiloEntry[]
+  /** Set when the earn API failed but the contracts-repo JSON succeeded. */
+  apiWarning: string | null
+}
+
+/**
+ * Load predefined silos: try earn API first; on any failure, fall back to `_siloDeployments.json`
+ * from silo-contracts-v3 (see `fetchSiloDeploymentsFromRepo`). Throws only if both fail.
+ */
+export async function fetchPredefinedSilosForChain(
+  chainId: number,
+  signal?: AbortSignal
+): Promise<PredefinedSilosResult> {
+  try {
+    const entries = await fetchEarnSilosFromApi(chainId, signal)
+    return { entries, apiWarning: null }
+  } catch (apiErr) {
+    const net = getNetworkDisplayName(chainId) ?? `chain ${chainId}`
+    const detail = apiErr instanceof Error ? apiErr.message : String(apiErr)
+    try {
+      const entries = await fetchSiloDeploymentsFromRepo(chainId, signal)
+      return {
+        entries,
+        apiWarning: `Earn API failed for ${net} (${detail}), fallback to silo repository`,
+      }
+    } catch (repoErr) {
+      const repoDetail = repoErr instanceof Error ? repoErr.message : String(repoErr)
+      throw new Error(
+        `Predefined silos: earn API failed (${detail}); contracts JSON failed (${repoDetail}).`
+      )
+    }
+  }
 }

@@ -7,6 +7,7 @@
 - predefined silos list now sourced from `app.silo.finance/api/earn-silos` so the picker matches the live earn UI exactly
 - predefined silos: SiloConfig only from `link`, dedupe by config, numeric `#id` from Silo v3 GraphQL by `configAddress`
 - fixed predefined `#id` enrichment: v3 GraphQL rejects oversized `silos(limit: …)` — page with `limit: 200` + `offset` instead
+- predefined silos: on earn API failure, warn in UI and fall back to silo-contracts-v3 `_siloDeployments.json` (raw GitHub)
 
 ## [0.18.0] - 2026-04-23
 
