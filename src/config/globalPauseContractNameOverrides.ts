@@ -58,6 +58,16 @@ export const GLOBAL_PAUSE_CONTRACT_NAME_OVERRIDES: Record<number, ChainOverrides
     '0x205451eB57b1C302EC58443223B52AadD13d69B9': 'LeverageRouter',
     '0xAd84B07082c67a1105b933c28f8c8bA5b89DFcFA': 'SiloRouterV2',
   },
+  // MegaETH
+  4326: {
+    '0x1C7861978D11E9fd13257607d3FCf7bF3478f6EB': 'LeverageRouter',
+    '0x30d3E6873118147bA84172490F35DbaB002fA230': 'SiloRouterV2',
+  },
+  // Mantle
+  5000: {
+    '0xfdA5f0b51910C3D9Ac654BbA13b722DE30b45a39': 'LeverageRouter',
+    '0x744a309977d3449b5FF2639C9EFd7a1994c7B702': 'SiloRouterV2',
+  },
   // Arbitrum One
   42161: {
     '0x128b7b7457e35E201Da5024C9e8D024e1b0AF94b': 'LeverageRouter',
