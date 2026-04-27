@@ -95,6 +95,24 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     iconPath: '/network-icons/injective.svg',
     walletRpcUrls: ['https://sentry.evm-rpc.injective.network'],
   },
+  {
+    chainId: 4326,
+    displayName: 'MegaETH',
+    chainName: 'megaeth',
+    explorerBaseUrl: 'https://mega.etherscan.io',
+    nativeTokenSymbol: 'ETH',
+    iconPath: '/network-icons/megaeth.ico',
+    walletRpcUrls: ['https://mainnet.megaeth.com/rpc'],
+  },
+  {
+    chainId: 5000,
+    displayName: 'Mantle',
+    chainName: 'mantle',
+    explorerBaseUrl: 'https://mantlescan.xyz',
+    nativeTokenSymbol: 'MNT',
+    iconPath: '/network-icons/mantle.ico',
+    walletRpcUrls: ['https://rpc.mantle.xyz'],
+  },
 ]
 
 const NETWORK_CONFIG_MAP: Map<number, NetworkConfig> = new Map(

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.21.0] - 2026-04-27
+### Added
+- support for Mantle and MegaETH blockchains
+
 ## [0.20.0] - 2026-04-24
 ### Added
 - Update IRM action

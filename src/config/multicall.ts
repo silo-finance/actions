@@ -31,6 +31,12 @@ export const MULTICALL3_BY_CHAIN_ID: Record<number, Multicall3Config> = {
   1776: {
     address: '0xcA11bde05977b3631167028862bE2a173976CA11',
   },
+  4326: {
+    address: '0xca11bde05977b3631167028862be2a173976ca11',
+  },
+  5000: {
+    address: '0xca11bde05977b3631167028862be2a173976ca11',
+  },
   42161: {
     address: '0xca11bde05977b3631167028862be2a173976ca11',
     blockCreated: 7654707,
