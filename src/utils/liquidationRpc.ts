@@ -95,6 +95,18 @@ function getReadonlyProvider(chainId: number): Provider {
   return provider
 }
 
+type ReadProviderPolicyOptions = {
+  preferredProvider?: Provider | null
+  preferredChainId?: number | null
+}
+
+function selectReadProvider(chainId: number, options?: ReadProviderPolicyOptions): Provider {
+  const preferredProvider = options?.preferredProvider ?? null
+  const preferredChainId = options?.preferredChainId ?? null
+  if (preferredProvider && preferredChainId === chainId) return preferredProvider
+  return getReadonlyProvider(chainId)
+}
+
 export type LiquidationMarketDynamicState = {
   siloAddress: string
   totalAssetsStorage: bigint
@@ -191,9 +203,10 @@ function normalizeBorrowerAddress(raw: string): string | null {
 export async function fetchBorrowersSolvency(
   chainId: number,
   siloAddress: string,
-  borrowers: string[]
+  borrowers: string[],
+  options?: ReadProviderPolicyOptions
 ): Promise<Map<string, boolean>> {
-  const provider = getReadonlyProvider(chainId)
+  const provider = selectReadProvider(chainId, options)
   const out = new Map<string, boolean>()
   const normalizedBorrowers = Array.from(new Set(borrowers.map((addr) => normalizeBorrowerAddress(addr)).filter(Boolean)))
   if (normalizedBorrowers.length === 0) return out
@@ -224,9 +237,10 @@ export async function fetchBorrowersSolvency(
 export async function fetchBorrowersLtvFromSiloLens(
   chainId: number,
   siloAddress: string,
-  borrowers: string[]
+  borrowers: string[],
+  options?: ReadProviderPolicyOptions
 ): Promise<Map<string, string>> {
-  const provider = getReadonlyProvider(chainId)
+  const provider = selectReadProvider(chainId, options)
   const out = new Map<string, string>()
   const normalizedBorrowers = Array.from(new Set(borrowers.map((addr) => normalizeBorrowerAddress(addr)).filter(Boolean)))
   if (normalizedBorrowers.length === 0) return out

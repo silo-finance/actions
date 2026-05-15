@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useWeb3 } from '@/contexts/Web3Context'
 import {
   getExplorerAddressUrl,
   getNetworkDisplayName,
@@ -409,6 +410,7 @@ function stringifyPretty(value: unknown): string {
 }
 
 function PositionsPageInner() {
+  const { provider: walletProvider, chainId: walletChainId } = useWeb3()
   const queryClient = useQueryClient()
   const router = useRouter()
   const pathname = usePathname()
@@ -1011,7 +1013,10 @@ function PositionsPageInner() {
     queryKey: ['liq', 'positions', 'solvency', selectedRow?.chainId, selectedRow?.siloAddress?.toLowerCase(), borrowerAddresses.join('|')],
     queryFn: async () => {
       if (!selectedRow) return new Map<string, boolean>()
-      return fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, borrowerAddresses)
+      return fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, borrowerAddresses, {
+        preferredProvider: walletProvider,
+        preferredChainId: walletChainId,
+      })
     },
     enabled: isClientMounted && selectedRow != null && borrowerAddresses.length > 0,
     initialData: () => {
@@ -1195,7 +1200,11 @@ function PositionsPageInner() {
           const nextLtvByBorrower = await fetchBorrowersLtvFromSiloLens(
             selectedRow.chainId,
             selectedRow.siloAddress,
-            realtimeBorrowersToMonitor
+            realtimeBorrowersToMonitor,
+            {
+              preferredProvider: walletProvider,
+              preferredChainId: walletChainId,
+            }
           )
           console.debug('[positions-live] tick', {
             chainId: selectedRow.chainId,
@@ -1230,7 +1239,7 @@ function PositionsPageInner() {
       cancelled = true
       if (timer != null) window.clearTimeout(timer)
     }
-  }, [isRealtimeEnabled, selectedRow, realtimeMonitorKey, realtimeBorrowersToMonitor])
+  }, [isRealtimeEnabled, selectedRow, realtimeMonitorKey, realtimeBorrowersToMonitor, walletProvider, walletChainId])
 
   const toggleSort = (column: SortColumn) => {
     if (sortColumn !== column) {
@@ -1273,7 +1282,10 @@ function PositionsPageInner() {
     ) as string[]
     const solvencyByBorrower =
       allBorrowerAddresses.length > 0
-        ? await fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, allBorrowerAddresses)
+        ? await fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, allBorrowerAddresses, {
+            preferredProvider: walletProvider,
+            preferredChainId: walletChainId,
+          })
         : new Map<string, boolean>()
 
     let warningCount = 0
