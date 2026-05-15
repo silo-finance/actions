@@ -6,6 +6,7 @@ type PositionCountBatchResponse = {
     markets?: {
       items?: Array<{
         id: string
+        chainId: number
         positions?: {
           totalCount?: number
         }
@@ -21,6 +22,30 @@ type PositionListResponse = {
       totalCount?: number
       items?: Array<{
         id: string
+        marketId: string | null
+        accountId: string
+        ltv: string | null
+        debtValue: string | null
+        collateralValue: string | null
+        debtAssets: string | null
+        collateralAssets: string | null
+        isInBadDet: string | null
+      }>
+      pageInfo?: {
+        hasNextPage?: boolean
+      }
+    }
+  }
+  errors?: Array<{ message?: string }>
+}
+
+type PositionListByMarketsResponse = {
+  data?: {
+    positions?: {
+      items?: Array<{
+        id: string
+        chainId: number
+        marketId: string | null
         accountId: string
         ltv: string | null
         debtValue: string | null
@@ -38,14 +63,15 @@ type PositionListResponse = {
 }
 
 const POSITION_COUNTS_QUERY = `
-query PositionsCountByMarkets($chainId: Int!, $marketIds: [String!], $limit: Int!, $offset: Int!) {
+query PositionsCountByMarkets($chainIds: [Int!], $marketIds: [String!], $limit: Int!, $offset: Int!) {
   markets(
-    where: { chainId: $chainId, id_in: $marketIds }
+    where: { chainId_in: $chainIds, id_in: $marketIds }
     limit: $limit
     offset: $offset
   ) {
     items {
       id
+      chainId
       positions(where: { isOpen: true, ltv_gt: "0" }, limit: 1, offset: 0) {
         totalCount
       }
@@ -66,6 +92,35 @@ query OpenPositionsByMarket($chainId: Int!, $marketId: String!, $limit: Int!, $o
     totalCount
     items {
       id
+      marketId
+      accountId
+      ltv
+      debtValue
+      collateralValue
+      debtAssets
+      collateralAssets
+      isInBadDet
+    }
+    pageInfo {
+      hasNextPage
+    }
+  }
+}
+`
+
+const OPEN_POSITIONS_BY_MARKETS_QUERY = `
+query OpenPositionsByMarkets($chainIds: [Int!], $marketIds: [String!], $limit: Int!, $offset: Int!) {
+  positions(
+    where: { chainId_in: $chainIds, marketId_in: $marketIds, isOpen: true, ltv_gt: "0" }
+    orderBy: "debtValue"
+    orderDirection: "desc"
+    limit: $limit
+    offset: $offset
+  ) {
+    items {
+      id
+      chainId
+      marketId
       accountId
       ltv
       debtValue
@@ -83,6 +138,8 @@ query OpenPositionsByMarket($chainId: Int!, $marketId: String!, $limit: Int!, $o
 
 export type OpenMarketPosition = {
   id: string
+  chainId: number
+  marketId: string | null
   accountId: string
   ltv: string | null
   debtValue: string | null
@@ -209,30 +266,68 @@ function chunkValues<T>(values: T[], size: number): T[][] {
   return out
 }
 
+type ChainMarketRef = {
+  chainId: number
+  marketId: string
+}
+
+function normalizeChainMarketRefs(markets: ChainMarketRef[]): ChainMarketRef[] {
+  const unique = new Map<string, ChainMarketRef>()
+  for (const market of markets) {
+    const chainId = Number(market.chainId)
+    const marketId = market.marketId.toLowerCase()
+    unique.set(`${chainId}:${marketId}`, { chainId, marketId })
+  }
+  return Array.from(unique.values())
+}
+
 export async function fetchOpenPositionCountsByMarket(
   chainId: number,
   siloAddresses: string[],
   marketChunkSize: number
 ): Promise<Map<string, number>> {
   const out = new Map<string, number>()
-  if (siloAddresses.length === 0) return out
+  const normalized = normalizeChainMarketRefs(
+    siloAddresses.map((marketId) => ({ chainId, marketId }))
+  )
+  const byChainAndMarket = await fetchOpenPositionCountsByChainAndMarket(normalized, marketChunkSize)
+  byChainAndMarket.forEach((count, key) => {
+    const [, marketId] = key.split(':')
+    if (!marketId) return
+    out.set(marketId, count)
+  })
+  return out
+}
 
-  const chunks = chunkValues(siloAddresses, Math.max(1, marketChunkSize))
+export async function fetchOpenPositionCountsByChainAndMarket(
+  markets: ChainMarketRef[],
+  marketChunkSize: number
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>()
+  if (markets.length === 0) return out
+
+  const normalized = normalizeChainMarketRefs(markets)
+  if (normalized.length === 0) return out
+  const chainIds = Array.from(new Set(normalized.map((row) => row.chainId)))
+  const marketIds = Array.from(new Set(normalized.map((row) => row.marketId)))
+  const allowedKeys = new Set(normalized.map((row) => `${row.chainId}:${row.marketId}`))
+  allowedKeys.forEach((key) => out.set(key, 0))
+
+  const chunks = chunkValues(marketIds, Math.max(1, marketChunkSize))
   for (const chunk of chunks) {
+    const limit = chunk.length * chainIds.length
     const data = await postGraphql<PositionCountBatchResponse['data']>(POSITION_COUNTS_QUERY, {
-      chainId,
+      chainIds,
       marketIds: chunk,
-      limit: chunk.length,
+      limit,
       offset: 0,
     })
     const items = data?.markets?.items ?? []
     for (const item of items) {
-      out.set(item.id.toLowerCase(), item.positions?.totalCount ?? 0)
+      const key = `${item.chainId}:${item.id.toLowerCase()}`
+      if (!allowedKeys.has(key)) continue
+      out.set(key, item.positions?.totalCount ?? 0)
     }
-  }
-
-  for (const id of siloAddresses) {
-    if (!out.has(id.toLowerCase())) out.set(id.toLowerCase(), 0)
   }
   return out
 }
@@ -271,5 +366,69 @@ export async function fetchAllOpenPositionsByMarket(
     if (!page.hasNextPage) break
     offset += limit
   }
+  return out
+}
+
+export async function fetchAllOpenPositionsByMarkets(
+  chainId: number,
+  siloAddresses: string[],
+  pageLimit: number,
+  marketChunkSize: number
+): Promise<Map<string, OpenMarketPosition[]>> {
+  const out = new Map<string, OpenMarketPosition[]>()
+  const byChainAndMarket = await fetchAllOpenPositionsByChainAndMarket(
+    siloAddresses.map((marketId) => ({ chainId, marketId })),
+    pageLimit,
+    marketChunkSize
+  )
+  byChainAndMarket.forEach((items, key) => {
+    const [, marketId] = key.split(':')
+    if (!marketId) return
+    out.set(marketId, items)
+  })
+  return out
+}
+
+export async function fetchAllOpenPositionsByChainAndMarket(
+  markets: ChainMarketRef[],
+  pageLimit: number,
+  marketChunkSize: number
+): Promise<Map<string, OpenMarketPosition[]>> {
+  const out = new Map<string, OpenMarketPosition[]>()
+  if (markets.length === 0) return out
+
+  const normalized = normalizeChainMarketRefs(markets)
+  if (normalized.length === 0) return out
+  const chainIds = Array.from(new Set(normalized.map((row) => row.chainId)))
+  const marketIds = Array.from(new Set(normalized.map((row) => row.marketId)))
+  const allowedKeys = new Set(normalized.map((row) => `${row.chainId}:${row.marketId}`))
+  allowedKeys.forEach((key) => out.set(key, []))
+
+  const marketChunks = chunkValues(marketIds, Math.max(1, marketChunkSize))
+  const limit = Math.max(1, pageLimit)
+  for (const marketIds of marketChunks) {
+    let offset = 0
+    while (true) {
+      const data = await postGraphql<PositionListByMarketsResponse['data']>(OPEN_POSITIONS_BY_MARKETS_QUERY, {
+        chainIds,
+        marketIds,
+        limit,
+        offset,
+      })
+      const page = data?.positions
+      const items = (page?.items ?? []) as OpenMarketPosition[]
+      for (const item of items) {
+        const chainId = Number(item.chainId)
+        const marketId = item.marketId?.toLowerCase()
+        if (!marketId) continue
+        const key = `${chainId}:${marketId}`
+        if (!allowedKeys.has(key)) continue
+        out.get(key)!.push(item)
+      }
+      if (!page?.pageInfo?.hasNextPage) break
+      offset += limit
+    }
+  }
+
   return out
 }

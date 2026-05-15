@@ -14,7 +14,8 @@ import {
 import { getLiquidationSnapshotEntries, getLiquidationSnapshotConfig } from '@/utils/liquidationSnapshot'
 import {
   fetchAllOpenPositionsByMarket,
-  fetchOpenPositionCountsByMarket,
+  fetchAllOpenPositionsByChainAndMarket,
+  fetchOpenPositionCountsByChainAndMarket,
   fetchOpenPositionsByMarket,
   type OpenMarketPosition,
 } from '@/utils/liquidationGraph'
@@ -457,27 +458,15 @@ function PositionsPageInner() {
   const positionsCountQuery = useQuery({
     queryKey: ['liq', 'markets', 'counts', snapshotKey, config.testGraphLimit],
     queryFn: async () => {
-      const byChain = new Map<number, typeof snapshotEntries>()
-      for (const row of snapshotEntries) {
-        if (!byChain.has(row.chainId)) byChain.set(row.chainId, [])
-        byChain.get(row.chainId)!.push(row)
-      }
       const out = new Map<string, number>()
-      const perChain = await Promise.all(
-        Array.from(byChain.entries()).map(async ([chainId, entries]) => ({
-          chainId,
-          countsByMarket: await fetchOpenPositionCountsByMarket(
-            chainId,
-            entries.map((row) => row.siloAddress.toLowerCase()),
-            config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK
-          ),
-        }))
+      const countsByChainAndMarket = await fetchOpenPositionCountsByChainAndMarket(
+        snapshotEntries.map((row) => ({
+          chainId: row.chainId,
+          marketId: row.siloAddress.toLowerCase(),
+        })),
+        config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK
       )
-      for (const { chainId, countsByMarket } of perChain) {
-        countsByMarket.forEach((count, siloAddress) => {
-          out.set(`${chainId}:${siloAddress.toLowerCase()}`, count)
-        })
-      }
+      countsByChainAndMarket.forEach((count, key) => out.set(key, count))
       return out
     },
     enabled: isClientMounted && snapshotEntries.length > 0,
@@ -499,9 +488,18 @@ function PositionsPageInner() {
     queryKey: ['liq', 'markets', 'positions-prefetch', snapshotKey, graphPageLimit],
     queryFn: async () => {
       const out = new Map<string, PrefetchedMarketPositionsEntry>()
+      const marketChunkSize = config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK
+      const positionsByChainAndMarket = await fetchAllOpenPositionsByChainAndMarket(
+        staticMarketRows.map((row) => ({
+          chainId: row.chainId,
+          marketId: row.siloAddress.toLowerCase(),
+        })),
+        graphPageLimit,
+        marketChunkSize
+      )
       for (const row of staticMarketRows) {
         const key = `${row.chainId}:${row.siloAddress.toLowerCase()}`
-        const items = await fetchAllOpenPositionsByMarket(row.chainId, row.siloAddress, graphPageLimit)
+        const items = positionsByChainAndMarket.get(key) ?? []
         const borrowerAddresses = Array.from(
           new Set(items.map((item) => extractBorrowerAddress(item.accountId)).filter(Boolean))
         ) as string[]
