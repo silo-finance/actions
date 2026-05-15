@@ -50,6 +50,7 @@ type MarketRow = {
 const DEFAULT_GRAPH_PAGE_LIMIT = 1000
 const DEFAULT_POSITIONS_COUNT_CHUNK = 40
 const BIGINT_ZERO = BigInt(0)
+const WARNING_HEALTH_FACTOR_THRESHOLD = 0.95
 
 type SortColumn =
   | 'siloId'
@@ -120,7 +121,8 @@ function formatPositionLtv(raw: string | null): string {
 
 function formatHealthFactor(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return '—'
-  return value.toLocaleString(undefined, {
+  const roundedDown = Math.floor(value * 100) / 100
+  return roundedDown.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
@@ -220,6 +222,10 @@ function getMarketsFreshnessTextClass(ageSeconds: number | null): string {
   if (ageSeconds > 60 * 60 * 24 * 3) return 'text-[color-mix(in_srgb,var(--silo-danger)_85%,#4f0f1c)]'
   if (ageSeconds > 60 * 60 * 24) return 'text-[color-mix(in_srgb,var(--silo-warning)_90%,#5a3b12)]'
   return 'text-[color-mix(in_srgb,var(--silo-text)_74%,#1f2430)]'
+}
+
+function isWarningHealthFactor(healthFactor: number | null, isInsolvent: boolean): boolean {
+  return !isInsolvent && healthFactor != null && healthFactor >= WARNING_HEALTH_FACTOR_THRESHOLD
 }
 
 async function copyToClipboard(value: string): Promise<void> {
@@ -516,7 +522,7 @@ function PositionsPageInner() {
           const borrowerAddress = extractBorrowerAddress(item.accountId)
           const isSolvent = borrowerAddress ? solvencyByBorrower.get(borrowerAddress) : undefined
           const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
-          const isWarning = !isInsolvent && healthFactor != null && healthFactor >= 0.9
+          const isWarning = isWarningHealthFactor(healthFactor, isInsolvent)
           if (isInsolvent) insolventCount += 1
           else if (isWarning) warningCount += 1
         }
@@ -1080,7 +1086,7 @@ function PositionsPageInner() {
       const borrowerAddress = extractBorrowerAddress(item.accountId)
       const isSolvent = borrowerAddress ? solvencyByBorrower.get(borrowerAddress) : undefined
       const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
-      const isWarning = !isInsolvent && healthFactor != null && healthFactor >= 0.95
+      const isWarning = isWarningHealthFactor(healthFactor, isInsolvent)
       if (isInsolvent) insolventCount += 1
       else if (isWarning) warningCount += 1
     }
@@ -1283,7 +1289,7 @@ function PositionsPageInner() {
                       const borrowerAddress = extractBorrowerAddress(row.accountId)
                       const isInsolventByRatio = healthFactor != null && healthFactor >= 1
                       const isInsolvent = isSolvent === false || isInsolventByRatio
-                      const isNearLt = !isInsolvent && healthFactor != null && healthFactor >= 0.95
+                      const isNearLt = isWarningHealthFactor(healthFactor, isInsolvent)
                       const hasLtMismatch =
                         isSolvent != null &&
                         healthFactor != null &&
