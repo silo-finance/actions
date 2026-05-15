@@ -1,13 +1,14 @@
 # Changelog
 
+## [0.22.1] - 2026-05-15
+
+### Fixed
+- fix base path
+
 ## [0.22.0] - 2026-05-15
 
 ### Added
-- positions (#62)
-
-## [Unreleased]
-### Added
-- positions dashboard with static silo snapshots
+- positions dashboard with static silo snapshots (#62)
 
 ## [0.21.0] - 2026-04-27
 ### Added
