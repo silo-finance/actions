@@ -1,0 +1,66 @@
+name: Liquidation Snapshot Remove Silo
+
+on:
+  workflow_dispatch:
+    inputs:
+      chainKey:
+        description: 'Chain key where this silo should be removed'
+        required: true
+        type: choice
+        options:
+          - ethereum
+          - arbitrum
+          - avalanche
+          - injective
+          - sonic
+          - xdc
+      siloAddress:
+        description: 'Silo market address (0x...)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  remove-silo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Remove single silo
+        run: |
+          set -euo pipefail
+          node ./scripts/sync-liquidation-silos.mjs remove \
+            --chainKey=${{ inputs.chainKey }} \
+            --siloAddress=${{ inputs.siloAddress }}
+
+      - name: Detect snapshot changes
+        id: detect
+        run: |
+          if git diff --quiet -- src/data/liquidation/silos; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No snapshot changes detected."
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create PR with silo removal
+        if: steps.detect.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/liquidation-remove-silo-${{ inputs.chainKey }}
+          commit-message: 'chore: remove liquidation silo snapshot'
+          title: 'chore: remove liquidation silo snapshot'
+          body: |
+            Automated removal of a liquidation silo snapshot entry.
+
+            - chain: `${{ inputs.chainKey }}`
+            - silo: `${{ inputs.siloAddress }}`

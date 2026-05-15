@@ -131,6 +131,27 @@ export function getNetworkDisplayName(chainId: number | string): string {
   return `Network ${id}`
 }
 
+export function getNetworkShortName(chainId: number | string): string {
+  const config = getNetworkConfig(chainId)
+  if (!config) {
+    const id = typeof chainId === 'string' ? parseInt(chainId, 10) : chainId
+    return `Network ${id}`
+  }
+
+  switch (config.chainId) {
+    case 1:
+      return 'Mainnet'
+    case 50:
+      return 'XDC'
+    case 42161:
+      return 'Arbitrum'
+    case 43114:
+      return 'Avalanche'
+    default:
+      return config.displayName.replace(/\s+(Mainnet|Network|One|C-Chain)$/i, '')
+  }
+}
+
 export function getNetworkIconPath(chainId: number | string): string | null {
   const config = getNetworkConfig(chainId)
   return config?.iconPath ?? null

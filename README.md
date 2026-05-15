@@ -32,6 +32,42 @@ npm run build
 
 GitHub Pages deployment is configured in `.github/workflows/deploy-pages.yml`.
 
+## Positions dashboard snapshot
+
+The `Positions` page reads static market metadata from local snapshot files in `src/data/liquidation/silos/`.
+
+Snapshot maintenance is CI-driven:
+
+- `.github/workflows/liquidation-full-refresh.yml`
+- `.github/workflows/liquidation-add-silo.yml`
+- `.github/workflows/liquidation-remove-silo.yml`
+
+Local sync commands:
+
+```bash
+node scripts/sync-liquidation-silos.mjs full
+node scripts/sync-liquidation-silos.mjs add --chainKey=arbitrum --siloAddress=0x...
+node scripts/sync-liquidation-silos.mjs remove --chainKey=arbitrum --siloAddress=0x...
+```
+
+Optional runtime envs for dashboard testing:
+
+```bash
+NEXT_PUBLIC_LIQ_GRAPHQL_URL=https://api-v3.silo.finance/graphql
+NEXT_PUBLIC_TEST_SILO_IDS=0x...,0x...
+NEXT_PUBLIC_TEST_API_LIMIT=20
+NEXT_PUBLIC_TEST_GRAPH_LIMIT=50
+NEXT_PUBLIC_TEST_DISABLE_PAGINATION=true
+NEXT_PUBLIC_RPC_ETHEREUM=https://ethereum.publicnode.com
+NEXT_PUBLIC_RPC_ARBITRUM=https://arb1.arbitrum.io/rpc
+NEXT_PUBLIC_RPC_AVALANCHE=https://api.avax.network/ext/bc/C/rpc
+NEXT_PUBLIC_RPC_INJECTIVE=https://sentry.evm-rpc.injective.network
+NEXT_PUBLIC_RPC_SONIC=https://rpc.soniclabs.com
+NEXT_PUBLIC_RPC_XDC=https://rpc.xdcrpc.com
+```
+
+Data contract details live in `docs/liquidation-dashboard-data.md`.
+
 For WalletConnect on the deployed site, add a **repository variable** (not required for local-only extension wallets):
 
 1. GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** → **New repository variable**

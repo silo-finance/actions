@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+### Added
+- positions dashboard with static silo snapshots
+
 ## [0.21.0] - 2026-04-27
 ### Added
 - support for Mantle and MegaETH blockchains
