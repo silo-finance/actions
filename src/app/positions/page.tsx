@@ -949,6 +949,10 @@ function PositionsPageInner() {
   const positionsFreshnessLabel = formatRelativeAge(positionsLastUpdatedAt, nowMs)
   const positionsAgeSeconds = getRelativeAgeSeconds(positionsLastUpdatedAt, nowMs)
   const positionsFreshnessClass = getPositionsFreshnessTextClass(positionsAgeSeconds)
+  const positionsTotalRecords = positionsQuery.data?.totalCount ?? (positionsQuery.data?.items ?? []).length
+  const positionsCurrentPage = Math.floor(paginationOffset / pageLimit) + 1
+  const positionsTotalPages = Math.max(1, Math.ceil(Math.max(positionsTotalRecords, 1) / pageLimit))
+  const positionsPageLabel = !config.testDisablePagination ? `Page ${positionsCurrentPage} of ${positionsTotalPages}` : null
 
   const sortedPositionRows = useMemo(() => {
     const rows = positionsQuery.data?.items ?? []
@@ -1065,7 +1069,7 @@ function PositionsPageInner() {
                 Back to markets
               </button>
             </div>
-            <p className="text-xs silo-text-soft m-0">
+            <p className="text-xs silo-text-soft m-0 flex flex-wrap items-center gap-1.5">
               <span className="inline-flex items-center gap-1">
                 {selectedRow.chainIconPath ? (
                   <Image
@@ -1073,14 +1077,14 @@ function PositionsPageInner() {
                     alt={`${selectedRow.chainDisplayName} icon`}
                     width={12}
                     height={12}
-                    className="rounded-sm"
+                    className="rounded-sm align-middle"
                   />
                 ) : null}
                 <span>{selectedRow.chainName}</span>
               </span>
-              <span> • </span>
+              <span className="silo-text-faint">•</span>
               <span>#{selectedRow.siloId ?? '—'}</span>
-              <span> • </span>
+              <span className="silo-text-faint">•</span>
               <a
                 href={getExplorerAddressUrl(selectedRow.chainId, selectedRow.siloAddress)}
                 target="_blank"
@@ -1116,20 +1120,26 @@ function PositionsPageInner() {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-end gap-3 px-1">
-                <span className={`text-xs ${positionsFreshnessClass}`}>Fetched {positionsFreshnessLabel}</span>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center h-10 w-10 rounded-md text-2xl silo-text-soft hover:silo-text-main disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={() => {
-                    void Promise.all([positionsQuery.refetch(), solvencyQuery.refetch()])
-                  }}
-                  disabled={positionsQuery.isFetching || solvencyQuery.isFetching}
-                  aria-label="Refresh positions data"
-                  title="Refresh"
-                >
-                  <span aria-hidden>⟳</span>
-                </button>
+              <div className="flex items-center justify-between gap-3 px-1">
+                <span className="text-xs text-[color-mix(in_srgb,var(--silo-text)_74%,#1f2430)]">
+                  {positionsTotalRecords} positions
+                  {positionsPageLabel ? ` • ${positionsPageLabel}` : ''}
+                </span>
+                <div className="inline-flex items-center gap-3">
+                  <span className={`text-xs ${positionsFreshnessClass}`}>Fetched {positionsFreshnessLabel}</span>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center h-10 w-10 rounded-md text-2xl silo-text-soft hover:silo-text-main disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => {
+                      void Promise.all([positionsQuery.refetch(), solvencyQuery.refetch()])
+                    }}
+                    disabled={positionsQuery.isFetching || solvencyQuery.isFetching}
+                    aria-label="Refresh positions data"
+                    title="Refresh"
+                  >
+                    <span aria-hidden>⟳</span>
+                  </button>
+                </div>
               </div>
               <div className="silo-panel p-0 overflow-hidden">
               {solvencyQuery.isError ? (
@@ -1170,7 +1180,7 @@ function PositionsPageInner() {
                       const borrowerAddress = extractBorrowerAddress(row.accountId)
                       const isInsolventByRatio = healthFactor != null && healthFactor >= 1
                       const isInsolvent = isSolvent === false || isInsolventByRatio
-                      const isNearLt = !isInsolvent && healthFactor != null && healthFactor >= 0.9
+                      const isNearLt = !isInsolvent && healthFactor != null && healthFactor >= 0.95
                       const hasLtMismatch =
                         isSolvent != null &&
                         healthFactor != null &&
@@ -1270,7 +1280,7 @@ function PositionsPageInner() {
               {!config.testDisablePagination ? (
                 <div className="border-t border-[var(--silo-border)] px-4 py-3 flex items-center justify-between">
                   <span className="text-xs silo-text-soft">
-                    Total: {positionsQuery.data?.totalCount ?? 0} • Offset: {paginationOffset}
+                    {positionsPageLabel}
                   </span>
                   <div className="flex items-center gap-2">
                     <button
@@ -1311,14 +1321,14 @@ function PositionsPageInner() {
                       <span className="block text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">
                         Token symbol
                       </span>
-                      <div className="flex flex-wrap items-center gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-10 gap-3 items-center">
                         <input
-                          className="silo-input silo-input--sm min-w-[190px]"
+                          className="silo-input silo-input--sm min-w-[120px] w-full sm:col-span-3"
                           placeholder="e.g. WETH"
                           value={filters.token}
                           onChange={(e) => updateFilter('token', e.target.value)}
                         />
-                        <label className="inline-flex items-center gap-2 text-xs silo-text-soft">
+                        <label className="inline-flex items-center gap-2 text-xs silo-text-soft sm:col-span-7">
                           <input
                             type="checkbox"
                             checked={filters.hideZeroPositions}
@@ -1383,28 +1393,33 @@ function PositionsPageInner() {
                   <p className="text-xs silo-text-soft mt-1 mb-0">Loading live metrics in background…</p>
                 ) : null}
               </div>
-              <div className="flex items-center justify-end gap-3 px-1">
-                <p className={`text-xs mb-0 ${marketsFreshnessClass}`}>Fetched {marketsFreshnessLabel}</p>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center h-10 w-10 rounded-md text-2xl silo-text-soft hover:silo-text-main disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={() => {
-                    void Promise.all([
-                      dynamicStateQuery.refetch(),
-                      positionsCountQuery.refetch(),
-                      prefetchedMarketPositionsQuery.refetch(),
-                    ])
-                  }}
-                  disabled={
-                    dynamicStateQuery.isFetching ||
-                    positionsCountQuery.isFetching ||
-                    prefetchedMarketPositionsQuery.isFetching
-                  }
-                  aria-label="Refresh markets data"
-                  title="Refresh"
-                >
-                  <span aria-hidden>⟳</span>
-                </button>
+              <div className="flex items-center justify-between gap-3 px-1">
+                <span className="text-xs text-[color-mix(in_srgb,var(--silo-text)_74%,#1f2430)]">
+                  {filteredRows.length} markets
+                </span>
+                <div className="inline-flex items-center gap-3">
+                  <p className={`text-xs mb-0 ${marketsFreshnessClass}`}>Fetched {marketsFreshnessLabel}</p>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center h-10 w-10 rounded-md text-2xl silo-text-soft hover:silo-text-main disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => {
+                      void Promise.all([
+                        dynamicStateQuery.refetch(),
+                        positionsCountQuery.refetch(),
+                        prefetchedMarketPositionsQuery.refetch(),
+                      ])
+                    }}
+                    disabled={
+                      dynamicStateQuery.isFetching ||
+                      positionsCountQuery.isFetching ||
+                      prefetchedMarketPositionsQuery.isFetching
+                    }
+                    aria-label="Refresh markets data"
+                    title="Refresh"
+                  >
+                    <span aria-hidden>⟳</span>
+                  </button>
+                </div>
               </div>
               <div className="silo-panel p-0 overflow-hidden">
               <div className="overflow-x-auto">
