@@ -115,12 +115,12 @@ function VaultPageInner() {
     !lastSuccessfulCheck || chainId == null || chainId === lastSuccessfulCheck.chainId
   const networkName = vaultDisplayChainId != null ? getNetworkDisplayName(vaultDisplayChainId) : null
   const networkIconPath = vaultDisplayChainId != null ? getNetworkIconPath(vaultDisplayChainId) : null
-  const networkIconSrc = networkIconPath ? `${basePath}${networkIconPath}` : null
+  const networkIconSrc = networkIconPath
 
   /** Current wallet chain (for "My vaults" API section only; not the loaded-vault display chain). */
   const walletChainName = chainId != null ? getNetworkDisplayName(chainId) : null
   const walletChainIconPath = chainId != null ? getNetworkIconPath(chainId) : null
-  const walletChainIconSrc = walletChainIconPath ? `${basePath}${walletChainIconPath}` : null
+  const walletChainIconSrc = walletChainIconPath
   const accountChecksum = account ? normalizeAddress(account) ?? account : null
   const accountShort = accountChecksum ? `${accountChecksum.slice(0, 6)}…${accountChecksum.slice(-4)}` : null
 

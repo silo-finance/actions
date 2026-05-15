@@ -142,10 +142,9 @@ export default function Header() {
                     /** Native `<select>` options cannot render images, so the active network icon sits inline before the picker. */
                     const iconPath = chainId != null ? getNetworkIconPath(chainId) : null
                     if (!iconPath) return null
-                    const iconSrc = `${basePath}${iconPath}`
                     return (
                       <Image
-                        src={iconSrc}
+                        src={iconPath}
                         alt=""
                         width={16}
                         height={16}

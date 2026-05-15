@@ -148,7 +148,7 @@ function SiloPageInner() {
 
   const networkName = displayChainId != null ? getNetworkDisplayName(displayChainId) : null
   const networkIconPath = displayChainId != null ? getNetworkIconPath(displayChainId) : null
-  const networkIconSrc = networkIconPath ? `${basePath}${networkIconPath}` : null
+  const networkIconSrc = networkIconPath
 
   const resetResolvedState = useCallback(() => {
     setResolved(null)

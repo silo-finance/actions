@@ -1133,7 +1133,6 @@ function SectionShell({
   networkLabel?: string
   networkChainId?: number | null
 }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
   const iconPath = networkChainId != null ? getNetworkIconPath(networkChainId) : null
   return (
     <div className="silo-panel silo-top-card p-5">
@@ -1143,7 +1142,7 @@ function SectionShell({
           <span className="inline-flex items-center gap-1.5 text-xs silo-text-soft">
             {iconPath ? (
               <Image
-                src={`${basePath}${iconPath}`}
+                src={iconPath}
                 alt=""
                 width={14}
                 height={14}
