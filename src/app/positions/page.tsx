@@ -4,7 +4,7 @@ import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getExplorerAddressUrl,
   getNetworkDisplayName,
@@ -341,6 +341,7 @@ function stringifyPretty(value: unknown): string {
 }
 
 function PositionsPageInner() {
+  const queryClient = useQueryClient()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -1024,6 +1025,72 @@ function PositionsPageInner() {
     setPositionsSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
   }
 
+  const syncMarketCachesFromPositionsRefresh = async () => {
+    if (!selectedRow || selectedChainId == null || !selectedSiloAddress) return
+    const marketKey = `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}`
+    const allItems = await fetchAllOpenPositionsByMarket(selectedRow.chainId, selectedRow.siloAddress, graphPageLimit)
+    const allBorrowerAddresses = Array.from(
+      new Set(allItems.map((item) => extractBorrowerAddress(item.accountId)).filter(Boolean))
+    ) as string[]
+    const solvencyByBorrower =
+      allBorrowerAddresses.length > 0
+        ? await fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, allBorrowerAddresses)
+        : new Map<string, boolean>()
+
+    let warningCount = 0
+    let insolventCount = 0
+    for (const item of allItems) {
+      const ltvRatio = parseScaledNumber(item.ltv, 18)
+      const healthFactor = ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
+      const borrowerAddress = extractBorrowerAddress(item.accountId)
+      const isSolvent = borrowerAddress ? solvencyByBorrower.get(borrowerAddress) : undefined
+      const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
+      const isWarning = !isInsolvent && healthFactor != null && healthFactor >= 0.95
+      if (isInsolvent) insolventCount += 1
+      else if (isWarning) warningCount += 1
+    }
+
+    queryClient.setQueryData<Map<string, number>>(
+      ['liq', 'markets', 'counts', snapshotKey, config.testGraphLimit],
+      (prev) => {
+        const next = new Map(prev ?? [])
+        next.set(marketKey, allItems.length)
+        return next
+      }
+    )
+
+    queryClient.setQueryData<Map<string, PrefetchedMarketPositionsEntry>>(
+      ['liq', 'markets', 'positions-prefetch', snapshotKey, graphPageLimit],
+      (prev) => {
+        const next = new Map(prev ?? [])
+        next.set(marketKey, {
+          chainId: selectedRow.chainId,
+          siloAddress: selectedRow.siloAddress.toLowerCase(),
+          items: allItems,
+          totalCount: allItems.length,
+          warningCount,
+          insolventCount,
+          solvencyByBorrower: Array.from(solvencyByBorrower.entries()),
+        })
+        return next
+      }
+    )
+
+    queryClient.setQueryData<{ items: OpenMarketPosition[]; totalCount: number; hasNextPage: boolean }>(
+      ['liq', 'positions', selectedChainId, selectedSiloAddress, pageLimit, paginationOffset],
+      {
+        items: allItems.slice(paginationOffset, paginationOffset + pageLimit),
+        totalCount: allItems.length,
+        hasNextPage: paginationOffset + pageLimit < allItems.length,
+      }
+    )
+
+    queryClient.setQueryData<Map<string, boolean>>(
+      ['liq', 'positions', 'solvency', selectedRow.chainId, selectedRow.siloAddress.toLowerCase(), borrowerAddresses.join('|')],
+      new Map(solvencyByBorrower)
+    )
+  }
+
   const openPositionsView = (row: MarketRow) => {
     const next = new URLSearchParams(searchParams.toString())
     next.set('view', 'positions')
@@ -1131,7 +1198,7 @@ function PositionsPageInner() {
                     type="button"
                     className="inline-flex items-center justify-center h-10 w-10 rounded-md text-2xl silo-text-soft hover:silo-text-main disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => {
-                      void Promise.all([positionsQuery.refetch(), solvencyQuery.refetch()])
+                      void syncMarketCachesFromPositionsRefresh()
                     }}
                     disabled={positionsQuery.isFetching || solvencyQuery.isFetching}
                     aria-label="Refresh positions data"
