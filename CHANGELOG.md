@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.22.2] - 2026-05-15
+
+### Updated
+- batch positions prefetch GraphQL requests by `chainId_in` + `marketId_in` to reduce refresh query fan-out
+
 ## [0.22.1] - 2026-05-15
 
 ### Fixed
