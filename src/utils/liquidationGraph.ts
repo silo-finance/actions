@@ -125,15 +125,28 @@ function stringifyPretty(value: unknown): string {
   }
 }
 
+function buildPlaygroundBlocks(query: string, variables: Record<string, unknown>): string {
+  return [
+    '----- GRAPHQL PLAYGROUND: QUERY START -----',
+    query.trim(),
+    '----- GRAPHQL PLAYGROUND: QUERY END -----',
+    '----- GRAPHQL PLAYGROUND: VARIABLES START -----',
+    stringifyPretty(variables),
+    '----- GRAPHQL PLAYGROUND: VARIABLES END -----',
+  ].join('\n')
+}
+
 async function postGraphql<TData>(query: string, variables: Record<string, unknown>): Promise<TData> {
   const endpoint = getLiquidationGraphqlUrl()
   graphqlRequestSeq += 1
   const requestId = graphqlRequestSeq
   const payload = { query, variables }
+  const playgroundBlocks = buildPlaygroundBlocks(query, variables)
   console.groupCollapsed(`[liq-graphql:${requestId}] request`)
   console.info('Endpoint:', endpoint)
   console.info('Query (playground-ready):\n%s', query)
   console.info('Variables (playground-ready):\n%s', stringifyPretty(variables))
+  console.info('%s', playgroundBlocks)
   console.groupEnd()
   const res = await fetch(endpoint, {
     method: 'POST',
@@ -147,6 +160,7 @@ async function postGraphql<TData>(query: string, variables: Record<string, unkno
     console.error('Status:', res.status, res.statusText)
     console.error('Query (playground-ready):\n%s', query)
     console.error('Variables (playground-ready):\n%s', stringifyPretty(variables))
+    console.error('%s', playgroundBlocks)
     console.error('Response body:\n' + (bodyText || '<empty>'))
     console.groupEnd()
     throw buildGraphqlError(`GraphQL HTTP ${res.status} ${res.statusText}; body=${bodyText || '<empty>'}`, query, variables, {
@@ -163,6 +177,7 @@ async function postGraphql<TData>(query: string, variables: Record<string, unkno
     console.error('Endpoint:', endpoint)
     console.error('Query (playground-ready):\n%s', query)
     console.error('Variables (playground-ready):\n%s', stringifyPretty(variables))
+    console.error('%s', playgroundBlocks)
     console.error('Errors:\n' + stringifyPretty(json.errors))
     console.groupEnd()
     throw buildGraphqlError(msg || 'GraphQL query failed', query, variables, {
@@ -175,6 +190,7 @@ async function postGraphql<TData>(query: string, variables: Record<string, unkno
     console.error('Endpoint:', endpoint)
     console.error('Query (playground-ready):\n%s', query)
     console.error('Variables (playground-ready):\n%s', stringifyPretty(variables))
+    console.error('%s', playgroundBlocks)
     console.error('Raw response:\n' + stringifyPretty(json))
     console.groupEnd()
     throw buildGraphqlError('GraphQL returned empty data', query, variables, {
