@@ -45,7 +45,7 @@ query PositionsCountByMarkets($chainId: Int!, $marketIds: [String!], $limit: Int
   ) {
     items {
       id
-      positions(where: { isOpen: true }, limit: 1, offset: 0) {
+      positions(where: { isOpen: true, ltv_gt: "0" }, limit: 1, offset: 0) {
         totalCount
       }
     }
@@ -56,7 +56,7 @@ query PositionsCountByMarkets($chainId: Int!, $marketIds: [String!], $limit: Int
 const OPEN_POSITIONS_BY_MARKET_QUERY = `
 query OpenPositionsByMarket($chainId: Int!, $marketId: String!, $limit: Int!, $offset: Int!) {
   positions(
-    where: { chainId: $chainId, marketId: $marketId, isOpen: true }
+    where: { chainId: $chainId, marketId: $marketId, isOpen: true, ltv_gt: "0" }
     orderBy: "debtValue"
     orderDirection: "desc"
     limit: $limit

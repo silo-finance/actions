@@ -136,6 +136,14 @@ function extractBorrowerAddress(raw: string): string | null {
 function formatScaledValue(raw: string | null, decimals = 18, maxFractionDigits = 2): string {
   const parsed = parseScaledNumber(raw, decimals)
   if (parsed == null) return '—'
+  if (parsed !== 0 && Math.abs(parsed) < 10 ** -maxFractionDigits) {
+    return new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 20,
+      maximumSignificantDigits: 2,
+      useGrouping: false,
+    }).format(parsed)
+  }
   return parsed.toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: maxFractionDigits,
@@ -196,6 +204,11 @@ function getMarketsFreshnessTextClass(ageSeconds: number | null): string {
   if (ageSeconds > 60 * 60 * 24 * 3) return 'text-[color-mix(in_srgb,var(--silo-danger)_85%,#4f0f1c)]'
   if (ageSeconds > 60 * 60 * 24) return 'text-[color-mix(in_srgb,var(--silo-warning)_90%,#5a3b12)]'
   return 'text-[color-mix(in_srgb,var(--silo-text)_74%,#1f2430)]'
+}
+
+async function copyToClipboard(value: string): Promise<void> {
+  if (typeof navigator === 'undefined' || !navigator.clipboard) return
+  await navigator.clipboard.writeText(value)
 }
 
 function isZeroLt(raw: string | null): boolean {
@@ -867,7 +880,41 @@ function PositionsPageInner() {
               </button>
             </div>
             <p className="text-xs silo-text-soft m-0">
-              {selectedRow.chainName} • #{selectedRow.siloId ?? '—'} • {shortenAddress(selectedRow.siloAddress)}
+              <span className="inline-flex items-center gap-1">
+                {selectedRow.chainIconPath ? (
+                  <Image
+                    src={selectedRow.chainIconPath}
+                    alt={`${selectedRow.chainDisplayName} icon`}
+                    width={12}
+                    height={12}
+                    className="rounded-sm"
+                  />
+                ) : null}
+                <span>{selectedRow.chainName}</span>
+              </span>
+              <span> • </span>
+              <span>#{selectedRow.siloId ?? '—'}</span>
+              <span> • </span>
+              <a
+                href={getExplorerAddressUrl(selectedRow.chainId, selectedRow.siloAddress)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 hover:underline"
+                title={selectedRow.siloAddress}
+              >
+                <span>{shortenAddress(selectedRow.siloAddress)}</span>
+              </a>
+              <button
+                type="button"
+                className="text-xs ml-1 silo-text-soft hover:silo-text-main"
+                aria-label="Copy market address"
+                title="Copy market address"
+                onClick={() => {
+                  void copyToClipboard(selectedRow.siloAddress)
+                }}
+              >
+                ⧉
+              </button>
               <span className="ml-4">{selectedRow.marketTokenPair}</span>
               <span className="ml-4">LT {positionLtLabel}</span>
             </p>
@@ -934,6 +981,7 @@ function PositionsPageInner() {
                   </thead>
                   <tbody>
                     {sortedPositionRows.map(({ row, healthFactor, isSolvent }) => {
+                      const borrowerAddress = extractBorrowerAddress(row.accountId)
                       const isInsolventByRatio = healthFactor != null && healthFactor >= 1
                       const isInsolvent = isSolvent === false || isInsolventByRatio
                       const isNearLt = !isInsolvent && healthFactor != null && healthFactor >= 0.9
@@ -954,7 +1002,36 @@ function PositionsPageInner() {
                       return (
                         <Fragment key={row.id}>
                           <tr className={rowClassName}>
-                            <td className="px-4 py-3 font-mono">{shortenAddress(row.accountId)}</td>
+                            <td className="px-4 py-3 font-mono">
+                              <div className="inline-flex items-center gap-2">
+                                {borrowerAddress ? (
+                                  <a
+                                    href={getExplorerAddressUrl(selectedRow.chainId, borrowerAddress)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="hover:underline"
+                                    title={borrowerAddress}
+                                  >
+                                    {shortenAddress(borrowerAddress)}
+                                  </a>
+                                ) : (
+                                  <span>{shortenAddress(row.accountId)}</span>
+                                )}
+                                {borrowerAddress ? (
+                                  <button
+                                    type="button"
+                                    className="text-xs silo-text-soft hover:silo-text-main"
+                                    aria-label="Copy borrower address"
+                                    title="Copy borrower address"
+                                    onClick={() => {
+                                      void copyToClipboard(borrowerAddress)
+                                    }}
+                                  >
+                                    ⧉
+                                  </button>
+                                ) : null}
+                              </div>
+                            </td>
                             <td className="px-4 py-3">{formatPositionLtv(row.ltv)}</td>
                             <td className="px-4 py-3">
                               {formatScaledValue(row.debtValue, 18, 2)}
