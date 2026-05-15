@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.22.1] - 2026-05-15
+
+### Fixed
+- fix base path
+
 ## [0.22.0] - 2026-05-15
 
 ### Added
