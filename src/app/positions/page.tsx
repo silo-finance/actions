@@ -13,6 +13,7 @@ import {
 } from '@/utils/networks'
 import { getLiquidationSnapshotEntries, getLiquidationSnapshotConfig } from '@/utils/liquidationSnapshot'
 import {
+  fetchAllOpenPositionsByMarket,
   fetchOpenPositionCountsByMarket,
   fetchOpenPositionsByMarket,
   type OpenMarketPosition,
@@ -40,6 +41,8 @@ type MarketRow = {
   liquidity: bigint | null
   totalDebt: bigint | null
   positionsCount: number | null
+  warningPositionsCount: number | null
+  insolventPositionsCount: number | null
   needsSanityAlert: boolean
 }
 
@@ -61,6 +64,7 @@ type PositionsSortColumn = 'healthFactor' | 'ltv' | 'debtValue' | 'collateralVal
 
 type ColumnFilters = {
   token: string
+  hideZeroPositions: boolean
 }
 
 type DynamicStateType = Awaited<ReturnType<typeof fetchMarketsDynamicState>> extends Map<string, infer T> ? T : never
@@ -77,6 +81,16 @@ type PersistedDynamicState = {
   interest: string
   liquidity: string
   totalDebt: string
+}
+
+type PrefetchedMarketPositionsEntry = {
+  chainId: number
+  siloAddress: string
+  items: OpenMarketPosition[]
+  totalCount: number
+  warningCount: number
+  insolventCount: number
+  solvencyByBorrower: Array<readonly [string, boolean]>
 }
 
 function shortenAddress(address: string): string {
@@ -216,6 +230,17 @@ function isZeroLt(raw: string | null): boolean {
   return value != null && value === 0
 }
 
+function resolveEffectiveLtRawForMarket(row: Pick<MarketRow, 'siloId' | 'ltRaw' | 'otherLtRaw'>): string | null {
+  const isV3 = (row.siloId ?? 0) > 3000
+  if (isV3) return row.otherLtRaw ?? row.ltRaw
+  const thisIsZero = isZeroLt(row.ltRaw)
+  const otherIsZero = isZeroLt(row.otherLtRaw)
+  if (thisIsZero !== otherIsZero) {
+    return thisIsZero ? row.otherLtRaw ?? row.ltRaw : row.ltRaw
+  }
+  return row.ltRaw
+}
+
 function canUseBrowserStorage(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 }
@@ -327,10 +352,12 @@ function PositionsPageInner() {
   const [selectedChains, setSelectedChains] = useState<Set<number>>(new Set())
   const [filters, setFilters] = useState<ColumnFilters>({
     token: '',
+    hideZeroPositions: true,
   })
   const [isClientMounted, setIsClientMounted] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const loggedErrorMarkersRef = useRef<Set<string>>(new Set())
+  const graphPageLimit = config.testGraphLimit ?? DEFAULT_GRAPH_PAGE_LIMIT
 
   useEffect(() => {
     setIsClientMounted(true)
@@ -351,6 +378,10 @@ function PositionsPageInner() {
   const marketsCountsStorageKey = useMemo(
     () => `liq:markets:counts:v1:${snapshotKey}:${config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK}`,
     [config.testGraphLimit, snapshotKey]
+  )
+  const marketsPrefetchStorageKey = useMemo(
+    () => `liq:markets:positions-prefetch:v1:${snapshotKey}:${graphPageLimit}`,
+    [snapshotKey, graphPageLimit]
   )
   const missingMarketRefreshRef = useRef<string | null>(null)
 
@@ -459,6 +490,62 @@ function PositionsPageInner() {
     refetchOnReconnect: false,
   })
 
+  const prefetchedMarketPositionsQuery = useQuery({
+    queryKey: ['liq', 'markets', 'positions-prefetch', snapshotKey, graphPageLimit],
+    queryFn: async () => {
+      const out = new Map<string, PrefetchedMarketPositionsEntry>()
+      for (const row of staticMarketRows) {
+        const key = `${row.chainId}:${row.siloAddress.toLowerCase()}`
+        const items = await fetchAllOpenPositionsByMarket(row.chainId, row.siloAddress, graphPageLimit)
+        const borrowerAddresses = Array.from(
+          new Set(items.map((item) => extractBorrowerAddress(item.accountId)).filter(Boolean))
+        ) as string[]
+        const solvencyByBorrower =
+          borrowerAddresses.length > 0
+            ? await fetchBorrowersSolvency(row.chainId, row.siloAddress, borrowerAddresses)
+            : new Map<string, boolean>()
+        const ltRatio = parseScaledNumber(resolveEffectiveLtRawForMarket(row), 18)
+        let warningCount = 0
+        let insolventCount = 0
+        for (const item of items) {
+          const ltvRatio = parseScaledNumber(item.ltv, 18)
+          const healthFactor = ltvRatio != null && ltRatio != null && ltRatio > 0 ? ltvRatio / ltRatio : null
+          const borrowerAddress = extractBorrowerAddress(item.accountId)
+          const isSolvent = borrowerAddress ? solvencyByBorrower.get(borrowerAddress) : undefined
+          const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
+          const isWarning = !isInsolvent && healthFactor != null && healthFactor >= 0.9
+          if (isInsolvent) insolventCount += 1
+          else if (isWarning) warningCount += 1
+        }
+        out.set(key, {
+          chainId: row.chainId,
+          siloAddress: row.siloAddress.toLowerCase(),
+          items,
+          totalCount: items.length,
+          warningCount,
+          insolventCount,
+          solvencyByBorrower: Array.from(solvencyByBorrower.entries()),
+        })
+      }
+      return out
+    },
+    enabled: isClientMounted && snapshotEntries.length > 0,
+    initialData: () => {
+      if (!isClientMounted) return undefined
+      const cached = readPersisted<Array<readonly [string, PrefetchedMarketPositionsEntry]>>(marketsPrefetchStorageKey)
+      return cached ? new Map<string, PrefetchedMarketPositionsEntry>(cached.data) : undefined
+    },
+    initialDataUpdatedAt: () =>
+      isClientMounted
+        ? readPersisted<Array<readonly [string, PrefetchedMarketPositionsEntry]>>(marketsPrefetchStorageKey)?.fetchedAt
+        : undefined,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: 1000 * 60 * 60 * 24,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+
   useEffect(() => {
     if (!dynamicStateQuery.data) return
     writePersisted(marketsDynamicStorageKey, {
@@ -474,6 +561,33 @@ function PositionsPageInner() {
       data: Array.from(positionsCountQuery.data.entries()),
     })
   }, [positionsCountQuery.data, positionsCountQuery.dataUpdatedAt, marketsCountsStorageKey])
+
+  useEffect(() => {
+    if (!prefetchedMarketPositionsQuery.data) return
+    const fetchedAt = prefetchedMarketPositionsQuery.dataUpdatedAt || Date.now()
+    writePersisted(marketsPrefetchStorageKey, {
+      fetchedAt,
+      data: Array.from(prefetchedMarketPositionsQuery.data.entries()),
+    })
+    prefetchedMarketPositionsQuery.data.forEach((entry, key) => {
+      const [chainIdRaw, siloAddress] = key.split(':')
+      const chainId = Number(chainIdRaw)
+      if (!Number.isFinite(chainId) || !siloAddress) return
+      const pageKey = `liq:positions:list:v1:${chainId}:${siloAddress}:${graphPageLimit}:0`
+      writePersisted(pageKey, {
+        fetchedAt,
+        data: {
+          items: entry.items.slice(0, graphPageLimit),
+          totalCount: entry.totalCount,
+          hasNextPage: entry.totalCount > graphPageLimit,
+        },
+      })
+      writePersisted(`${pageKey}:solvency`, {
+        fetchedAt,
+        data: entry.solvencyByBorrower,
+      })
+    })
+  }, [prefetchedMarketPositionsQuery.data, prefetchedMarketPositionsQuery.dataUpdatedAt, marketsPrefetchStorageKey, graphPageLimit])
 
   useEffect(() => {
     if (!dynamicStateQuery.isError) return
@@ -522,13 +636,33 @@ function PositionsPageInner() {
     config.testGraphLimit,
   ])
 
+  useEffect(() => {
+    if (!prefetchedMarketPositionsQuery.isError) return
+    const marker = `prefetch:${prefetchedMarketPositionsQuery.errorUpdatedAt}`
+    if (loggedErrorMarkersRef.current.has(marker)) return
+    loggedErrorMarkersRef.current.add(marker)
+    console.group('[positions] markets positions prefetch failed')
+    console.error('queryKey', ['liq', 'markets', 'positions-prefetch', snapshotKey, graphPageLimit])
+    console.error('error dump', toErrorDump(prefetchedMarketPositionsQuery.error))
+    console.error('raw error', prefetchedMarketPositionsQuery.error)
+    console.groupEnd()
+  }, [
+    prefetchedMarketPositionsQuery.isError,
+    prefetchedMarketPositionsQuery.error,
+    prefetchedMarketPositionsQuery.errorUpdatedAt,
+    snapshotKey,
+    graphPageLimit,
+  ])
+
   const marketRows = useMemo<MarketRow[]>(() => {
     const dynamic = dynamicStateQuery.data ?? new Map()
     const counts = positionsCountQuery.data ?? new Map()
+    const prefetched = prefetchedMarketPositionsQuery.data ?? new Map()
     return staticMarketRows.map((row) => {
       const key = `${row.chainId}:${row.siloAddress.toLowerCase()}`
       const d = dynamic.get(key)
-      const positionsCount = counts.get(key) ?? null
+      const prefetch = prefetched.get(key)
+      const positionsCount = counts.get(key) ?? prefetch?.totalCount ?? null
       const totalDebt = d?.totalDebt ?? null
       return {
         ...row,
@@ -536,15 +670,23 @@ function PositionsPageInner() {
         liquidity: d?.liquidity ?? null,
         totalDebt,
         positionsCount,
+        warningPositionsCount: prefetch?.warningCount ?? null,
+        insolventPositionsCount: prefetch?.insolventCount ?? null,
         needsSanityAlert: totalDebt != null && positionsCount != null && totalDebt > BIGINT_ZERO && positionsCount === 0,
       }
     })
-  }, [dynamicStateQuery.data, positionsCountQuery.data, staticMarketRows])
+  }, [dynamicStateQuery.data, positionsCountQuery.data, prefetchedMarketPositionsQuery.data, staticMarketRows])
   const dynamicStateData = dynamicStateQuery.data
   const positionsCountData = positionsCountQuery.data
+  const prefetchedPositionsData = prefetchedMarketPositionsQuery.data
   const refetchDynamicState = dynamicStateQuery.refetch
   const refetchPositionsCount = positionsCountQuery.refetch
-  const marketsLastUpdatedAt = Math.max(dynamicStateQuery.dataUpdatedAt || 0, positionsCountQuery.dataUpdatedAt || 0)
+  const refetchPrefetchedPositions = prefetchedMarketPositionsQuery.refetch
+  const marketsLastUpdatedAt = Math.max(
+    dynamicStateQuery.dataUpdatedAt || 0,
+    positionsCountQuery.dataUpdatedAt || 0,
+    prefetchedMarketPositionsQuery.dataUpdatedAt || 0
+  )
   const marketsFreshnessLabel = formatRelativeAge(marketsLastUpdatedAt, nowMs)
   const marketsAgeSeconds = getRelativeAgeSeconds(marketsLastUpdatedAt, nowMs)
   const marketsFreshnessClass = getMarketsFreshnessTextClass(marketsAgeSeconds)
@@ -554,7 +696,6 @@ function PositionsPageInner() {
   const view = searchParams.get('view') === 'positions' ? 'positions' : 'markets'
   const paginationOffsetRaw = parseIntParam(searchParams.get('offset'))
   const paginationOffset = config.testDisablePagination ? 0 : paginationOffsetRaw ?? 0
-  const graphPageLimit = config.testGraphLimit ?? DEFAULT_GRAPH_PAGE_LIMIT
   const pageLimit = config.testDisablePagination ? graphPageLimit : graphPageLimit
   const positionsStorageKey = useMemo(
     () => `liq:positions:list:v1:${selectedChainId ?? 'na'}:${selectedSiloAddress || 'na'}:${pageLimit}:${paginationOffset}`,
@@ -571,10 +712,33 @@ function PositionsPageInner() {
         const tokenScope = `${row.tokenSymbol ?? ''} ${row.otherTokenSymbol ?? ''}`.toLowerCase()
         if (!tokenScope.includes(tokenFilter)) return false
       }
+      if (filters.hideZeroPositions && row.positionsCount === 0) return false
       return true
     })
 
     const sorted = [...subset].sort((a, b) => {
+      if (sortColumn === 'positions') {
+        const compareTuple = (
+          lhs: [number, number, number],
+          rhs: [number, number, number]
+        ): number => {
+          if (lhs[0] !== rhs[0]) return lhs[0] - rhs[0]
+          if (lhs[1] !== rhs[1]) return lhs[1] - rhs[1]
+          return lhs[2] - rhs[2]
+        }
+        const lhs: [number, number, number] = [
+          a.insolventPositionsCount ?? 0,
+          a.warningPositionsCount ?? 0,
+          a.positionsCount ?? 0,
+        ]
+        const rhs: [number, number, number] = [
+          b.insolventPositionsCount ?? 0,
+          b.warningPositionsCount ?? 0,
+          b.positionsCount ?? 0,
+        ]
+        const cmp = compareTuple(lhs, rhs)
+        return sortDirection === 'asc' ? cmp : -cmp
+      }
       const byColumn: Record<SortColumn, string | number | bigint | null> = {
         siloId: a.siloId,
         chain: a.chainDisplayName,
@@ -602,12 +766,13 @@ function PositionsPageInner() {
 
   useEffect(() => {
     if (snapshotEntries.length === 0) return
-    if (!dynamicStateData || !positionsCountData) return
+    if (!dynamicStateData || !positionsCountData || !prefetchedPositionsData) return
     const hasMissingLiveData = snapshotEntries.some((entry) => {
       const key = `${entry.chainId}:${entry.siloAddress.toLowerCase()}`
       const hasDynamic = dynamicStateData.has(key)
       const hasCount = positionsCountData.has(key)
-      return !hasDynamic || !hasCount
+      const hasPrefetchedPositions = prefetchedPositionsData.has(key)
+      return !hasDynamic || !hasCount || !hasPrefetchedPositions
     })
     if (!hasMissingLiveData) {
       if (missingMarketRefreshRef.current === snapshotKey) missingMarketRefreshRef.current = null
@@ -615,14 +780,16 @@ function PositionsPageInner() {
     }
     if (missingMarketRefreshRef.current === snapshotKey) return
     missingMarketRefreshRef.current = snapshotKey
-    void Promise.all([refetchDynamicState(), refetchPositionsCount()])
+    void Promise.all([refetchDynamicState(), refetchPositionsCount(), refetchPrefetchedPositions()])
   }, [
     snapshotEntries,
     snapshotKey,
     dynamicStateData,
     positionsCountData,
+    prefetchedPositionsData,
     refetchDynamicState,
     refetchPositionsCount,
+    refetchPrefetchedPositions,
   ])
 
   const availableChainIds = useMemo(
@@ -636,6 +803,10 @@ function PositionsPageInner() {
           (row) => row.chainId === selectedChainId && row.siloAddress.toLowerCase() === selectedSiloAddress
         ) ?? null
       : null
+  const selectedPrefetchedEntry =
+    selectedRow != null
+      ? prefetchedMarketPositionsQuery.data?.get(`${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}`) ?? null
+      : null
 
   const positionsQuery = useQuery({
     queryKey: ['liq', 'positions', selectedChainId, selectedSiloAddress, pageLimit, paginationOffset],
@@ -644,15 +815,23 @@ function PositionsPageInner() {
       return fetchOpenPositionsByMarket(selectedRow.chainId, selectedRow.siloAddress, pageLimit, paginationOffset)
     },
     enabled: isClientMounted && selectedRow != null,
-    initialData: () =>
-      isClientMounted
-        ? readPersisted<{ items: OpenMarketPosition[]; totalCount: number; hasNextPage: boolean }>(positionsStorageKey)
-            ?.data
-        : undefined,
+    initialData: () => {
+      if (!isClientMounted) return undefined
+      if (paginationOffset === 0 && selectedPrefetchedEntry) {
+        return {
+          items: selectedPrefetchedEntry.items.slice(0, pageLimit),
+          totalCount: selectedPrefetchedEntry.totalCount,
+          hasNextPage: selectedPrefetchedEntry.totalCount > pageLimit,
+        }
+      }
+      return readPersisted<{ items: OpenMarketPosition[]; totalCount: number; hasNextPage: boolean }>(positionsStorageKey)?.data
+    },
     initialDataUpdatedAt: () =>
       isClientMounted
-        ? readPersisted<{ items: OpenMarketPosition[]; totalCount: number; hasNextPage: boolean }>(positionsStorageKey)
-            ?.fetchedAt
+        ? paginationOffset === 0 && selectedPrefetchedEntry
+          ? prefetchedMarketPositionsQuery.dataUpdatedAt || undefined
+          : readPersisted<{ items: OpenMarketPosition[]; totalCount: number; hasNextPage: boolean }>(positionsStorageKey)
+              ?.fetchedAt
         : undefined,
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: 1000 * 60 * 60 * 24,
@@ -723,12 +902,19 @@ function PositionsPageInner() {
     enabled: isClientMounted && selectedRow != null && borrowerAddresses.length > 0,
     initialData: () => {
       if (!isClientMounted) return undefined
+      if (paginationOffset === 0 && selectedPrefetchedEntry) {
+        return new Map<string, boolean>(selectedPrefetchedEntry.solvencyByBorrower)
+      }
       const storageKey = `${positionsStorageKey}:solvency`
       const cached = readPersisted<Array<readonly [string, boolean]>>(storageKey)
       return cached ? new Map<string, boolean>(cached.data) : undefined
     },
     initialDataUpdatedAt: () =>
-      isClientMounted ? readPersisted<Array<readonly [string, boolean]>>(`${positionsStorageKey}:solvency`)?.fetchedAt : undefined,
+      isClientMounted
+        ? paginationOffset === 0 && selectedPrefetchedEntry
+          ? prefetchedMarketPositionsQuery.dataUpdatedAt || undefined
+          : readPersisted<Array<readonly [string, boolean]>>(`${positionsStorageKey}:solvency`)?.fetchedAt
+        : undefined,
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: 1000 * 60 * 60 * 24,
     refetchOnMount: false,
@@ -1112,7 +1298,7 @@ function PositionsPageInner() {
         </div>
       ) : (
         <div className="space-y-4">
-          {dynamicStateQuery.isError || positionsCountQuery.isError ? (
+          {dynamicStateQuery.isError || positionsCountQuery.isError || prefetchedMarketPositionsQuery.isError ? (
             <div className="silo-alert silo-alert-error">
               Failed to load some live market metrics. Static data is visible; use Refresh to retry (see console error dump).
             </div>
@@ -1125,12 +1311,22 @@ function PositionsPageInner() {
                       <span className="block text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">
                         Token symbol
                       </span>
-                      <input
-                        className="silo-input silo-input--sm min-w-[190px]"
-                        placeholder="e.g. WETH"
-                        value={filters.token}
-                        onChange={(e) => updateFilter('token', e.target.value)}
-                      />
+                      <div className="flex flex-wrap items-center gap-3">
+                        <input
+                          className="silo-input silo-input--sm min-w-[190px]"
+                          placeholder="e.g. WETH"
+                          value={filters.token}
+                          onChange={(e) => updateFilter('token', e.target.value)}
+                        />
+                        <label className="inline-flex items-center gap-2 text-xs silo-text-soft">
+                          <input
+                            type="checkbox"
+                            checked={filters.hideZeroPositions}
+                            onChange={(e) => setFilters((prev) => ({ ...prev, hideZeroPositions: e.target.checked }))}
+                          />
+                          <span>Hide markets without positions</span>
+                        </label>
+                      </div>
                     </label>
                     <div>
                       <span className="block text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">
@@ -1183,7 +1379,7 @@ function PositionsPageInner() {
                     </div>
                   </div>
                 </div>
-                {dynamicStateQuery.isFetching || positionsCountQuery.isFetching ? (
+                {dynamicStateQuery.isFetching || positionsCountQuery.isFetching || prefetchedMarketPositionsQuery.isFetching ? (
                   <p className="text-xs silo-text-soft mt-1 mb-0">Loading live metrics in background…</p>
                 ) : null}
               </div>
@@ -1193,9 +1389,17 @@ function PositionsPageInner() {
                   type="button"
                   className="inline-flex items-center justify-center h-10 w-10 rounded-md text-2xl silo-text-soft hover:silo-text-main disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => {
-                    void Promise.all([dynamicStateQuery.refetch(), positionsCountQuery.refetch()])
+                    void Promise.all([
+                      dynamicStateQuery.refetch(),
+                      positionsCountQuery.refetch(),
+                      prefetchedMarketPositionsQuery.refetch(),
+                    ])
                   }}
-                  disabled={dynamicStateQuery.isFetching || positionsCountQuery.isFetching}
+                  disabled={
+                    dynamicStateQuery.isFetching ||
+                    positionsCountQuery.isFetching ||
+                    prefetchedMarketPositionsQuery.isFetching
+                  }
                   aria-label="Refresh markets data"
                   title="Refresh"
                 >
@@ -1245,8 +1449,20 @@ function PositionsPageInner() {
                       <FragmentRow
                         key={`${row.chainId}:${row.siloAddress}`}
                         row={row}
-                        isDynamicLoading={dynamicStateQuery.isLoading || dynamicStateQuery.isFetching}
-                        isCountsLoading={positionsCountQuery.isLoading || positionsCountQuery.isFetching}
+                        isDynamicLoading={
+                          !isClientMounted || dynamicStateQuery.isLoading || dynamicStateQuery.isFetching
+                        }
+                        isCountsLoading={
+                          !isClientMounted || positionsCountQuery.isLoading || positionsCountQuery.isFetching
+                        }
+                        isPrefetchLoading={
+                          !isClientMounted ||
+                          prefetchedMarketPositionsQuery.isLoading ||
+                          prefetchedMarketPositionsQuery.isFetching
+                        }
+                        hasDynamicError={dynamicStateQuery.isError}
+                        hasCountsError={positionsCountQuery.isError}
+                        hasPrefetchError={prefetchedMarketPositionsQuery.isError}
                         onOpenPositions={() => openPositionsView(row)}
                       />
                     ))}
@@ -1273,13 +1489,23 @@ function FragmentRow({
   onOpenPositions,
   isDynamicLoading,
   isCountsLoading,
+  isPrefetchLoading,
+  hasDynamicError,
+  hasCountsError,
+  hasPrefetchError,
 }: {
   row: MarketRow
   onOpenPositions: () => void
   isDynamicLoading: boolean
   isCountsLoading: boolean
+  isPrefetchLoading: boolean
+  hasDynamicError: boolean
+  hasCountsError: boolean
+  hasPrefetchError: boolean
 }) {
   const canOpenPositions = (row.positionsCount ?? 0) > 0
+  const warningCount = row.warningPositionsCount ?? 0
+  const insolventCount = row.insolventPositionsCount ?? 0
 
   return (
     <>
@@ -1313,23 +1539,62 @@ function FragmentRow({
         </td>
         <td className="px-4 py-3">{row.tokenSymbol ?? 'Unknown'}</td>
         <td className="px-4 py-3 text-right tabular-nums">
-          {row.totalAssets == null && isDynamicLoading ? <InlineLoadingHint /> : formatMetric(row.totalAssets, row.tokenDecimals)}
+          {row.totalAssets == null
+            ? isDynamicLoading || !hasDynamicError
+              ? <InlineLoadingHint />
+              : '—'
+            : formatMetric(row.totalAssets, row.tokenDecimals)}
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
-          {row.liquidity == null && isDynamicLoading ? <InlineLoadingHint /> : formatMetric(row.liquidity, row.tokenDecimals)}
+          {row.liquidity == null ? (isDynamicLoading || !hasDynamicError ? <InlineLoadingHint /> : '—') : formatMetric(row.liquidity, row.tokenDecimals)}
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
-          {row.totalDebt == null && isDynamicLoading ? <InlineLoadingHint /> : formatMetric(row.totalDebt, row.tokenDecimals)}
+          {row.totalDebt == null ? (isDynamicLoading || !hasDynamicError ? <InlineLoadingHint /> : '—') : formatMetric(row.totalDebt, row.tokenDecimals)}
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
-          {row.positionsCount == null && isCountsLoading ? (
-            <InlineLoadingHint />
+          {row.positionsCount == null ? (
+            isCountsLoading || !hasCountsError ? <InlineLoadingHint /> : '—'
           ) : canOpenPositions ? (
-            <button type="button" onClick={onOpenPositions} className="font-semibold hover:underline">
-              {row.positionsCount}
+            <button
+              type="button"
+              onClick={onOpenPositions}
+              className="inline-flex items-center gap-2 font-semibold hover:underline"
+              title="Open positions"
+            >
+              <span className="text-[var(--silo-text)]">{row.positionsCount}</span>
+              <span className={warningCount === 0 ? 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)] opacity-30' : 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)]'}>
+                {row.warningPositionsCount == null
+                  ? isPrefetchLoading || !hasPrefetchError
+                    ? <InlineLoadingHint />
+                    : warningCount
+                  : warningCount}
+              </span>
+              <span className={insolventCount === 0 ? 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] opacity-30' : 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)]'}>
+                {row.insolventPositionsCount == null
+                  ? isPrefetchLoading || !hasPrefetchError
+                    ? <InlineLoadingHint />
+                    : insolventCount
+                  : insolventCount}
+              </span>
             </button>
           ) : (
-            <span className="silo-text-soft">{row.positionsCount ?? '—'}</span>
+            <span className="inline-flex items-center gap-2">
+              <span className="silo-text-soft">{row.positionsCount ?? '—'}</span>
+              <span className={warningCount === 0 ? 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)] opacity-30' : 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)]'}>
+                {row.warningPositionsCount == null
+                  ? isPrefetchLoading || !hasPrefetchError
+                    ? <InlineLoadingHint />
+                    : warningCount
+                  : warningCount}
+              </span>
+              <span className={insolventCount === 0 ? 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] opacity-30' : 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)]'}>
+                {row.insolventPositionsCount == null
+                  ? isPrefetchLoading || !hasPrefetchError
+                    ? <InlineLoadingHint />
+                    : insolventCount
+                  : insolventCount}
+              </span>
+            </span>
           )}
         </td>
       </tr>

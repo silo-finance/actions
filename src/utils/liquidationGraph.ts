@@ -203,3 +203,20 @@ export async function fetchOpenPositionsByMarket(
     hasNextPage: Boolean(page?.pageInfo?.hasNextPage),
   }
 }
+
+export async function fetchAllOpenPositionsByMarket(
+  chainId: number,
+  siloAddress: string,
+  pageLimit: number
+): Promise<OpenMarketPosition[]> {
+  const out: OpenMarketPosition[] = []
+  const limit = Math.max(1, pageLimit)
+  let offset = 0
+  while (true) {
+    const page = await fetchOpenPositionsByMarket(chainId, siloAddress, limit, offset)
+    out.push(...page.items)
+    if (!page.hasNextPage) break
+    offset += limit
+  }
+  return out
+}
