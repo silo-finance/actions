@@ -1,6 +1,6 @@
 {
   "name": "silo-actions",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "private": true,
   "engines": {
     "node": ">=20.19.0"
@@ -8,6 +8,9 @@
   "scripts": {
     "dev": "rm -rf .next && NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next dev",
     "dev:proxy-earn-silos": "node ./scripts/earn-silos-dev-proxy.mjs",
+    "sync:liquidation:full": "node ./scripts/sync-liquidation-silos.mjs full",
+    "sync:liquidation:add": "node ./scripts/sync-liquidation-silos.mjs add",
+    "sync:liquidation:remove": "node ./scripts/sync-liquidation-silos.mjs remove",
     "prebuild": "node ./scripts/sync-manifest-version.mjs",
     "build": "NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next build",
     "start": "next start",

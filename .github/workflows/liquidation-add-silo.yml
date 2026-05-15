@@ -1,0 +1,66 @@
+name: Liquidation Snapshot Add Or Refresh Silo
+
+on:
+  workflow_dispatch:
+    inputs:
+      chainKey:
+        description: 'Chain key for the silo'
+        required: true
+        type: choice
+        options:
+          - ethereum
+          - arbitrum
+          - avalanche
+          - injective
+          - sonic
+          - xdc
+      siloAddress:
+        description: 'Silo market address (0x...)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  add-refresh-silo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Add or refresh single silo
+        run: |
+          set -euo pipefail
+          node ./scripts/sync-liquidation-silos.mjs add \
+            --chainKey=${{ inputs.chainKey }} \
+            --siloAddress=${{ inputs.siloAddress }}
+
+      - name: Detect snapshot changes
+        id: detect
+        run: |
+          if git diff --quiet -- src/data/liquidation/silos; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No snapshot changes detected."
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create PR with silo refresh
+        if: steps.detect.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/liquidation-add-silo-${{ inputs.chainKey }}
+          commit-message: 'chore: add or refresh liquidation silo snapshot'
+          title: 'chore: add or refresh liquidation silo snapshot'
+          body: |
+            Automated add/refresh for a single liquidation silo snapshot entry.
+
+            - chain: `${{ inputs.chainKey }}`
+            - silo: `${{ inputs.siloAddress }}`
