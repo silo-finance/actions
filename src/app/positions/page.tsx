@@ -86,6 +86,7 @@ type PersistedDynamicState = {
 type PrefetchedMarketPositionsEntry = {
   chainId: number
   siloAddress: string
+  fetchedAt: number
   items: OpenMarketPosition[]
   totalCount: number
   warningCount: number
@@ -357,6 +358,7 @@ function PositionsPageInner() {
   })
   const [isClientMounted, setIsClientMounted] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
+  const [marketsTimerMs, setMarketsTimerMs] = useState(0)
   const loggedErrorMarkersRef = useRef<Set<string>>(new Set())
   const graphPageLimit = config.testGraphLimit ?? DEFAULT_GRAPH_PAGE_LIMIT
 
@@ -384,7 +386,9 @@ function PositionsPageInner() {
     () => `liq:markets:positions-prefetch:v1:${snapshotKey}:${graphPageLimit}`,
     [snapshotKey, graphPageLimit]
   )
+  const marketsTimerStorageKey = useMemo(() => `liq:markets:timer:v1:${snapshotKey}`, [snapshotKey])
   const missingMarketRefreshRef = useRef<string | null>(null)
+  const wasMarketFetchingRef = useRef(false)
 
   const staticMarketRows = useMemo(
     () =>
@@ -521,6 +525,7 @@ function PositionsPageInner() {
         out.set(key, {
           chainId: row.chainId,
           siloAddress: row.siloAddress.toLowerCase(),
+          fetchedAt: Date.now(),
           items,
           totalCount: items.length,
           warningCount,
@@ -564,6 +569,17 @@ function PositionsPageInner() {
   }, [positionsCountQuery.data, positionsCountQuery.dataUpdatedAt, marketsCountsStorageKey])
 
   useEffect(() => {
+    if (!isClientMounted) return
+    try {
+      const raw = window.localStorage.getItem(marketsTimerStorageKey)
+      const parsed = raw ? Number(raw) : 0
+      setMarketsTimerMs(Number.isFinite(parsed) && parsed > 0 ? parsed : 0)
+    } catch {
+      setMarketsTimerMs(0)
+    }
+  }, [isClientMounted, marketsTimerStorageKey])
+
+  useEffect(() => {
     if (!prefetchedMarketPositionsQuery.data) return
     const fetchedAt = prefetchedMarketPositionsQuery.dataUpdatedAt || Date.now()
     writePersisted(marketsPrefetchStorageKey, {
@@ -589,6 +605,31 @@ function PositionsPageInner() {
       })
     })
   }, [prefetchedMarketPositionsQuery.data, prefetchedMarketPositionsQuery.dataUpdatedAt, marketsPrefetchStorageKey, graphPageLimit])
+
+  useEffect(() => {
+    if (!isClientMounted) return
+    const marketFetching =
+      dynamicStateQuery.isFetching || positionsCountQuery.isFetching || prefetchedMarketPositionsQuery.isFetching
+    if (marketFetching) {
+      wasMarketFetchingRef.current = true
+      return
+    }
+    if (!wasMarketFetchingRef.current) return
+    wasMarketFetchingRef.current = false
+    const now = Date.now()
+    setMarketsTimerMs(now)
+    try {
+      window.localStorage.setItem(marketsTimerStorageKey, String(now))
+    } catch {
+      // ignore storage errors
+    }
+  }, [
+    isClientMounted,
+    dynamicStateQuery.isFetching,
+    positionsCountQuery.isFetching,
+    prefetchedMarketPositionsQuery.isFetching,
+    marketsTimerStorageKey,
+  ])
 
   useEffect(() => {
     if (!dynamicStateQuery.isError) return
@@ -683,11 +724,7 @@ function PositionsPageInner() {
   const refetchDynamicState = dynamicStateQuery.refetch
   const refetchPositionsCount = positionsCountQuery.refetch
   const refetchPrefetchedPositions = prefetchedMarketPositionsQuery.refetch
-  const marketsLastUpdatedAt = Math.max(
-    dynamicStateQuery.dataUpdatedAt || 0,
-    positionsCountQuery.dataUpdatedAt || 0,
-    prefetchedMarketPositionsQuery.dataUpdatedAt || 0
-  )
+  const marketsLastUpdatedAt = marketsTimerMs
   const marketsFreshnessLabel = formatRelativeAge(marketsLastUpdatedAt, nowMs)
   const marketsAgeSeconds = getRelativeAgeSeconds(marketsLastUpdatedAt, nowMs)
   const marketsFreshnessClass = getMarketsFreshnessTextClass(marketsAgeSeconds)
@@ -830,7 +867,7 @@ function PositionsPageInner() {
     initialDataUpdatedAt: () =>
       isClientMounted
         ? paginationOffset === 0 && selectedPrefetchedEntry
-          ? prefetchedMarketPositionsQuery.dataUpdatedAt || undefined
+          ? selectedPrefetchedEntry.fetchedAt || prefetchedMarketPositionsQuery.dataUpdatedAt || undefined
           : readPersisted<{ items: OpenMarketPosition[]; totalCount: number; hasNextPage: boolean }>(positionsStorageKey)
               ?.fetchedAt
         : undefined,
@@ -913,7 +950,7 @@ function PositionsPageInner() {
     initialDataUpdatedAt: () =>
       isClientMounted
         ? paginationOffset === 0 && selectedPrefetchedEntry
-          ? prefetchedMarketPositionsQuery.dataUpdatedAt || undefined
+          ? selectedPrefetchedEntry.fetchedAt || prefetchedMarketPositionsQuery.dataUpdatedAt || undefined
           : readPersisted<Array<readonly [string, boolean]>>(`${positionsStorageKey}:solvency`)?.fetchedAt
         : undefined,
     staleTime: Number.POSITIVE_INFINITY,
@@ -1066,6 +1103,7 @@ function PositionsPageInner() {
         next.set(marketKey, {
           chainId: selectedRow.chainId,
           siloAddress: selectedRow.siloAddress.toLowerCase(),
+          fetchedAt: Date.now(),
           items: allItems,
           totalCount: allItems.length,
           warningCount,

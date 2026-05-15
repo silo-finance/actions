@@ -1,4 +1,5 @@
 const LIQ_GRAPHQL_URL_DEFAULT = 'https://api-v3.silo.finance/graphql'
+let graphqlRequestSeq = 0
 
 type PositionCountBatchResponse = {
   data?: {
@@ -116,15 +117,38 @@ function buildGraphqlError(
   return error
 }
 
+function stringifyPretty(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
 async function postGraphql<TData>(query: string, variables: Record<string, unknown>): Promise<TData> {
   const endpoint = getLiquidationGraphqlUrl()
+  graphqlRequestSeq += 1
+  const requestId = graphqlRequestSeq
+  const payload = { query, variables }
+  console.groupCollapsed(`[liq-graphql:${requestId}] request`)
+  console.info('Endpoint:', endpoint)
+  console.info('Query (playground-ready):\n%s', query)
+  console.info('Variables (playground-ready):\n%s', stringifyPretty(variables))
+  console.groupEnd()
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify(payload),
   })
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '')
+    console.group(`[liq-graphql:${requestId}] error`)
+    console.error('Endpoint:', endpoint)
+    console.error('Status:', res.status, res.statusText)
+    console.error('Query (playground-ready):\n%s', query)
+    console.error('Variables (playground-ready):\n%s', stringifyPretty(variables))
+    console.error('Response body:\n' + (bodyText || '<empty>'))
+    console.groupEnd()
     throw buildGraphqlError(`GraphQL HTTP ${res.status} ${res.statusText}; body=${bodyText || '<empty>'}`, query, variables, {
       endpoint,
       status: res.status,
@@ -135,17 +159,30 @@ async function postGraphql<TData>(query: string, variables: Record<string, unkno
   const json = (await res.json()) as { data?: TData; errors?: Array<{ message?: string }> }
   if (json.errors?.length) {
     const msg = json.errors.map((x) => x.message ?? '').filter(Boolean).join('; ')
+    console.group(`[liq-graphql:${requestId}] graphql-errors`)
+    console.error('Endpoint:', endpoint)
+    console.error('Query (playground-ready):\n%s', query)
+    console.error('Variables (playground-ready):\n%s', stringifyPretty(variables))
+    console.error('Errors:\n' + stringifyPretty(json.errors))
+    console.groupEnd()
     throw buildGraphqlError(msg || 'GraphQL query failed', query, variables, {
       endpoint,
       graphqlErrors: json.errors,
     })
   }
   if (!json.data) {
+    console.group(`[liq-graphql:${requestId}] empty-data`)
+    console.error('Endpoint:', endpoint)
+    console.error('Query (playground-ready):\n%s', query)
+    console.error('Variables (playground-ready):\n%s', stringifyPretty(variables))
+    console.error('Raw response:\n' + stringifyPretty(json))
+    console.groupEnd()
     throw buildGraphqlError('GraphQL returned empty data', query, variables, {
       endpoint,
       rawResponse: json,
     })
   }
+  console.info(`[liq-graphql:${requestId}] ok`)
   return json.data
 }
 
