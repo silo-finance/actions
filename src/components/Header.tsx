@@ -91,6 +91,13 @@ export default function Header() {
             >
               Pause
             </Link>
+            <Link
+              href="/positions"
+              className={navLinkClass(isNavActive('/positions'))}
+              aria-current={isNavActive('/positions') ? 'page' : undefined}
+            >
+              Positions
+            </Link>
             <a
               href="https://silo-finance.github.io/silo-market-crafter/"
               target="_blank"
