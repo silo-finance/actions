@@ -1175,6 +1175,13 @@ function PositionsPageInner() {
     [realtimeBorrowersToMonitor]
   )
   const realtimeMonitoredBorrowerSet = useMemo(() => new Set(realtimeBorrowersToMonitor), [realtimeBorrowersToMonitor])
+  const hasRealtimeCandidates = realtimeBorrowersToMonitor.length > 0
+
+  useEffect(() => {
+    if (!isRealtimeEnabled) return
+    if (hasRealtimeCandidates) return
+    setIsRealtimeEnabled(false)
+  }, [isRealtimeEnabled, hasRealtimeCandidates])
 
   useEffect(() => {
     if (!isRealtimeEnabled || !selectedRow) return
@@ -1486,21 +1493,23 @@ function PositionsPageInner() {
                           <button type="button" onClick={() => togglePositionsSort('ltv')}>
                             LTV{positionsSortIndicator('ltv')}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setIsRealtimeEnabled((prev) => !prev)}
-                            disabled={positionsQuery.isFetching || solvencyQuery.isFetching}
-                            className={`text-[10px] font-semibold tracking-wide transition-colors ${
-                              isRealtimeEnabled
-                                ? 'text-[color-mix(in_srgb,var(--silo-text)_96%,#000000)]'
-                                : 'text-[color-mix(in_srgb,var(--silo-text)_26%,transparent)]'
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
-                            aria-pressed={isRealtimeEnabled}
-                            aria-label="Toggle realtime monitoring"
-                            title="Toggle realtime monitoring"
-                          >
-                            LIVE
-                          </button>
+                          {hasRealtimeCandidates ? (
+                            <button
+                              type="button"
+                              onClick={() => setIsRealtimeEnabled((prev) => !prev)}
+                              disabled={positionsQuery.isFetching || solvencyQuery.isFetching}
+                              className={`text-[10px] font-semibold tracking-wide transition-colors ${
+                                isRealtimeEnabled
+                                  ? 'text-[color-mix(in_srgb,var(--silo-text)_96%,#000000)]'
+                                  : 'text-[color-mix(in_srgb,var(--silo-text)_26%,transparent)]'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                              aria-pressed={isRealtimeEnabled}
+                              aria-label="Toggle realtime monitoring"
+                              title="Toggle realtime monitoring"
+                            >
+                              LIVE
+                            </button>
+                          ) : null}
                         </span>
                       </th>
                       <th className="text-left px-4 py-3 font-semibold">
