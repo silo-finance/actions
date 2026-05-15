@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.22.3] - 2026-05-15
+
+### Fixed
+- fix icon path
+- unify warning configion
+
 ## [0.22.2] - 2026-05-15
 
 ### Updated
