@@ -48,9 +48,9 @@ jobs:
       - name: Detect snapshot changes
         id: detect
         run: |
-          if git diff --quiet -- src/data/liquidation/silos; then
+          if git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/liquidation/silos; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No snapshot changes detected."
+            echo "::notice::No snapshot changes detected (or only generatedAt changed)."
           else
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi

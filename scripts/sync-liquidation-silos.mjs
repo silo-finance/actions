@@ -173,6 +173,35 @@ async function fetchAllEarnSilos() {
   return out
 }
 
+async function fetchEarnSilosForChain(chainKey) {
+  const out = []
+  let offset = 0
+  for (;;) {
+    const body = {
+      siloIds: [],
+      search: null,
+      riskProfiles: [],
+      chainKeys: [chainKey],
+      minTotalSupplyUsd: null,
+      sort: null,
+      limit: EARN_PAGE_SIZE,
+      offset,
+    }
+    const res = await fetch(EARN_SILOS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) throw new Error(`earn-silos HTTP ${res.status}`)
+    const json = await res.json()
+    const silos = Array.isArray(json.silos) ? json.silos : []
+    out.push(...silos)
+    if (silos.length < EARN_PAGE_SIZE) break
+    offset += EARN_PAGE_SIZE
+  }
+  return out
+}
+
 function normalizeConfigData(config) {
   if (!config) return null
   return {
@@ -546,10 +575,36 @@ async function runAddOrRefreshSingle() {
   const snapshot = loadSnapshotByChain()
   const current = snapshot.get(chainKey)?.silos ?? []
   const targetSet = new Set(current.map((row) => normalizeAddress(row.siloAddress)).filter(Boolean))
+
+  const apiRows = await fetchEarnSilosForChain(chainKey)
+  const apiMatch = apiRows.find((row) => normalizeAddress(row?.siloAddress) === siloAddress)
+  if (apiMatch) {
+    console.log(`[sync-liquidation-silos] source=api found ${chainKey}:${siloAddress}`)
+  } else {
+    console.warn(
+      `[sync-liquidation-silos] source=rpc-fallback ${chainKey}:${siloAddress} not found in API; collecting directly from contracts via multicall`
+    )
+  }
+
   targetSet.add(siloAddress)
   const targetsByChain = new Map([[chainKey, targetSet]])
   const refreshed = await refreshTargets(targetsByChain)
   const out = refreshed.get(chainKey) ?? []
+  const targetRows = out.filter((row) => normalizeAddress(row.siloAddress) === siloAddress)
+  if (targetRows.length === 0) {
+    throw new Error(
+      `Requested address is not a valid Silo market on ${chainKey}: ${siloAddress} (could not resolve silo config/data)`
+    )
+  }
+  if (targetRows.length > 1) {
+    throw new Error(`Duplicate Silo entry detected for ${chainKey}:${siloAddress}; refusing to write snapshot`)
+  }
+  const targetRow = targetRows[0]
+  if (!targetRow?.siloConfigAddress || !targetRow?.siloConfig || !targetRow?.tokenAddress) {
+    throw new Error(
+      `Incomplete Silo data for ${chainKey}:${siloAddress} (missing config/token metadata); refusing to write snapshot`
+    )
+  }
   writeChainSnapshot(chainKey, CHAIN_ID_BY_KEY[chainKey], out)
   console.log(`[sync-liquidation-silos] add/refresh wrote ${out.length} records for ${chainKey}`)
 }
@@ -589,7 +644,11 @@ async function main() {
 }
 
 main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error)
-  console.error(`[sync-liquidation-silos] ${message}`)
+  if (error instanceof Error) {
+    console.error(`[sync-liquidation-silos] ${error.message}`)
+    if (error.stack) console.error(error.stack)
+  } else {
+    console.error(`[sync-liquidation-silos] ${String(error)}`)
+  }
   process.exit(1)
 })
