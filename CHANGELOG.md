@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.22.0] - 2026-05-15
+
+### Added
+- positions (#62)
+
 ## [Unreleased]
 ### Added
 - positions dashboard with static silo snapshots
