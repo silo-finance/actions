@@ -119,6 +119,22 @@ const NETWORK_CONFIG_MAP: Map<number, NetworkConfig> = new Map(
   NETWORK_CONFIGS.map((config) => [config.chainId, config])
 )
 
+function normalizeBasePath(raw: string | undefined): string {
+  const value = (raw ?? '').trim()
+  if (!value) return ''
+  if (value === '/') return ''
+  const withLeading = value.startsWith('/') ? value : `/${value}`
+  return withLeading.replace(/\/+$/, '')
+}
+
+function withBasePath(path: string): string {
+  if (!path.startsWith('/')) return path
+  const basePath = normalizeBasePath(process.env.NEXT_PUBLIC_BASE_PATH)
+  if (!basePath) return path
+  if (path === basePath || path.startsWith(`${basePath}/`)) return path
+  return `${basePath}${path}`
+}
+
 export function getNetworkConfig(chainId: number | string): NetworkConfig | undefined {
   const id = typeof chainId === 'string' ? parseInt(chainId, 10) : chainId
   return NETWORK_CONFIG_MAP.get(id)
@@ -154,7 +170,7 @@ export function getNetworkShortName(chainId: number | string): string {
 
 export function getNetworkIconPath(chainId: number | string): string | null {
   const config = getNetworkConfig(chainId)
-  return config?.iconPath ?? null
+  return config?.iconPath ? withBasePath(config.iconPath) : null
 }
 
 export function getExplorerBaseUrl(chainId: number | string): string {
