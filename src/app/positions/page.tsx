@@ -57,7 +57,8 @@ const DEFAULT_GRAPH_PAGE_LIMIT = 1000
 const DEFAULT_POSITIONS_COUNT_CHUNK = 40
 const BIGINT_ZERO = BigInt(0)
 const WARNING_HEALTH_FACTOR_THRESHOLD = 0.95
-const REALTIME_REFRESH_INTERVAL_SECONDS = 10
+const REALTIME_REFRESH_INTERVAL_SECONDS = 60
+const REALTIME_AGE_THRESHOLD_SECONDS = 30 * 60
 
 type SortColumn =
   | 'siloId'
@@ -289,6 +290,36 @@ function isWarningHealthFactor(healthFactor: number | null, isInsolvent: boolean
   return !isInsolvent && healthFactor != null && healthFactor >= WARNING_HEALTH_FACTOR_THRESHOLD
 }
 
+function formatLtvPercentFromRaw18(ltvRaw18: string): string {
+  if (/^-?\d+$/.test(ltvRaw18)) {
+    return formatUnits(BigInt(ltvRaw18), 16)
+  }
+  const parsed = Number(ltvRaw18)
+  if (Number.isFinite(parsed)) return String(parsed * 100)
+  return ltvRaw18
+}
+
+function shouldMonitorPositionInRealtime({
+  row,
+  positionLtRatio,
+  isSolvent,
+  nowMs,
+}: {
+  row: OpenMarketPosition
+  positionLtRatio: number | null
+  isSolvent: boolean | null | undefined
+  nowMs: number
+}): boolean {
+  const ltvRatio = parseScaledNumber(row.ltv, 18)
+  const healthFactor = ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
+  const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
+  const isWarning = isWarningHealthFactor(healthFactor, isInsolvent)
+  const timestampMs = parsePositionTimestampMs(row.lastUpdatedTimestamp)
+  const ageSeconds = timestampMs == null ? null : Math.max(0, Math.floor((nowMs - timestampMs) / 1000))
+  const isOlderThanThreshold = ageSeconds != null && ageSeconds > REALTIME_AGE_THRESHOLD_SECONDS
+  return isWarning || isInsolvent || isOlderThanThreshold
+}
+
 async function copyToClipboard(value: string): Promise<void> {
   if (typeof navigator === 'undefined' || !navigator.clipboard) return
   await navigator.clipboard.writeText(value)
@@ -429,6 +460,7 @@ function PositionsPageInner() {
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [isRealtimeEnabled, setIsRealtimeEnabled] = useState(false)
   const [realtimeLtvByBorrower, setRealtimeLtvByBorrower] = useState<Map<string, string>>(new Map())
+  const [realtimeNextRefreshAtMs, setRealtimeNextRefreshAtMs] = useState<number | null>(null)
   const [marketsTimerMs, setMarketsTimerMs] = useState(0)
   const loggedErrorMarkersRef = useRef<Set<string>>(new Set())
   const graphPageLimit = config.testGraphLimit ?? DEFAULT_GRAPH_PAGE_LIMIT
@@ -1161,26 +1193,36 @@ function PositionsPageInner() {
     for (const row of rows) {
       const borrowerAddress = extractBorrowerAddress(row.accountId)
       if (!borrowerAddress) continue
-      const ltvRatio = parseScaledNumber(row.ltv, 18)
-      const healthFactor = ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
       const isSolvent = solvencyQuery.data?.get(borrowerAddress)
-      const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
-      const isWarning = isWarningHealthFactor(healthFactor, isInsolvent)
-      if (isWarning || isInsolvent) addresses.push(borrowerAddress)
+      if (shouldMonitorPositionInRealtime({ row, positionLtRatio, isSolvent, nowMs })) {
+        addresses.push(borrowerAddress)
+      }
     }
     return Array.from(new Set(addresses))
-  }, [positionsQuery.data?.items, positionLtRatio, solvencyQuery.data])
+  }, [positionsQuery.data?.items, positionLtRatio, solvencyQuery.data, nowMs])
   const realtimeMonitorKey = useMemo(
     () => realtimeBorrowersToMonitor.join('|'),
     [realtimeBorrowersToMonitor]
   )
+  const realtimeBorrowersToMonitorStable = useMemo(
+    () => (realtimeMonitorKey ? realtimeMonitorKey.split('|') : []),
+    [realtimeMonitorKey]
+  )
   const realtimeMonitoredBorrowerSet = useMemo(() => new Set(realtimeBorrowersToMonitor), [realtimeBorrowersToMonitor])
   const hasRealtimeCandidates = realtimeBorrowersToMonitor.length > 0
+  const realtimeSecondsUntilRefresh = useMemo(() => {
+    if (!isRealtimeEnabled || realtimeNextRefreshAtMs == null) return null
+    return Math.min(
+      REALTIME_REFRESH_INTERVAL_SECONDS,
+      Math.max(0, Math.ceil((realtimeNextRefreshAtMs - nowMs) / 1000))
+    )
+  }, [isRealtimeEnabled, realtimeNextRefreshAtMs, nowMs])
 
   useEffect(() => {
     if (!isRealtimeEnabled) return
     if (hasRealtimeCandidates) return
     setIsRealtimeEnabled(false)
+    setRealtimeNextRefreshAtMs(null)
   }, [isRealtimeEnabled, hasRealtimeCandidates])
 
   useEffect(() => {
@@ -1203,11 +1245,11 @@ function PositionsPageInner() {
     const run = async () => {
       if (cancelled) return
       try {
-        if (realtimeBorrowersToMonitor.length > 0) {
+        if (realtimeBorrowersToMonitorStable.length > 0) {
           const nextLtvByBorrower = await fetchBorrowersLtvFromSiloLens(
             selectedRow.chainId,
             selectedRow.siloAddress,
-            realtimeBorrowersToMonitor,
+            realtimeBorrowersToMonitorStable,
             {
               preferredProvider: walletProvider,
               preferredChainId: walletChainId,
@@ -1216,12 +1258,11 @@ function PositionsPageInner() {
           console.debug('[positions-live] tick', {
             chainId: selectedRow.chainId,
             market: selectedRow.siloAddress,
-            monitoredBorrowers: realtimeBorrowersToMonitor.length,
+            monitoredBorrowers: realtimeBorrowersToMonitorStable.length,
             refreshedBorrowers: nextLtvByBorrower.size,
           })
           nextLtvByBorrower.forEach((ltvRaw18, borrowerAddress) => {
-            console.info(`[positions-live] borrower: ${borrowerAddress}`)
-            console.info(`[positions-live] ltvRaw18: ${ltvRaw18}`)
+            console.info(`[positions-live] borrower: ${borrowerAddress} ltv: ${formatLtvPercentFromRaw18(ltvRaw18)}`)
           })
           if (!cancelled) {
             setRealtimeLtvByBorrower((prev) => (areStringMapsEqual(prev, nextLtvByBorrower) ? prev : nextLtvByBorrower))
@@ -1237,6 +1278,7 @@ function PositionsPageInner() {
         }
       } finally {
         if (cancelled) return
+        setRealtimeNextRefreshAtMs(Date.now() + REALTIME_REFRESH_INTERVAL_SECONDS * 1000)
         timer = window.setTimeout(run, REALTIME_REFRESH_INTERVAL_SECONDS * 1000)
       }
     }
@@ -1244,9 +1286,10 @@ function PositionsPageInner() {
     void run()
     return () => {
       cancelled = true
+      setRealtimeNextRefreshAtMs(null)
       if (timer != null) window.clearTimeout(timer)
     }
-  }, [isRealtimeEnabled, selectedRow, realtimeMonitorKey, realtimeBorrowersToMonitor, walletProvider, walletChainId])
+  }, [isRealtimeEnabled, selectedRow, realtimeMonitorKey, realtimeBorrowersToMonitorStable, walletProvider, walletChainId])
 
   const toggleSort = (column: SortColumn) => {
     if (sortColumn !== column) {
@@ -1432,7 +1475,7 @@ function PositionsPageInner() {
                 ⧉
               </button>
               <span className="ml-4">{selectedRow.marketTokenPair}</span>
-              <span className="ml-4">LT {positionLtLabel}</span>
+              <span className="ml-4 text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] font-semibold">LT {positionLtLabel}</span>
             </p>
           </div>
 
@@ -1507,7 +1550,7 @@ function PositionsPageInner() {
                               aria-label="Toggle realtime monitoring"
                               title="Toggle realtime monitoring"
                             >
-                              LIVE
+                              LIVE{isRealtimeEnabled && realtimeSecondsUntilRefresh != null ? ` ${realtimeSecondsUntilRefresh}s` : ''}
                             </button>
                           ) : null}
                         </span>

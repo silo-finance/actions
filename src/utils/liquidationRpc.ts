@@ -274,6 +274,8 @@ export async function fetchBorrowersLtvFromSiloLens(
     chainId,
     chunkSize: 128,
     debugLabel: `liq-ltv:${chainId}`,
+    logRpcCalls: true,
+    rpcMethodName: 'getUserLTV',
   })
   for (let i = 0; i < normalizedBorrowers.length; i += 1) {
     const value = results[i]

@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Updated
+- expand LIVE monitoring candidates to include rows older than 30 minutes
+
 ## [0.22.3] - 2026-05-15
 
 ### Fixed
