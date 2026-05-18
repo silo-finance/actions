@@ -460,6 +460,7 @@ function PositionsPageInner() {
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [isRealtimeEnabled, setIsRealtimeEnabled] = useState(false)
   const [realtimeLtvByBorrower, setRealtimeLtvByBorrower] = useState<Map<string, string>>(new Map())
+  const [customRealtimeBorrowers, setCustomRealtimeBorrowers] = useState<string[]>([])
   const [realtimeNextRefreshAtMs, setRealtimeNextRefreshAtMs] = useState<number | null>(null)
   const [marketsTimerMs, setMarketsTimerMs] = useState(0)
   const loggedErrorMarkersRef = useRef<Set<string>>(new Set())
@@ -949,11 +950,15 @@ function PositionsPageInner() {
   useEffect(() => {
     if (view === 'positions' && selectedRow) return
     setIsRealtimeEnabled(false)
+    setCustomRealtimeBorrowers([])
+    setRealtimeNextRefreshAtMs(null)
   }, [view, selectedRow])
 
   useEffect(() => {
     if (isRealtimeEnabled) return
     setRealtimeLtvByBorrower(new Map())
+    setCustomRealtimeBorrowers([])
+    setRealtimeNextRefreshAtMs(null)
   }, [isRealtimeEnabled])
 
   const positionsQuery = useQuery({
@@ -1187,7 +1192,7 @@ function PositionsPageInner() {
     realtimeLtvByBorrower,
   ])
 
-  const realtimeBorrowersToMonitor = useMemo(() => {
+  const filteredRealtimeBorrowersToMonitor = useMemo(() => {
     const rows = positionsQuery.data?.items ?? []
     const addresses: string[] = []
     for (const row of rows) {
@@ -1200,6 +1205,14 @@ function PositionsPageInner() {
     }
     return Array.from(new Set(addresses))
   }, [positionsQuery.data?.items, positionLtRatio, solvencyQuery.data, nowMs])
+  const customRealtimeBorrowersStable = useMemo(
+    () => Array.from(new Set(customRealtimeBorrowers)),
+    [customRealtimeBorrowers]
+  )
+  const realtimeBorrowersToMonitor = useMemo(
+    () => Array.from(new Set([...filteredRealtimeBorrowersToMonitor, ...customRealtimeBorrowersStable])),
+    [filteredRealtimeBorrowersToMonitor, customRealtimeBorrowersStable]
+  )
   const realtimeMonitorKey = useMemo(
     () => realtimeBorrowersToMonitor.join('|'),
     [realtimeBorrowersToMonitor]
@@ -1209,7 +1222,6 @@ function PositionsPageInner() {
     [realtimeMonitorKey]
   )
   const realtimeMonitoredBorrowerSet = useMemo(() => new Set(realtimeBorrowersToMonitor), [realtimeBorrowersToMonitor])
-  const hasRealtimeCandidates = realtimeBorrowersToMonitor.length > 0
   const realtimeSecondsUntilRefresh = useMemo(() => {
     if (!isRealtimeEnabled || realtimeNextRefreshAtMs == null) return null
     return Math.min(
@@ -1217,13 +1229,6 @@ function PositionsPageInner() {
       Math.max(0, Math.ceil((realtimeNextRefreshAtMs - nowMs) / 1000))
     )
   }, [isRealtimeEnabled, realtimeNextRefreshAtMs, nowMs])
-
-  useEffect(() => {
-    if (!isRealtimeEnabled) return
-    if (hasRealtimeCandidates) return
-    setIsRealtimeEnabled(false)
-    setRealtimeNextRefreshAtMs(null)
-  }, [isRealtimeEnabled, hasRealtimeCandidates])
 
   useEffect(() => {
     if (!isRealtimeEnabled || !selectedRow) return
@@ -1536,23 +1541,27 @@ function PositionsPageInner() {
                           <button type="button" onClick={() => togglePositionsSort('ltv')}>
                             LTV{positionsSortIndicator('ltv')}
                           </button>
-                          {hasRealtimeCandidates ? (
-                            <button
-                              type="button"
-                              onClick={() => setIsRealtimeEnabled((prev) => !prev)}
-                              disabled={positionsQuery.isFetching || solvencyQuery.isFetching}
-                              className={`text-[10px] font-semibold tracking-wide transition-colors ${
-                                isRealtimeEnabled
-                                  ? 'text-[color-mix(in_srgb,var(--silo-text)_96%,#000000)]'
-                                  : 'text-[color-mix(in_srgb,var(--silo-text)_26%,transparent)]'
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              aria-pressed={isRealtimeEnabled}
-                              aria-label="Toggle realtime monitoring"
-                              title="Toggle realtime monitoring"
-                            >
-                              LIVE{isRealtimeEnabled && realtimeSecondsUntilRefresh != null ? ` ${realtimeSecondsUntilRefresh}s` : ''}
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isRealtimeEnabled) {
+                                setIsRealtimeEnabled(false)
+                                return
+                              }
+                              setIsRealtimeEnabled(true)
+                            }}
+                            disabled={positionsQuery.isFetching || solvencyQuery.isFetching}
+                            className={`text-[10px] font-semibold tracking-wide transition-colors ${
+                              isRealtimeEnabled
+                                ? 'text-[color-mix(in_srgb,var(--silo-text)_96%,#000000)]'
+                                : 'text-[color-mix(in_srgb,var(--silo-text)_26%,transparent)]'
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            aria-pressed={isRealtimeEnabled}
+                            aria-label="Toggle realtime monitoring"
+                            title="Toggle realtime monitoring"
+                          >
+                            LIVE{isRealtimeEnabled && realtimeSecondsUntilRefresh != null ? ` ${realtimeSecondsUntilRefresh}s` : ''}
+                          </button>
                         </span>
                       </th>
                       <th className="text-left px-4 py-3 font-semibold">
@@ -1569,6 +1578,8 @@ function PositionsPageInner() {
                       const borrowerAddress = extractBorrowerAddress(row.accountId)
                       const isRealtimeMonitored =
                         isRealtimeEnabled && Boolean(borrowerAddress && realtimeMonitoredBorrowerSet.has(borrowerAddress))
+                      const canAddRealtimeMonitor =
+                        isRealtimeEnabled && Boolean(borrowerAddress && !realtimeMonitoredBorrowerSet.has(borrowerAddress))
                       const isInsolventByRatio = healthFactor != null && healthFactor >= 1
                       const isInsolvent = isSolvent === false || isInsolventByRatio
                       const isNearLt = isWarningHealthFactor(healthFactor, isInsolvent)
@@ -1637,14 +1648,26 @@ function PositionsPageInner() {
                             </td>
                             <td className="px-4 py-3">
                               <span className="inline-flex items-center gap-1.5">
-                                <span>{formatPositionLtv(effectiveLtvRaw)}</span>
                                 {isRealtimeMonitored ? (
                                   <span
                                     className="inline-block h-2 w-2 rounded-full bg-[var(--silo-success)] animate-pulse"
                                     aria-label="Realtime monitoring active for this position"
                                     title="Realtime monitoring active for this position"
                                   />
+                                ) : canAddRealtimeMonitor && borrowerAddress ? (
+                                  <button
+                                    type="button"
+                                    className="inline-block h-2 w-2 rounded-full border border-[color-mix(in_srgb,var(--silo-text)_42%,transparent)] bg-[color-mix(in_srgb,var(--silo-text)_28%,transparent)] hover:bg-[color-mix(in_srgb,var(--silo-text)_44%,transparent)] transition-colors"
+                                    onClick={() =>
+                                      setCustomRealtimeBorrowers((prev) =>
+                                        prev.includes(borrowerAddress) ? prev : [...prev, borrowerAddress]
+                                      )
+                                    }
+                                    aria-label="Add position to realtime monitoring"
+                                    title="Add position to realtime monitoring"
+                                  />
                                 ) : null}
+                                <span>{formatPositionLtv(effectiveLtvRaw)}</span>
                               </span>
                             </td>
                             <td className="px-4 py-3">{formatHealthFactor(healthFactor)}</td>
