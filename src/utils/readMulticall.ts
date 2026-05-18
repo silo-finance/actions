@@ -33,6 +33,8 @@ export type ExecuteReadMulticallOptions = {
   chainId?: number
   chunkSize?: number
   debugLabel?: string
+  rpcMethodName?: string
+  logRpcCalls?: boolean
 }
 
 type Aggregate3Result = {
@@ -116,7 +118,13 @@ export async function executeReadMulticall<T>(
   }
   const chunks = chunkCalls(calls, Math.max(1, opts.chunkSize ?? 128))
   const out: (T | null)[] = []
-  for (const chunk of chunks) {
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+    const chunk = chunks[chunkIndex]!
+    if (opts.logRpcCalls && opts.rpcMethodName) {
+      console.info(
+        `[readMulticall] RPC call for ${opts.rpcMethodName} (${chunk.length} users in batch), batch ${chunkIndex + 1} of ${chunks.length}`
+      )
+    }
     const payload = chunk.map((c) => ({
       target: getAddress(c.target),
       allowFailure: c.allowFailure ?? false,

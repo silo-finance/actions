@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useWeb3 } from '@/contexts/Web3Context'
 import {
   getExplorerAddressUrl,
   getNetworkDisplayName,
@@ -19,7 +20,12 @@ import {
   fetchOpenPositionsByMarket,
   type OpenMarketPosition,
 } from '@/utils/liquidationGraph'
-import { fetchBorrowersSolvency, fetchMarketsDynamicState } from '@/utils/liquidationRpc'
+import {
+  fetchBorrowersLtvFromSiloLens,
+  fetchBorrowersSolvency,
+  fetchMarketsDynamicState,
+  getSiloLensAddressForChain,
+} from '@/utils/liquidationRpc'
 import { formatUnits } from 'ethers'
 
 type MarketRow = {
@@ -51,6 +57,8 @@ const DEFAULT_GRAPH_PAGE_LIMIT = 1000
 const DEFAULT_POSITIONS_COUNT_CHUNK = 40
 const BIGINT_ZERO = BigInt(0)
 const WARNING_HEALTH_FACTOR_THRESHOLD = 0.95
+const REALTIME_REFRESH_INTERVAL_SECONDS = 60
+const REALTIME_AGE_THRESHOLD_SECONDS = 30 * 60
 
 type SortColumn =
   | 'siloId'
@@ -168,6 +176,60 @@ function formatScaledValue(raw: string | null, decimals = 18, maxFractionDigits 
   })
 }
 
+function parsePositionTimestampMs(raw: string | null): number | null {
+  if (!raw) return null
+  const value = raw.trim()
+  if (!value) return null
+  if (/^\d+$/.test(value)) {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed) || parsed <= 0) return null
+    return parsed > 1_000_000_000_000 ? parsed : parsed * 1000
+  }
+  const asDate = Date.parse(value)
+  return Number.isFinite(asDate) ? asDate : null
+}
+
+function formatEnglishCount(value: number, singular: string): string {
+  return `${value} ${value === 1 ? singular : `${singular}s`}`
+}
+
+function areStringMapsEqual(a: Map<string, string>, b: Map<string, string>): boolean {
+  if (a.size !== b.size) return false
+  let same = true
+  a.forEach((value, key) => {
+    if (!same) return
+    if (b.get(key) !== value) same = false
+  })
+  return same
+}
+
+function formatPositionAge(rawTimestamp: string | null, nowMs: number): string {
+  const timestampMs = parsePositionTimestampMs(rawTimestamp)
+  if (timestampMs == null) return '—'
+  const ageSeconds = Math.max(0, Math.floor((nowMs - timestampMs) / 1000))
+  if (ageSeconds < 60) {
+    return formatEnglishCount(ageSeconds, 'second')
+  }
+  const ageMinutes = Math.floor(ageSeconds / 60)
+  if (ageMinutes < 60) {
+    return formatEnglishCount(ageMinutes, 'minute')
+  }
+  const ageHours = Math.floor(ageMinutes / 60)
+  if (ageHours < 24) {
+    return formatEnglishCount(ageHours, 'hour')
+  }
+  const ageDays = Math.floor(ageHours / 24)
+  if (ageDays < 30) {
+    return formatEnglishCount(ageDays, 'day')
+  }
+  const ageMonths = Math.floor(ageDays / 30)
+  if (ageMonths < 12) {
+    return formatEnglishCount(ageMonths, 'month')
+  }
+  const ageYears = Math.floor(ageDays / 365)
+  return formatEnglishCount(ageYears, 'year')
+}
+
 function formatMetric(value: bigint | null, decimals: number | null): string {
   if (value == null) return '—'
   const parsed = Number(formatUnits(value, decimals ?? 18))
@@ -226,6 +288,36 @@ function getMarketsFreshnessTextClass(ageSeconds: number | null): string {
 
 function isWarningHealthFactor(healthFactor: number | null, isInsolvent: boolean): boolean {
   return !isInsolvent && healthFactor != null && healthFactor >= WARNING_HEALTH_FACTOR_THRESHOLD
+}
+
+function formatLtvPercentFromRaw18(ltvRaw18: string): string {
+  if (/^-?\d+$/.test(ltvRaw18)) {
+    return formatUnits(BigInt(ltvRaw18), 16)
+  }
+  const parsed = Number(ltvRaw18)
+  if (Number.isFinite(parsed)) return String(parsed * 100)
+  return ltvRaw18
+}
+
+function shouldMonitorPositionInRealtime({
+  row,
+  positionLtRatio,
+  isSolvent,
+  nowMs,
+}: {
+  row: OpenMarketPosition
+  positionLtRatio: number | null
+  isSolvent: boolean | null | undefined
+  nowMs: number
+}): boolean {
+  const ltvRatio = parseScaledNumber(row.ltv, 18)
+  const healthFactor = ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
+  const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
+  const isWarning = isWarningHealthFactor(healthFactor, isInsolvent)
+  const timestampMs = parsePositionTimestampMs(row.lastUpdatedTimestamp)
+  const ageSeconds = timestampMs == null ? null : Math.max(0, Math.floor((nowMs - timestampMs) / 1000))
+  const isOlderThanThreshold = ageSeconds != null && ageSeconds > REALTIME_AGE_THRESHOLD_SECONDS
+  return isWarning || isInsolvent || isOlderThanThreshold
 }
 
 async function copyToClipboard(value: string): Promise<void> {
@@ -349,6 +441,7 @@ function stringifyPretty(value: unknown): string {
 }
 
 function PositionsPageInner() {
+  const { provider: walletProvider, chainId: walletChainId } = useWeb3()
   const queryClient = useQueryClient()
   const router = useRouter()
   const pathname = usePathname()
@@ -365,6 +458,10 @@ function PositionsPageInner() {
   })
   const [isClientMounted, setIsClientMounted] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
+  const [isRealtimeEnabled, setIsRealtimeEnabled] = useState(false)
+  const [realtimeLtvByBorrower, setRealtimeLtvByBorrower] = useState<Map<string, string>>(new Map())
+  const [customRealtimeBorrowers, setCustomRealtimeBorrowers] = useState<string[]>([])
+  const [realtimeNextRefreshAtMs, setRealtimeNextRefreshAtMs] = useState<number | null>(null)
   const [marketsTimerMs, setMarketsTimerMs] = useState(0)
   const loggedErrorMarkersRef = useRef<Set<string>>(new Set())
   const graphPageLimit = config.testGraphLimit ?? DEFAULT_GRAPH_PAGE_LIMIT
@@ -750,9 +847,11 @@ function PositionsPageInner() {
       if (selectedChains.size > 0 && !selectedChains.has(row.chainId)) return false
 
       if (filters.token.trim()) {
-        const tokenFilter = filters.token.trim().toLowerCase()
-        const tokenScope = `${row.tokenSymbol ?? ''} ${row.otherTokenSymbol ?? ''}`.toLowerCase()
-        if (!tokenScope.includes(tokenFilter)) return false
+        const query = filters.token.trim().toLowerCase()
+        const symbolScope = `${row.tokenSymbol ?? ''} ${row.otherTokenSymbol ?? ''} ${row.quoteTokenSymbol ?? ''}`.toLowerCase()
+        const addressScope = row.siloAddress.toLowerCase()
+        const siloIdScope = row.siloId == null ? '' : String(row.siloId).toLowerCase()
+        if (!symbolScope.includes(query) && !addressScope.includes(query) && !siloIdScope.includes(query)) return false
       }
       if (filters.hideZeroPositions && row.positionsCount === 0) return false
       return true
@@ -850,6 +949,20 @@ function PositionsPageInner() {
       ? prefetchedMarketPositionsQuery.data?.get(`${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}`) ?? null
       : null
 
+  useEffect(() => {
+    if (view === 'positions' && selectedRow) return
+    setIsRealtimeEnabled(false)
+    setCustomRealtimeBorrowers([])
+    setRealtimeNextRefreshAtMs(null)
+  }, [view, selectedRow])
+
+  useEffect(() => {
+    if (isRealtimeEnabled) return
+    setRealtimeLtvByBorrower(new Map())
+    setCustomRealtimeBorrowers([])
+    setRealtimeNextRefreshAtMs(null)
+  }, [isRealtimeEnabled])
+
   const positionsQuery = useQuery({
     queryKey: ['liq', 'positions', selectedChainId, selectedSiloAddress, pageLimit, paginationOffset],
     queryFn: async () => {
@@ -939,7 +1052,10 @@ function PositionsPageInner() {
     queryKey: ['liq', 'positions', 'solvency', selectedRow?.chainId, selectedRow?.siloAddress?.toLowerCase(), borrowerAddresses.join('|')],
     queryFn: async () => {
       if (!selectedRow) return new Map<string, boolean>()
-      return fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, borrowerAddresses)
+      return fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, borrowerAddresses, {
+        preferredProvider: walletProvider,
+        preferredChainId: walletChainId,
+      })
     },
     enabled: isClientMounted && selectedRow != null && borrowerAddresses.length > 0,
     initialData: () => {
@@ -1000,9 +1116,21 @@ function PositionsPageInner() {
     const rows = positionsQuery.data?.items ?? []
     const scored = rows.map((row) => ({
       row,
-      ltvRatio: parseScaledNumber(row.ltv, 18),
+      borrowerAddress: extractBorrowerAddress(row.accountId),
+      effectiveLtvRaw: (() => {
+        const borrowerAddress = extractBorrowerAddress(row.accountId)
+        if (!borrowerAddress) return row.ltv
+        return realtimeLtvByBorrower.get(borrowerAddress) ?? row.ltv
+      })(),
+      ltvRatio: (() => {
+        const borrowerAddress = extractBorrowerAddress(row.accountId)
+        const effectiveLtvRaw = borrowerAddress ? realtimeLtvByBorrower.get(borrowerAddress) ?? row.ltv : row.ltv
+        return parseScaledNumber(effectiveLtvRaw, 18)
+      })(),
       healthFactor: (() => {
-        const ltvRatio = parseScaledNumber(row.ltv, 18)
+        const borrowerAddress = extractBorrowerAddress(row.accountId)
+        const effectiveLtvRaw = borrowerAddress ? realtimeLtvByBorrower.get(borrowerAddress) ?? row.ltv : row.ltv
+        const ltvRatio = parseScaledNumber(effectiveLtvRaw, 18)
         if (ltvRatio == null || positionLtRatio == null || positionLtRatio <= 0) return null
         return ltvRatio / positionLtRatio
       })(),
@@ -1013,6 +1141,31 @@ function PositionsPageInner() {
         if (!address) return null
         if (!solvencyQuery.data) return null
         return solvencyQuery.data.get(address) ?? null
+      })(),
+      isInsolvent: (() => {
+        const borrowerAddress = extractBorrowerAddress(row.accountId)
+        const effectiveLtvRaw = borrowerAddress ? realtimeLtvByBorrower.get(borrowerAddress) ?? row.ltv : row.ltv
+        const ltvRatio = parseScaledNumber(effectiveLtvRaw, 18)
+        const healthFactor =
+          ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
+        const isSolvent = (() => {
+          if (!borrowerAddress || !solvencyQuery.data) return null
+          return solvencyQuery.data.get(borrowerAddress) ?? null
+        })()
+        return isSolvent === false || (healthFactor != null && healthFactor >= 1)
+      })(),
+      isWarning: (() => {
+        const borrowerAddress = extractBorrowerAddress(row.accountId)
+        const effectiveLtvRaw = borrowerAddress ? realtimeLtvByBorrower.get(borrowerAddress) ?? row.ltv : row.ltv
+        const ltvRatio = parseScaledNumber(effectiveLtvRaw, 18)
+        const healthFactor =
+          ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
+        const isSolvent = (() => {
+          if (!borrowerAddress || !solvencyQuery.data) return null
+          return solvencyQuery.data.get(borrowerAddress) ?? null
+        })()
+        const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
+        return isWarningHealthFactor(healthFactor, isInsolvent)
       })(),
     }))
     scored.sort((a, b) => {
@@ -1032,7 +1185,118 @@ function PositionsPageInner() {
       return positionsSortDirection === 'asc' ? cmp : -cmp
     })
     return scored
-  }, [positionsQuery.data?.items, positionsSortColumn, positionsSortDirection, solvencyQuery.data, positionLtRatio])
+  }, [
+    positionsQuery.data?.items,
+    positionsSortColumn,
+    positionsSortDirection,
+    solvencyQuery.data,
+    positionLtRatio,
+    realtimeLtvByBorrower,
+  ])
+
+  const filteredRealtimeBorrowersToMonitor = useMemo(() => {
+    const rows = positionsQuery.data?.items ?? []
+    const addresses: string[] = []
+    for (const row of rows) {
+      const borrowerAddress = extractBorrowerAddress(row.accountId)
+      if (!borrowerAddress) continue
+      const isSolvent = solvencyQuery.data?.get(borrowerAddress)
+      if (shouldMonitorPositionInRealtime({ row, positionLtRatio, isSolvent, nowMs })) {
+        addresses.push(borrowerAddress)
+      }
+    }
+    return Array.from(new Set(addresses))
+  }, [positionsQuery.data?.items, positionLtRatio, solvencyQuery.data, nowMs])
+  const customRealtimeBorrowersStable = useMemo(
+    () => Array.from(new Set(customRealtimeBorrowers)),
+    [customRealtimeBorrowers]
+  )
+  const realtimeBorrowersToMonitor = useMemo(
+    () => Array.from(new Set([...filteredRealtimeBorrowersToMonitor, ...customRealtimeBorrowersStable])),
+    [filteredRealtimeBorrowersToMonitor, customRealtimeBorrowersStable]
+  )
+  const realtimeMonitorKey = useMemo(
+    () => realtimeBorrowersToMonitor.join('|'),
+    [realtimeBorrowersToMonitor]
+  )
+  const realtimeBorrowersToMonitorStable = useMemo(
+    () => (realtimeMonitorKey ? realtimeMonitorKey.split('|') : []),
+    [realtimeMonitorKey]
+  )
+  const realtimeMonitoredBorrowerSet = useMemo(() => new Set(realtimeBorrowersToMonitor), [realtimeBorrowersToMonitor])
+  const realtimeSecondsUntilRefresh = useMemo(() => {
+    if (!isRealtimeEnabled || realtimeNextRefreshAtMs == null) return null
+    return Math.min(
+      REALTIME_REFRESH_INTERVAL_SECONDS,
+      Math.max(0, Math.ceil((realtimeNextRefreshAtMs - nowMs) / 1000))
+    )
+  }, [isRealtimeEnabled, realtimeNextRefreshAtMs, nowMs])
+
+  useEffect(() => {
+    if (!isRealtimeEnabled || !selectedRow) return
+    let cancelled = false
+    let timer: number | null = null
+    void getSiloLensAddressForChain(selectedRow.chainId).then((siloLensAddress) => {
+      if (cancelled) return
+      const siloLensExplorerUrl = siloLensAddress
+        ? getExplorerAddressUrl(selectedRow.chainId, siloLensAddress)
+        : null
+      console.info('[positions-live] enabled', {
+        chainId: selectedRow.chainId,
+        market: selectedRow.siloAddress,
+        siloLensAddress,
+        siloLensExplorerUrl,
+      })
+    })
+
+    const run = async () => {
+      if (cancelled) return
+      try {
+        if (realtimeBorrowersToMonitorStable.length > 0) {
+          const nextLtvByBorrower = await fetchBorrowersLtvFromSiloLens(
+            selectedRow.chainId,
+            selectedRow.siloAddress,
+            realtimeBorrowersToMonitorStable,
+            {
+              preferredProvider: walletProvider,
+              preferredChainId: walletChainId,
+            }
+          )
+          console.debug('[positions-live] tick', {
+            chainId: selectedRow.chainId,
+            market: selectedRow.siloAddress,
+            monitoredBorrowers: realtimeBorrowersToMonitorStable.length,
+            refreshedBorrowers: nextLtvByBorrower.size,
+          })
+          nextLtvByBorrower.forEach((ltvRaw18, borrowerAddress) => {
+            console.info(`[positions-live] borrower: ${borrowerAddress} ltv: ${formatLtvPercentFromRaw18(ltvRaw18)}`)
+          })
+          if (!cancelled) {
+            setRealtimeLtvByBorrower((prev) => (areStringMapsEqual(prev, nextLtvByBorrower) ? prev : nextLtvByBorrower))
+          }
+        } else if (!cancelled) {
+          console.debug('[positions-live] tick', {
+            chainId: selectedRow.chainId,
+            market: selectedRow.siloAddress,
+            monitoredBorrowers: 0,
+            refreshedBorrowers: 0,
+          })
+          setRealtimeLtvByBorrower((prev) => (prev.size === 0 ? prev : new Map()))
+        }
+      } finally {
+        if (cancelled) return
+        setRealtimeNextRefreshAtMs(Date.now() + REALTIME_REFRESH_INTERVAL_SECONDS * 1000)
+        timer = window.setTimeout(run, REALTIME_REFRESH_INTERVAL_SECONDS * 1000)
+      }
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+      setRealtimeNextRefreshAtMs(null)
+      if (timer != null) window.clearTimeout(timer)
+    }
+  }, [isRealtimeEnabled, selectedRow, realtimeMonitorKey, realtimeBorrowersToMonitorStable, walletProvider, walletChainId])
 
   const toggleSort = (column: SortColumn) => {
     if (sortColumn !== column) {
@@ -1075,7 +1339,10 @@ function PositionsPageInner() {
     ) as string[]
     const solvencyByBorrower =
       allBorrowerAddresses.length > 0
-        ? await fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, allBorrowerAddresses)
+        ? await fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, allBorrowerAddresses, {
+            preferredProvider: walletProvider,
+            preferredChainId: walletChainId,
+          })
         : new Map<string, boolean>()
 
     let warningCount = 0
@@ -1215,7 +1482,7 @@ function PositionsPageInner() {
                 ⧉
               </button>
               <span className="ml-4">{selectedRow.marketTokenPair}</span>
-              <span className="ml-4">LT {positionLtLabel}</span>
+              <span className="ml-4 text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] font-semibold">LT {positionLtLabel}</span>
             </p>
           </div>
 
@@ -1262,8 +1529,8 @@ function PositionsPageInner() {
                     <tr>
                       <th className="text-left px-4 py-3 font-semibold">Borrower</th>
                       <th className="text-left px-4 py-3 font-semibold">
-                        <button type="button" onClick={() => togglePositionsSort('ltv')}>
-                          LTV{positionsSortIndicator('ltv')}
+                        <button type="button" onClick={() => togglePositionsSort('collateralValue')}>
+                          Collateral Value{positionsSortIndicator('collateralValue')}
                         </button>
                       </th>
                       <th className="text-left px-4 py-3 font-semibold">
@@ -1272,9 +1539,32 @@ function PositionsPageInner() {
                         </button>
                       </th>
                       <th className="text-left px-4 py-3 font-semibold">
-                        <button type="button" onClick={() => togglePositionsSort('collateralValue')}>
-                          Collateral Value{positionsSortIndicator('collateralValue')}
-                        </button>
+                        <span className="inline-flex items-center gap-2">
+                          <button type="button" onClick={() => togglePositionsSort('ltv')}>
+                            LTV{positionsSortIndicator('ltv')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isRealtimeEnabled) {
+                                setIsRealtimeEnabled(false)
+                                return
+                              }
+                              setIsRealtimeEnabled(true)
+                            }}
+                            disabled={positionsQuery.isFetching || solvencyQuery.isFetching}
+                            className={`text-[10px] font-semibold tracking-wide transition-colors ${
+                              isRealtimeEnabled
+                                ? 'text-[color-mix(in_srgb,var(--silo-text)_96%,#000000)]'
+                                : 'text-[color-mix(in_srgb,var(--silo-text)_26%,transparent)]'
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            aria-pressed={isRealtimeEnabled}
+                            aria-label="Toggle realtime monitoring"
+                            title="Toggle realtime monitoring"
+                          >
+                            LIVE{isRealtimeEnabled && realtimeSecondsUntilRefresh != null ? ` ${realtimeSecondsUntilRefresh}s` : ''}
+                          </button>
+                        </span>
                       </th>
                       <th className="text-left px-4 py-3 font-semibold">
                         <button type="button" onClick={() => togglePositionsSort('healthFactor')}>
@@ -1282,11 +1572,16 @@ function PositionsPageInner() {
                         </button>
                       </th>
                       <th className="text-left px-4 py-3 font-semibold">Solvent</th>
+                      <th className="text-left px-4 py-3 font-semibold">Age</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedPositionRows.map(({ row, healthFactor, isSolvent }) => {
+                    {sortedPositionRows.map(({ row, effectiveLtvRaw, healthFactor, isSolvent }) => {
                       const borrowerAddress = extractBorrowerAddress(row.accountId)
+                      const isRealtimeMonitored =
+                        isRealtimeEnabled && Boolean(borrowerAddress && realtimeMonitoredBorrowerSet.has(borrowerAddress))
+                      const canAddRealtimeMonitor =
+                        isRealtimeEnabled && Boolean(borrowerAddress && !realtimeMonitoredBorrowerSet.has(borrowerAddress))
                       const isInsolventByRatio = healthFactor != null && healthFactor >= 1
                       const isInsolvent = isSolvent === false || isInsolventByRatio
                       const isNearLt = isWarningHealthFactor(healthFactor, isInsolvent)
@@ -1337,7 +1632,14 @@ function PositionsPageInner() {
                                 ) : null}
                               </div>
                             </td>
-                            <td className="px-4 py-3">{formatPositionLtv(row.ltv)}</td>
+                            <td className="px-4 py-3">
+                              {formatScaledValue(row.collateralValue, 18, 2)}
+                              {row.collateralValue ? (
+                                <span className={`ml-1 ${symbolToneClass}`}>
+                                  {selectedRow.quoteTokenSymbol ?? selectedRow.tokenSymbol ?? ''}
+                                </span>
+                              ) : null}
+                            </td>
                             <td className="px-4 py-3">
                               {formatScaledValue(row.debtValue, 18, 2)}
                               {row.debtValue ? (
@@ -1347,12 +1649,28 @@ function PositionsPageInner() {
                               ) : null}
                             </td>
                             <td className="px-4 py-3">
-                              {formatScaledValue(row.collateralValue, 18, 2)}
-                              {row.collateralValue ? (
-                                <span className={`ml-1 ${symbolToneClass}`}>
-                                  {selectedRow.quoteTokenSymbol ?? selectedRow.tokenSymbol ?? ''}
-                                </span>
-                              ) : null}
+                              <span className="inline-flex items-center gap-1.5">
+                                {isRealtimeMonitored ? (
+                                  <span
+                                    className="inline-block h-2 w-2 rounded-full bg-[var(--silo-success)] animate-pulse"
+                                    aria-label="Realtime monitoring active for this position"
+                                    title="Realtime monitoring active for this position"
+                                  />
+                                ) : canAddRealtimeMonitor && borrowerAddress ? (
+                                  <button
+                                    type="button"
+                                    className="inline-block h-2 w-2 rounded-full border border-[color-mix(in_srgb,var(--silo-text)_42%,transparent)] bg-[color-mix(in_srgb,var(--silo-text)_28%,transparent)] hover:bg-[color-mix(in_srgb,var(--silo-text)_44%,transparent)] transition-colors"
+                                    onClick={() =>
+                                      setCustomRealtimeBorrowers((prev) =>
+                                        prev.includes(borrowerAddress) ? prev : [...prev, borrowerAddress]
+                                      )
+                                    }
+                                    aria-label="Add position to realtime monitoring"
+                                    title="Add position to realtime monitoring"
+                                  />
+                                ) : null}
+                                <span>{formatPositionLtv(effectiveLtvRaw)}</span>
+                              </span>
                             </td>
                             <td className="px-4 py-3">{formatHealthFactor(healthFactor)}</td>
                             <td className="px-4 py-3">
@@ -1364,10 +1682,11 @@ function PositionsPageInner() {
                                 <span className="text-[color-mix(in_srgb,var(--silo-danger)_85%,#4f0f1c)] font-semibold">no</span>
                               )}
                             </td>
+                            <td className="px-4 py-3">{formatPositionAge(row.lastUpdatedTimestamp, nowMs)}</td>
                           </tr>
                           {hasLtMismatch ? (
                             <tr className="border-t border-[var(--silo-border)]">
-                              <td colSpan={6} className="px-4 py-2 text-xs text-[color-mix(in_srgb,var(--silo-warning)_88%,#5a3b12)]">
+                              <td colSpan={7} className="px-4 py-2 text-xs text-[color-mix(in_srgb,var(--silo-warning)_88%,#5a3b12)]">
                                 Warning: `isSolvent` and Health Factor threshold are divergent for this borrower (possible rounding or pricing mismatch).
                               </td>
                             </tr>
@@ -1377,7 +1696,7 @@ function PositionsPageInner() {
                     })}
                     {(positionsQuery.data?.items ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-4 text-sm silo-text-soft">
+                        <td colSpan={7} className="px-4 py-4 text-sm silo-text-soft">
                           No open positions returned for this market.
                         </td>
                       </tr>
@@ -1428,15 +1747,28 @@ function PositionsPageInner() {
                   <div className="grid grid-cols-1 gap-3 w-full">
                     <label className="block">
                       <span className="block text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">
-                        Token symbol
+                        Search
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-10 gap-3 items-center">
-                        <input
-                          className="silo-input silo-input--sm min-w-[120px] w-full sm:col-span-3"
-                          placeholder="e.g. WETH"
-                          value={filters.token}
-                          onChange={(e) => updateFilter('token', e.target.value)}
-                        />
+                        <div className="relative sm:col-span-3">
+                          <input
+                            className="silo-input silo-input--sm min-w-[120px] w-full pr-7"
+                            placeholder="Symbol, silo address, or silo ID"
+                            value={filters.token}
+                            onChange={(e) => updateFilter('token', e.target.value)}
+                          />
+                          {filters.token.trim() ? (
+                            <button
+                              type="button"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-3xl leading-none text-[color-mix(in_srgb,var(--silo-text)_45%,transparent)] hover:text-[color-mix(in_srgb,var(--silo-text)_75%,transparent)]"
+                              onClick={() => updateFilter('token', '')}
+                              aria-label="Clear search"
+                              title="Clear search"
+                            >
+                              ×
+                            </button>
+                          ) : null}
+                        </div>
                         <label className="inline-flex items-center gap-2 text-xs silo-text-soft sm:col-span-7">
                           <input
                             type="checkbox"

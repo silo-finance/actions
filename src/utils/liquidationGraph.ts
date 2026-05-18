@@ -23,6 +23,7 @@ type PositionListResponse = {
       items?: Array<{
         id: string
         marketId: string | null
+        lastUpdatedTimestamp: string | null
         accountId: string
         ltv: string | null
         debtValue: string | null
@@ -46,6 +47,7 @@ type PositionListByMarketsResponse = {
         id: string
         chainId: number
         marketId: string | null
+        lastUpdatedTimestamp: string | null
         accountId: string
         ltv: string | null
         debtValue: string | null
@@ -93,6 +95,7 @@ query OpenPositionsByMarket($chainId: Int!, $marketId: String!, $limit: Int!, $o
     items {
       id
       marketId
+      lastUpdatedTimestamp
       accountId
       ltv
       debtValue
@@ -121,6 +124,7 @@ query OpenPositionsByMarkets($chainIds: [Int!], $marketIds: [String!], $limit: I
       id
       chainId
       marketId
+      lastUpdatedTimestamp
       accountId
       ltv
       debtValue
@@ -140,6 +144,7 @@ export type OpenMarketPosition = {
   id: string
   chainId: number
   marketId: string | null
+  lastUpdatedTimestamp: string | null
   accountId: string
   ltv: string | null
   debtValue: string | null
