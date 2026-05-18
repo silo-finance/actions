@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.23.0] - 2026-05-18
+
+### Added
+- extend filtering
+- include any position for live monitoring
+- expand LIVE monitoring candidates to include rows older than 30 minutes
+- package-lock.json
+- chore: add or refresh liquidation silo snapshot
+- use multicall RPC fallback when the silo is missing in API
+- use strict package version
+- add npm ci
+- hide live when no positions
+- rpc policy
+- live LTV monitoring
+
 ## [Unreleased]
 
 ### Updated
