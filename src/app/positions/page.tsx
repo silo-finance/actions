@@ -847,9 +847,11 @@ function PositionsPageInner() {
       if (selectedChains.size > 0 && !selectedChains.has(row.chainId)) return false
 
       if (filters.token.trim()) {
-        const tokenFilter = filters.token.trim().toLowerCase()
-        const tokenScope = `${row.tokenSymbol ?? ''} ${row.otherTokenSymbol ?? ''}`.toLowerCase()
-        if (!tokenScope.includes(tokenFilter)) return false
+        const query = filters.token.trim().toLowerCase()
+        const symbolScope = `${row.tokenSymbol ?? ''} ${row.otherTokenSymbol ?? ''} ${row.quoteTokenSymbol ?? ''}`.toLowerCase()
+        const addressScope = row.siloAddress.toLowerCase()
+        const siloIdScope = row.siloId == null ? '' : String(row.siloId).toLowerCase()
+        if (!symbolScope.includes(query) && !addressScope.includes(query) && !siloIdScope.includes(query)) return false
       }
       if (filters.hideZeroPositions && row.positionsCount === 0) return false
       return true
@@ -1745,15 +1747,28 @@ function PositionsPageInner() {
                   <div className="grid grid-cols-1 gap-3 w-full">
                     <label className="block">
                       <span className="block text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">
-                        Token symbol
+                        Search
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-10 gap-3 items-center">
-                        <input
-                          className="silo-input silo-input--sm min-w-[120px] w-full sm:col-span-3"
-                          placeholder="e.g. WETH"
-                          value={filters.token}
-                          onChange={(e) => updateFilter('token', e.target.value)}
-                        />
+                        <div className="relative sm:col-span-3">
+                          <input
+                            className="silo-input silo-input--sm min-w-[120px] w-full pr-7"
+                            placeholder="Symbol, silo address, or silo ID"
+                            value={filters.token}
+                            onChange={(e) => updateFilter('token', e.target.value)}
+                          />
+                          {filters.token.trim() ? (
+                            <button
+                              type="button"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-3xl leading-none text-[color-mix(in_srgb,var(--silo-text)_45%,transparent)] hover:text-[color-mix(in_srgb,var(--silo-text)_75%,transparent)]"
+                              onClick={() => updateFilter('token', '')}
+                              aria-label="Clear search"
+                              title="Clear search"
+                            >
+                              ×
+                            </button>
+                          ) : null}
+                        </div>
                         <label className="inline-flex items-center gap-2 text-xs silo-text-soft sm:col-span-7">
                           <input
                             type="checkbox"
