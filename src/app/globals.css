@@ -737,3 +737,57 @@ body {
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+@keyframes hot-value-flame-flicker {
+  0% {
+    transform: rotate(-2deg) scale(1);
+    filter: brightness(1);
+  }
+  40% {
+    transform: rotate(2deg) scale(1.04);
+    filter: brightness(1.08);
+  }
+  75% {
+    transform: rotate(-1deg) scale(0.98);
+    filter: brightness(0.96);
+  }
+  100% {
+    transform: rotate(-2deg) scale(1.01);
+    filter: brightness(1.04);
+  }
+}
+
+@keyframes hot-value-flame-inner-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.hot-value-flame {
+  display: inline-flex;
+  align-items: flex-end;
+  line-height: 0;
+  vertical-align: baseline;
+  transform: translateY(1px);
+}
+
+.hot-value-flame__frame {
+  display: inline-flex;
+  transform-origin: 50% 100%;
+  transform: scaleX(0.82);
+}
+
+.hot-value-flame__svg {
+  display: block;
+  transform-origin: 50% 100%;
+  animation: hot-value-flame-flicker 0.85s ease-in-out infinite;
+}
+
+.hot-value-flame__inner {
+  animation: hot-value-flame-inner-pulse 0.55s ease-in-out infinite;
+}
+
