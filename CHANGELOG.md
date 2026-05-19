@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.24.4] - 2026-05-19
+
+### Fixed
+- fix network selection
+- ci: change PR title and commit message
+
 ## [0.24.3] - 2026-05-19
 
 ### Fixed
