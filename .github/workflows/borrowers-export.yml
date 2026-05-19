@@ -136,3 +136,5 @@ jobs:
           echo "::notice::Updated files:"
           echo "::notice:: - scripts/pull_borrowers/${CHAIN}_borrowers.json"
           echo "::notice:: - scripts/pull_borrowers/${CHAIN}_positions.json"
+          echo "::notice::Borrowers URL: https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${TARGET_BRANCH}/scripts/pull_borrowers/${CHAIN}_borrowers.json"
+          echo "::notice::Positions URL: https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${TARGET_BRANCH}/scripts/pull_borrowers/${CHAIN}_positions.json"
