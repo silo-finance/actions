@@ -2332,11 +2332,7 @@ function PositionsPageInner() {
                             <button
                               key={chainId}
                               type="button"
-                              className={`silo-btn-secondary text-xs inline-flex items-center gap-2 ${
-                                isSelected
-                                  ? 'bg-[color-mix(in_srgb,var(--silo-soft-purple)_44%,var(--silo-surface))] border-[color-mix(in_srgb,var(--silo-accent)_45%,var(--silo-border))]'
-                                  : 'bg-[var(--silo-surface)] border-[var(--silo-border)]'
-                              }`}
+                              className="silo-btn-secondary text-xs inline-flex items-center gap-2"
                               aria-pressed={isSelected}
                               onClick={() =>
                                 setSelectedChains((prev) => {
@@ -2363,6 +2359,7 @@ function PositionsPageInner() {
                         <button
                           type="button"
                           className="silo-btn-secondary text-xs"
+                          aria-pressed={selectedChains.size === 0}
                           onClick={() => setSelectedChains(new Set())}
                         >
                           All networks

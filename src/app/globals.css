@@ -505,6 +505,27 @@ body {
   background: color-mix(in srgb, var(--silo-soft-purple) 26%, var(--silo-surface));
 }
 
+.silo-btn-secondary[aria-pressed='true'] {
+  background: var(--silo-soft-purple);
+  color: var(--silo-text);
+  border-color: var(--silo-border);
+}
+
+.theme-dark .silo-btn-secondary[aria-pressed='true'] {
+  background: var(--silo-accent-soft);
+  color: var(--silo-text);
+}
+
+.silo-btn-secondary[aria-pressed='true']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--silo-soft-purple) 88%, var(--silo-surface));
+  border-color: var(--silo-border);
+}
+
+.theme-dark .silo-btn-secondary[aria-pressed='true']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--silo-accent) 32%, var(--silo-surface));
+  border-color: var(--silo-border);
+}
+
 .silo-btn-secondary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
