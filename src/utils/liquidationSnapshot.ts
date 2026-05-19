@@ -39,6 +39,7 @@ export type RelatedSiloSnapshotData = {
 export type LiquidationSnapshotEntry = {
   chainId: number
   chainKey: string
+  marketVersion?: 'v3' | 'legacy'
   siloAddress: string
   siloConfigAddress: string | null
   siloId: number | null
@@ -66,6 +67,10 @@ const SNAPSHOTS: ChainSnapshotFile[] = [
   sonicSnapshot as ChainSnapshotFile,
   xdcSnapshot as ChainSnapshotFile,
 ]
+
+function normalizeMarketVersion(value: unknown): 'v3' | 'legacy' {
+  return value === 'legacy' ? 'legacy' : 'v3'
+}
 
 function parseAddressCsv(raw: string | undefined): Set<string> {
   if (!raw?.trim()) return new Set()
@@ -102,7 +107,12 @@ export function getLiquidationSnapshotConfig(): LiquidationSnapshotConfig {
 
 export function getLiquidationSnapshotEntries(): LiquidationSnapshotEntry[] {
   const config = getLiquidationSnapshotConfig()
-  const out = SNAPSHOTS.flatMap((snapshot) => snapshot.silos)
+  const out = SNAPSHOTS.flatMap((snapshot) =>
+    snapshot.silos.map((row) => ({
+      ...row,
+      marketVersion: normalizeMarketVersion(row.marketVersion),
+    }))
+  )
   const filtered =
     config.filteredSiloAddresses.size > 0
       ? out.filter((row) => config.filteredSiloAddresses.has(row.siloAddress.toLowerCase()))

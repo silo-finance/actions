@@ -116,16 +116,27 @@ export type LiquidationMarketDynamicState = {
   totalDebt: bigint
 }
 
+/** Primary silo plus paired `otherSilo` addresses, deduped by lowercase key. */
+function collectUniqueSiloAddresses(entries: LiquidationSnapshotEntry[]): string[] {
+  const byLower = new Map<string, string>()
+  for (const entry of entries) {
+    byLower.set(entry.siloAddress.toLowerCase(), entry.siloAddress)
+    const other = entry.otherSilo?.siloAddress
+    if (other) byLower.set(other.toLowerCase(), other)
+  }
+  return Array.from(byLower.values())
+}
+
 export async function fetchMarketsDynamicState(
   chainId: number,
   entries: LiquidationSnapshotEntry[]
 ): Promise<Map<string, LiquidationMarketDynamicState>> {
   const provider = getReadonlyProvider(chainId)
   const states = new Map<string, LiquidationMarketDynamicState>()
-  if (entries.length === 0) return states
+  const siloAddresses = collectUniqueSiloAddresses(entries)
+  if (siloAddresses.length === 0) return states
 
-  const calls = entries.flatMap((entry) => {
-    const marketAddress = entry.siloAddress
+  const calls = siloAddresses.flatMap((marketAddress) => {
     const direct = new Contract(marketAddress, SiloAbi, provider)
     return [
       buildReadMulticallCall({
@@ -171,14 +182,14 @@ export async function fetchMarketsDynamicState(
     debugLabel: `liq:${chainId}`,
   })
 
-  for (let i = 0; i < entries.length; i += 1) {
+  for (let i = 0; i < siloAddresses.length; i += 1) {
     const baseIndex = i * 4
     const totalAssetsStorage = (results[baseIndex] as bigint | null) ?? BIGINT_ZERO
     const totalAssets = (results[baseIndex + 1] as bigint | null) ?? BIGINT_ZERO
     const liquidity = (results[baseIndex + 2] as bigint | null) ?? BIGINT_ZERO
     const totalDebt = (results[baseIndex + 3] as bigint | null) ?? BIGINT_ZERO
     const interest = totalAssets > totalAssetsStorage ? totalAssets - totalAssetsStorage : BIGINT_ZERO
-    const siloAddress = entries[i]!.siloAddress.toLowerCase()
+    const siloAddress = siloAddresses[i]!.toLowerCase()
     states.set(siloAddress, {
       siloAddress,
       totalAssetsStorage,

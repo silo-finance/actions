@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.24.0] - 2026-05-19
+
+### Added
+- priority column
+- moredescriptive health factor
+- display market version
+- display other silo metadata and liquidity warning
+- support legacy positions - initial version (#71)
+- chore: add or refresh liquidation silo snapshot
+
+## Unreleased
+
 ## [0.23.0] - 2026-05-18
 
 ### Added
@@ -14,11 +26,6 @@
 - hide live when no positions
 - rpc policy
 - live LTV monitoring
-
-## [Unreleased]
-
-### Updated
-- expand LIVE monitoring candidates to include rows older than 30 minutes
 
 ## [0.22.3] - 2026-05-15
 
