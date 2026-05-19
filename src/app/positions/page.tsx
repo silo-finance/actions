@@ -30,6 +30,7 @@ import {
   getSiloLensAddressForChain,
 } from '@/utils/liquidationRpc'
 import { formatUnits } from 'ethers'
+import { capDisplayHealthFactor, computeHealthFactor } from '@/utils/healthFactor'
 
 type MarketRow = {
   chainId: number
@@ -65,7 +66,6 @@ const DEFAULT_GRAPH_PAGE_LIMIT = 1000
 const DEFAULT_POSITIONS_COUNT_CHUNK = 40
 const BIGINT_ZERO = BigInt(0)
 const WARNING_HEALTH_FACTOR_THRESHOLD = 0.95
-const MAX_DISPLAY_HEALTH_FACTOR = 100
 const MAX_DISPLAY_LTV_PERCENT = 999
 /** Applied to table columns not refreshed by LIVE (collateral, debt, age). */
 const POSITIONS_LIVE_STALE_COLUMN_CLASS = 'opacity-40 transition-opacity'
@@ -141,11 +141,6 @@ function parseIntParam(raw: string | null): number | null {
 function capDisplayLtvPercent(percent: number): number {
   if (!Number.isFinite(percent)) return percent
   return Math.min(percent, MAX_DISPLAY_LTV_PERCENT)
-}
-
-function capDisplayHealthFactor(value: number): number {
-  if (!Number.isFinite(value)) return value
-  return Math.min(value, MAX_DISPLAY_HEALTH_FACTOR)
 }
 
 function formatPositionLtv(raw: string | null): string {
@@ -375,7 +370,7 @@ function shouldMonitorPositionInRealtime({
   nowMs: number
 }): boolean {
   const ltvRatio = parseScaledNumber(row.ltv, 18)
-  const healthFactor = ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
+  const healthFactor = computeHealthFactor(ltvRatio, positionLtRatio)
   const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
   const isWarning = isWarningHealthFactor(healthFactor, isInsolvent)
   const timestampMs = parsePositionTimestampMs(row.lastUpdatedTimestamp)
@@ -814,7 +809,7 @@ function PositionsPageInner() {
         let insolventCount = 0
         for (const item of items) {
           const ltvRatio = parseScaledNumber(item.ltv, 18)
-          const healthFactor = ltvRatio != null && ltRatio != null && ltRatio > 0 ? ltvRatio / ltRatio : null
+          const healthFactor = computeHealthFactor(ltvRatio, ltRatio)
           const borrowerAddress = extractBorrowerAddress(item.accountId)
           const positionKey = borrowerAddress
             ? buildLiquidationPositionKey(row.chainId, row.siloAddress, borrowerAddress)
@@ -1392,8 +1387,7 @@ function PositionsPageInner() {
       const hasLiveLtv = Boolean(borrowerAddress && realtimeLtvByBorrower.has(borrowerAddress))
       const effectiveLtvRaw = resolveEffectiveLtvRaw(row, borrowerAddress, realtimeLtvByBorrower)
       const ltvRatio = parseScaledNumber(effectiveLtvRaw, 18)
-      const healthFactor =
-        ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
+      const healthFactor = computeHealthFactor(ltvRatio, positionLtRatio)
       const externalKey =
         selectedRow && borrowerAddress
           ? buildLiquidationPositionKey(selectedRow.chainId, selectedRow.siloAddress, borrowerAddress)
@@ -1691,7 +1685,7 @@ function PositionsPageInner() {
     let insolventCount = 0
     for (const item of allItems) {
       const ltvRatio = parseScaledNumber(item.ltv, 18)
-      const healthFactor = ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
+      const healthFactor = computeHealthFactor(ltvRatio, positionLtRatio)
       const borrowerAddress = extractBorrowerAddress(item.accountId)
       const externalSolventKey = borrowerAddress
         ? buildLiquidationPositionKey(selectedRow.chainId, selectedRow.siloAddress, borrowerAddress)
