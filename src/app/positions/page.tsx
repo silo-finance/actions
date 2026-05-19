@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import HotValueFlame from '@/components/HotValueFlame'
 import PositionPriorityTicks from '@/components/PositionPriorityTicks'
 import { useWeb3 } from '@/contexts/Web3Context'
 import {
@@ -22,6 +23,7 @@ import {
 } from '@/utils/liquidationGraph'
 import { fetchExternalPositionsData } from '@/utils/liquidationExternalPositions'
 import { buildLiquidationPositionKey, extractBorrowerAddress } from '@/utils/liquidationPositionIdentity'
+import { resolveHotValuePositionIds } from '@/utils/positionHotValue'
 import { mergeMarketPositionItems, solvencyMapFromExternalMarket } from '@/utils/liquidationPositionMerge'
 import {
   fetchBorrowersLtvFromSiloLens,
@@ -1639,8 +1641,11 @@ function PositionsPageInner() {
     const rows = positionsQuery.data?.items ?? []
     const scored = rows.map((row) => scoreOpenMarketPosition(row, positionScoreContext))
     scored.sort((a, b) => {
-      const tierCmp = positionRiskSortTier(a.isInsolvent, a.isWarning) - positionRiskSortTier(b.isInsolvent, b.isWarning)
-      if (tierCmp !== 0) return tierCmp
+      if (positionsSortColumn === 'priority') {
+        const tierCmp =
+          positionRiskSortTier(a.isInsolvent, a.isWarning) - positionRiskSortTier(b.isInsolvent, b.isWarning)
+        if (tierCmp !== 0) return tierCmp
+      }
 
       const lhs: Record<PositionsSortColumn, number | null> = {
         healthFactor: a.healthFactor,
@@ -1697,6 +1702,17 @@ function PositionsPageInner() {
       return true
     })
   }, [sortedPositionRows, normalizedBorrowerQuery, minDebtValueThreshold])
+
+  const hotDebtPositionIds = useMemo(
+    () =>
+      resolveHotValuePositionIds(
+        sortedPositionRows.map((scored) => ({
+          id: scored.row.id,
+          value: scored.debtValueNum,
+        }))
+      ),
+    [sortedPositionRows]
+  )
 
   const hasBorrowerAddressFilter = normalizedBorrowerQuery.length > 0
   const hasDebtValueFilter = minDebtValueThreshold != null
@@ -2270,18 +2286,18 @@ function PositionsPageInner() {
                         Borrower
                       </th>
                       <th
-                        className={`text-left px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
+                        className={`text-right px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
                         title={isRealtimeEnabled ? 'Not updated during LIVE refresh' : undefined}
                       >
-                        <button type="button" onClick={() => togglePositionsSort('collateralValue')}>
+                        <button type="button" onClick={() => togglePositionsSort('collateralValue')} className="w-full text-right">
                           Collateral Value{positionsSortIndicator('collateralValue')}
                         </button>
                       </th>
                       <th
-                        className={`text-left px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
+                        className={`text-right px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
                         title={isRealtimeEnabled ? 'Not updated during LIVE refresh' : undefined}
                       >
-                        <button type="button" onClick={() => togglePositionsSort('debtValue')}>
+                        <button type="button" onClick={() => togglePositionsSort('debtValue')} className="w-full text-right">
                           Debt Value{positionsSortIndicator('debtValue')}
                         </button>
                       </th>
@@ -2458,21 +2474,30 @@ function PositionsPageInner() {
                                 ) : null}
                               </div>
                             </td>
-                            <td className={`px-4 py-3 ${staleColumnClass}`}>
-                              {formatScaledValue(row.collateralValue, 18, 2)}
-                              {row.collateralValue ? (
-                                <span className={`ml-1 ${symbolToneClass}`}>
-                                  {selectedRow.quoteTokenSymbol ?? selectedRow.tokenSymbol ?? ''}
+                            <td className={`px-4 py-3 text-right ${staleColumnClass}`}>
+                              <span className="inline-flex flex-wrap items-baseline justify-end gap-x-1.5 w-full tabular-nums leading-none">
+                                <span className="inline-flex items-baseline gap-1">
+                                  <span>{formatScaledValue(row.collateralValue, 18, 2)}</span>
                                 </span>
-                              ) : null}
+                                {row.collateralValue ? (
+                                  <span className={symbolToneClass}>
+                                    {selectedRow.quoteTokenSymbol ?? selectedRow.tokenSymbol ?? ''}
+                                  </span>
+                                ) : null}
+                              </span>
                             </td>
-                            <td className={`px-4 py-3 ${staleColumnClass}`}>
-                              {formatScaledValue(row.debtValue, 18, 2)}
-                              {row.debtValue ? (
-                                <span className={`ml-1 ${symbolToneClass}`}>
-                                  {selectedRow.quoteTokenSymbol ?? selectedRow.tokenSymbol ?? ''}
+                            <td className={`px-4 py-3 text-right ${staleColumnClass}`}>
+                              <span className="inline-flex flex-wrap items-baseline justify-end gap-x-1.5 w-full tabular-nums leading-none">
+                                <span className="inline-flex items-baseline gap-1">
+                                  {hotDebtPositionIds.has(row.id) ? <HotValueFlame /> : null}
+                                  <span>{formatScaledValue(row.debtValue, 18, 2)}</span>
                                 </span>
-                              ) : null}
+                                {row.debtValue ? (
+                                  <span className={symbolToneClass}>
+                                    {selectedRow.quoteTokenSymbol ?? selectedRow.tokenSymbol ?? ''}
+                                  </span>
+                                ) : null}
+                              </span>
                             </td>
                             <td className={`px-4 py-3 ${liveMetricClass}`}>
                               <span className="inline-flex items-center gap-1.5">
