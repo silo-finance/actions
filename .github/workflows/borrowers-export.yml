@@ -88,15 +88,15 @@ jobs:
       - name: Prepare output bundle
         run: |
           set -euo pipefail
-          mkdir -p .ci-export
-          cp "scripts/pull_borrowers/${CHAIN}_borrowers.json" ".ci-export/${CHAIN}_borrowers.json"
-          cp "scripts/pull_borrowers/${CHAIN}_positions.json" ".ci-export/${CHAIN}_positions.json"
+          mkdir -p ci-export
+          cp "scripts/pull_borrowers/${CHAIN}_borrowers.json" "ci-export/${CHAIN}_borrowers.json"
+          cp "scripts/pull_borrowers/${CHAIN}_positions.json" "ci-export/${CHAIN}_positions.json"
 
       - name: Upload export artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.CHAIN }}-legacy-export
-          path: .ci-export/
+          path: ci-export/
           if-no-files-found: error
 
       - name: Commit export files to target branch
@@ -114,8 +114,8 @@ jobs:
           fi
 
           mkdir -p scripts/pull_borrowers
-          cp ".ci-export/${CHAIN}_borrowers.json" "scripts/pull_borrowers/${CHAIN}_borrowers.json"
-          cp ".ci-export/${CHAIN}_positions.json" "scripts/pull_borrowers/${CHAIN}_positions.json"
+          cp "ci-export/${CHAIN}_borrowers.json" "scripts/pull_borrowers/${CHAIN}_borrowers.json"
+          cp "ci-export/${CHAIN}_positions.json" "scripts/pull_borrowers/${CHAIN}_positions.json"
 
           git add \
             "scripts/pull_borrowers/${CHAIN}_borrowers.json" \
