@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Contract, Interface, JsonRpcProvider, getAddress } from 'ethers'
@@ -11,6 +11,7 @@ import SiloOracleAbi from '../src/abis/ISiloOracle.json' with { type: 'json' }
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const snapshotDir = join(root, 'src', 'data', 'liquidation', 'silos')
+const legacyWhitelistDir = join(root, 'src', 'data', 'positions')
 
 const CHAIN_ID_BY_KEY = {
   ethereum: 1,
@@ -634,6 +635,61 @@ async function runAddOrRefreshSingle() {
   }
   writeChainSnapshot(chainKey, CHAIN_ID_BY_KEY[chainKey], outWithVersion)
   console.log(`[sync-liquidation-silos] add/refresh wrote ${outWithVersion.length} records for ${chainKey}`)
+  if (targetRow.marketVersion === 'legacy') {
+    addToLegacyWhitelist(chainKey, siloAddress)
+  }
+}
+
+function readLegacyWhitelistItems(whitelistPath) {
+  if (!existsSync(whitelistPath)) return null
+  const payload = JSON.parse(readFileSync(whitelistPath, 'utf8'))
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.silos)
+      ? payload.silos
+      : null
+  if (!items) {
+    throw new Error(`Invalid whitelist format in ${whitelistPath}`)
+  }
+  return items
+}
+
+function writeLegacyWhitelistItems(whitelistPath, items) {
+  mkdirSync(dirname(whitelistPath), { recursive: true })
+  writeFileSync(whitelistPath, `${JSON.stringify(items, null, 4)}\n`, 'utf8')
+}
+
+function addToLegacyWhitelist(chainKey, siloAddress) {
+  const whitelistPath = join(legacyWhitelistDir, `legacy_whitelist_${chainKey}.json`)
+  const items = readLegacyWhitelistItems(whitelistPath) ?? []
+  const alreadyListed = items.some((entry) => normalizeAddress(entry) === siloAddress)
+  if (alreadyListed) {
+    console.log(`[sync-liquidation-silos] legacy whitelist already contains ${siloAddress} in ${whitelistPath}`)
+    return
+  }
+  items.push(siloAddress)
+  writeLegacyWhitelistItems(whitelistPath, items)
+  console.log(
+    `[sync-liquidation-silos] legacy whitelist added ${siloAddress} to ${whitelistPath} (${items.length} total)`
+  )
+}
+
+function removeFromLegacyWhitelist(chainKey, siloAddress) {
+  const whitelistPath = join(legacyWhitelistDir, `legacy_whitelist_${chainKey}.json`)
+  if (!existsSync(whitelistPath)) {
+    console.log(`[sync-liquidation-silos] legacy whitelist skip missing file: ${whitelistPath}`)
+    return
+  }
+  const items = readLegacyWhitelistItems(whitelistPath)
+  if (!items) return
+  const kept = items.filter(
+    (entry) => typeof entry === 'string' && normalizeAddress(entry) !== siloAddress
+  )
+  const removed = items.length - kept.length
+  writeLegacyWhitelistItems(whitelistPath, kept)
+  console.log(
+    `[sync-liquidation-silos] legacy whitelist removed ${removed} entry/entries from ${whitelistPath} (kept ${kept.length})`
+  )
 }
 
 function runRemoveSingle() {
@@ -652,6 +708,7 @@ function runRemoveSingle() {
   console.log(
     `[sync-liquidation-silos] remove wrote ${filtered.length} records for ${chainKey} (removed ${siloAddress})`
   )
+  removeFromLegacyWhitelist(chainKey, siloAddress)
 }
 
 async function main() {

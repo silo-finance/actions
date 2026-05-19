@@ -45,14 +45,24 @@ jobs:
             --chainKey=${{ inputs.chainKey }} \
             --siloAddress=${{ inputs.siloAddress }}
 
-      - name: Detect snapshot changes
+      - name: Detect changes
         id: detect
         run: |
-          if git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/liquidation/silos; then
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No snapshot changes detected (or only generatedAt changed)."
-          else
+          snapshot_changed=false
+          legacy_whitelist_changed=false
+
+          if ! git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/liquidation/silos; then
+            snapshot_changed=true
+          fi
+          if ! git diff --quiet -- src/data/positions; then
+            legacy_whitelist_changed=true
+          fi
+
+          if [ "${snapshot_changed}" = true ] || [ "${legacy_whitelist_changed}" = true ]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No snapshot or legacy whitelist changes detected (or only generatedAt changed)."
           fi
 
       - name: Build PR title and commit message
@@ -64,7 +74,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          chain_name="$(tr '[:lower:]' '[:upper:]' <<< "${CHAIN_KEY:0:1}")${CHAIN_KEY:1}"
+          chain_upper="$(printf '%s' "$CHAIN_KEY" | tr '[:lower:]' '[:upper:]')"
           address="$(printf '%s' "$SILO_ADDRESS" | tr '[:upper:]' '[:lower:]')"
           token_symbol="$(
             node -e '
@@ -89,12 +99,11 @@ jobs:
             '
           )"
 
-          suffix=""
           if [ -n "$token_symbol" ]; then
-            suffix=" (${token_symbol})"
+            title="Add \`${address}\` (${token_symbol}) to ${chain_upper}"
+          else
+            title="Add \`${address}\` to ${chain_upper}"
           fi
-
-          title="Add ${address} on ${chain_name}${suffix}"
           echo "title=${title}" >> "$GITHUB_OUTPUT"
           echo "commit_message=${title}" >> "$GITHUB_OUTPUT"
 

@@ -209,7 +209,10 @@ def get_default_graphql_url(chain: str) -> str:
 
 
 def get_default_whitelist_path(chain: str) -> str:
-  return str(Path(__file__).with_name("whitelists") / f"silos_whitelist_{chain}.json")
+  repo_root = Path(__file__).resolve().parents[2]
+  return str(
+    repo_root / "src" / "data" / "positions" / f"legacy_whitelist_{chain}.json"
+  )
 
 
 def get_default_output_path(chain: str) -> str:
@@ -470,7 +473,7 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument(
     "--whitelist-file",
     default=None,
-    help="Path to whitelist JSON file (default: scripts/pull_borrowers/whitelists/silos_whitelist_<chain>.json).",
+    help="Path to whitelist JSON file (default: src/data/positions/legacy_whitelist_<chain>.json).",
   )
   parser.add_argument(
     "--env-file",
