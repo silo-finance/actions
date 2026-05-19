@@ -1,3 +1,5 @@
+import { buildLiquidationPositionKey } from '@/utils/liquidationPositionIdentity'
+
 export type ExternalPositionRecord = {
   chainId: number
   accountId: string
@@ -111,7 +113,8 @@ export async function fetchExternalPositionsData(chainIds: number[]): Promise<Ex
           const parsed = parseExternalRecord(chainId, row)
           if (!parsed) continue
           accepted += 1
-          const positionKey = `${chainId}:${parsed.marketId}:${parsed.accountId}`
+          const positionKey = buildLiquidationPositionKey(chainId, parsed.marketId, parsed.accountId)
+          if (!positionKey) continue
           byPositionKey.set(positionKey, parsed)
           const marketKey = `${chainId}:${parsed.marketId}`
           if (!byMarketKey.has(marketKey)) byMarketKey.set(marketKey, [])

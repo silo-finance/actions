@@ -20,11 +20,9 @@ import {
   fetchOpenPositionsByMarket,
   type OpenMarketPosition,
 } from '@/utils/liquidationGraph'
-import {
-  fetchExternalPositionsData,
-  type ExternalPositionRecord,
-  type ExternalPositionsData,
-} from '@/utils/liquidationExternalPositions'
+import { fetchExternalPositionsData } from '@/utils/liquidationExternalPositions'
+import { buildLiquidationPositionKey, extractBorrowerAddress } from '@/utils/liquidationPositionIdentity'
+import { mergeMarketPositionItems, solvencyMapFromExternalMarket } from '@/utils/liquidationPositionMerge'
 import {
   fetchBorrowersLtvFromSiloLens,
   fetchBorrowersSolvency,
@@ -113,49 +111,6 @@ type PrefetchedMarketPositionsEntry = {
   solvencyByBorrower: Array<readonly [string, boolean]>
 }
 
-function buildPositionKey(chainId: number, marketId: string, accountId: string): string | null {
-  const borrower = extractBorrowerAddress(accountId)
-  const normalizedMarketId = marketId.trim().toLowerCase()
-  if (!borrower || !/^0x[0-9a-f]{40}$/.test(normalizedMarketId)) return null
-  return `${chainId}:${normalizedMarketId}:${borrower}`
-}
-
-function mergeExternalIntoGraphPosition(
-  row: OpenMarketPosition,
-  chainId: number,
-  marketId: string,
-  externalData: ExternalPositionsData | undefined
-): OpenMarketPosition {
-  if (!externalData) return row
-  const key = buildPositionKey(chainId, marketId, row.accountId)
-  if (!key) return row
-  const external = externalData.byPositionKey.get(key)
-  if (!external) return row
-  return {
-    ...row,
-    ltv: external.ltv ?? row.ltv,
-    debtValue: external.debtValue ?? row.debtValue,
-    collateralValue: external.collateralValue ?? row.collateralValue,
-    lastUpdatedTimestamp: external.lastUpdatedTimestamp ?? row.lastUpdatedTimestamp,
-  }
-}
-
-function toOpenMarketPositionFromExternal(row: ExternalPositionRecord): OpenMarketPosition {
-  return {
-    id: `${row.marketId}-${row.accountId}-external`,
-    chainId: row.chainId,
-    marketId: row.marketId,
-    lastUpdatedTimestamp: row.lastUpdatedTimestamp,
-    accountId: row.accountId,
-    ltv: row.ltv,
-    debtValue: row.debtValue,
-    collateralValue: row.collateralValue,
-    debtAssets: null,
-    collateralAssets: null,
-    isInBadDet: null,
-  }
-}
-
 function normalizeSnapshotMarketVersion(value: unknown): 'v3' | 'legacy' {
   return value === 'legacy' ? 'legacy' : 'v3'
 }
@@ -216,13 +171,6 @@ function parseScaledNumber(raw: string | null, decimals = 18): number | null {
   if (!raw) return null
   const parsed = /^-?\d+$/.test(raw) ? Number(formatUnits(BigInt(raw), decimals)) : Number(raw)
   return Number.isFinite(parsed) ? parsed : null
-}
-
-function extractBorrowerAddress(raw: string): string | null {
-  const trimmed = raw.trim()
-  if (/^0x[0-9a-fA-F]{40}$/.test(trimmed)) return trimmed.toLowerCase()
-  const suffix = /(0x[0-9a-fA-F]{40})$/.exec(trimmed)
-  return suffix ? suffix[1].toLowerCase() : null
 }
 
 function formatScaledValue(raw: string | null, decimals = 18, maxFractionDigits = 2): string {
@@ -356,6 +304,48 @@ function isWarningHealthFactor(healthFactor: number | null, isInsolvent: boolean
   return !isInsolvent && healthFactor != null && healthFactor >= WARNING_HEALTH_FACTOR_THRESHOLD
 }
 
+/** Solvent when LTV is at or below the market liquidation threshold (matches on-chain / export scripts). */
+function deriveSolventFromLtvRatio(ltvRatio: number | null, ltRatio: number | null): boolean | null {
+  if (ltvRatio == null || ltRatio == null || ltRatio <= 0) return null
+  return ltvRatio <= ltRatio
+}
+
+function resolveEffectiveLtvRaw(
+  row: OpenMarketPosition,
+  borrowerAddress: string | null,
+  realtimeLtvByBorrower: Map<string, string>
+): string | null {
+  if (borrowerAddress && realtimeLtvByBorrower.has(borrowerAddress)) {
+    return realtimeLtvByBorrower.get(borrowerAddress) ?? row.ltv
+  }
+  return row.ltv
+}
+
+function resolvePositionSolvent({
+  effectiveLtvRaw,
+  positionLtRatio,
+  externalSolvent,
+  rpcSolvent,
+  preferLtvDerivation,
+}: {
+  effectiveLtvRaw: string | null
+  positionLtRatio: number | null
+  externalSolvent: boolean | null | undefined
+  rpcSolvent: boolean | null | undefined
+  preferLtvDerivation: boolean
+}): boolean | null {
+  if (preferLtvDerivation) {
+    const derived = deriveSolventFromLtvRatio(parseScaledNumber(effectiveLtvRaw, 18), positionLtRatio)
+    if (derived != null) return derived
+  }
+  if (externalSolvent != null) return externalSolvent
+  if (rpcSolvent != null) return rpcSolvent
+  if (!preferLtvDerivation) {
+    return deriveSolventFromLtvRatio(parseScaledNumber(effectiveLtvRaw, 18), positionLtRatio)
+  }
+  return null
+}
+
 function formatLtvPercentFromRaw18(ltvRaw18: string): string {
   if (/^-?\d+$/.test(ltvRaw18)) {
     const pct = Number(formatUnits(BigInt(ltvRaw18), 16))
@@ -451,6 +441,36 @@ function serializeDynamicStateMap(map: Map<string, DynamicStateType>) {
   ] as const)
 }
 
+function stripLegacyMarketsFromPrefetchCache(
+  cached: Map<string, PrefetchedMarketPositionsEntry>,
+  markets: Array<{ chainId: number; siloAddress: string; marketVersion: 'v3' | 'legacy' }>
+): Map<string, PrefetchedMarketPositionsEntry> {
+  const legacyKeys = new Set(
+    markets
+      .filter((row) => row.marketVersion === 'legacy')
+      .map((row) => `${row.chainId}:${row.siloAddress.toLowerCase()}`)
+  )
+  if (legacyKeys.size === 0) return cached
+  const out = new Map(cached)
+  legacyKeys.forEach((key) => out.delete(key))
+  return out
+}
+
+function stripLegacyCountsFromCache(
+  cached: Map<string, number>,
+  markets: Array<{ chainId: number; siloAddress: string; marketVersion: 'v3' | 'legacy' }>
+): Map<string, number> {
+  const legacyKeys = new Set(
+    markets
+      .filter((row) => row.marketVersion === 'legacy')
+      .map((row) => `${row.chainId}:${row.siloAddress.toLowerCase()}`)
+  )
+  if (legacyKeys.size === 0) return cached
+  const out = new Map(cached)
+  legacyKeys.forEach((key) => out.delete(key))
+  return out
+}
+
 function deserializeDynamicStateMap(
   payload:
     | Array<readonly [string, PersistedDynamicState]>
@@ -528,6 +548,9 @@ function PositionsPageInner() {
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [isRealtimeEnabled, setIsRealtimeEnabled] = useState(false)
   const [realtimeLtvByBorrower, setRealtimeLtvByBorrower] = useState<Map<string, string>>(new Map())
+  const [solventFlashByBorrower, setSolventFlashByBorrower] = useState<Map<string, 'improved' | 'worsened'>>(new Map())
+  const prevSolventByBorrowerRef = useRef<Map<string, boolean>>(new Map())
+  const realtimeSolventBaselineSeededRef = useRef(false)
   const [customRealtimeBorrowers, setCustomRealtimeBorrowers] = useState<string[]>([])
   const [realtimeNextRefreshAtMs, setRealtimeNextRefreshAtMs] = useState<number | null>(null)
   const [marketsTimerMs, setMarketsTimerMs] = useState(0)
@@ -592,11 +615,11 @@ function PositionsPageInner() {
     queryKey: ['liq', 'positions', 'external', snapshotKey],
     queryFn: () => fetchExternalPositionsData(snapshotEntries.map((row) => row.chainId)),
     enabled: isClientMounted && snapshotEntries.length > 0,
-    staleTime: Number.POSITIVE_INFINITY,
+    staleTime: 0,
     gcTime: 1000 * 60 * 60 * 24,
-    refetchOnMount: false,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
   })
   const externalDataVersion = externalPositionsQuery.dataUpdatedAt || 0
 
@@ -670,7 +693,9 @@ function PositionsPageInner() {
     initialData: () => {
       if (!isClientMounted) return undefined
       const cached = readPersisted<Array<readonly [string, number]>>(marketsCountsStorageKey)
-      return cached ? new Map<string, number>(cached.data) : undefined
+      return cached
+        ? stripLegacyCountsFromCache(new Map<string, number>(cached.data), staticMarketRows)
+        : undefined
     },
     initialDataUpdatedAt: () =>
       isClientMounted ? readPersisted<Array<readonly [string, number]>>(marketsCountsStorageKey)?.fetchedAt : undefined,
@@ -699,12 +724,13 @@ function PositionsPageInner() {
           : new Map<string, OpenMarketPosition[]>()
       for (const row of staticMarketRows) {
         const key = `${row.chainId}:${row.siloAddress.toLowerCase()}`
-        const items =
-          row.marketVersion === 'legacy'
-            ? (externalData?.byMarketKey.get(key) ?? []).map(toOpenMarketPositionFromExternal)
-            : (positionsByChainAndMarket.get(key) ?? []).map((item) =>
-                mergeExternalIntoGraphPosition(item, row.chainId, row.siloAddress, externalData)
-              )
+        const items = mergeMarketPositionItems(
+          row.chainId,
+          row.siloAddress,
+          row.marketVersion,
+          positionsByChainAndMarket.get(key) ?? [],
+          externalData
+        )
         if (row.marketVersion === 'legacy') {
           console.info(
             `[positions-legacy] market=${key} source=external count=${items.length} hasExternal=${Boolean(externalData)}`
@@ -715,11 +741,7 @@ function PositionsPageInner() {
         ) as string[]
         const solvencyByBorrower =
           row.marketVersion === 'legacy'
-            ? new Map<string, boolean>(
-                (externalData?.byMarketKey.get(key) ?? [])
-                  .filter((item) => item.solvent != null)
-                  .map((item) => [item.accountId, item.solvent as boolean])
-              )
+            ? solvencyMapFromExternalMarket(externalData, key)
             : borrowerAddresses.length > 0
               ? await fetchBorrowersSolvency(row.chainId, row.siloAddress, borrowerAddresses)
               : new Map<string, boolean>()
@@ -730,7 +752,9 @@ function PositionsPageInner() {
           const ltvRatio = parseScaledNumber(item.ltv, 18)
           const healthFactor = ltvRatio != null && ltRatio != null && ltRatio > 0 ? ltvRatio / ltRatio : null
           const borrowerAddress = extractBorrowerAddress(item.accountId)
-          const positionKey = borrowerAddress ? `${row.chainId}:${row.siloAddress.toLowerCase()}:${borrowerAddress}` : null
+          const positionKey = borrowerAddress
+            ? buildLiquidationPositionKey(row.chainId, row.siloAddress, borrowerAddress)
+            : null
           const externalSolvent = positionKey ? externalData?.byPositionKey.get(positionKey)?.solvent : null
           const isSolvent = externalSolvent ?? (borrowerAddress ? solvencyByBorrower.get(borrowerAddress) : undefined)
           const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
@@ -755,7 +779,12 @@ function PositionsPageInner() {
     initialData: () => {
       if (!isClientMounted) return undefined
       const cached = readPersisted<Array<readonly [string, PrefetchedMarketPositionsEntry]>>(marketsPrefetchStorageKey)
-      return cached ? new Map<string, PrefetchedMarketPositionsEntry>(cached.data) : undefined
+      return cached
+        ? stripLegacyMarketsFromPrefetchCache(
+            new Map<string, PrefetchedMarketPositionsEntry>(cached.data),
+            staticMarketRows
+          )
+        : undefined
     },
     initialDataUpdatedAt: () =>
       isClientMounted
@@ -806,6 +835,10 @@ function PositionsPageInner() {
       const [chainIdRaw, siloAddress] = key.split(':')
       const chainId = Number(chainIdRaw)
       if (!Number.isFinite(chainId) || !siloAddress) return
+      const marketRow = staticMarketRows.find(
+        (row) => row.chainId === chainId && row.siloAddress.toLowerCase() === siloAddress
+      )
+      if (marketRow?.marketVersion === 'legacy') return
       const pageKey = `liq:positions:list:v3:${chainId}:${siloAddress}:${graphPageLimit}:0`
       writePersisted(pageKey, {
         fetchedAt,
@@ -820,7 +853,13 @@ function PositionsPageInner() {
         data: entry.solvencyByBorrower,
       })
     })
-  }, [prefetchedMarketPositionsQuery.data, prefetchedMarketPositionsQuery.dataUpdatedAt, marketsPrefetchStorageKey, graphPageLimit])
+  }, [
+    prefetchedMarketPositionsQuery.data,
+    prefetchedMarketPositionsQuery.dataUpdatedAt,
+    marketsPrefetchStorageKey,
+    graphPageLimit,
+    staticMarketRows,
+  ])
 
   useEffect(() => {
     if (!isClientMounted) return
@@ -1079,6 +1118,9 @@ function PositionsPageInner() {
   useEffect(() => {
     if (isRealtimeEnabled) return
     setRealtimeLtvByBorrower(new Map())
+    setSolventFlashByBorrower(new Map())
+    prevSolventByBorrowerRef.current = new Map()
+    realtimeSolventBaselineSeededRef.current = false
     setCustomRealtimeBorrowers([])
     setRealtimeNextRefreshAtMs(null)
   }, [isRealtimeEnabled])
@@ -1096,8 +1138,13 @@ function PositionsPageInner() {
     queryFn: async () => {
       if (!selectedRow) return { items: [] as OpenMarketPosition[], totalCount: 0, hasNextPage: false }
       if (selectedRow.marketVersion === 'legacy') {
-        const key = `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}`
-        const allItems = (externalPositionsQuery.data?.byMarketKey.get(key) ?? []).map(toOpenMarketPositionFromExternal)
+        const allItems = mergeMarketPositionItems(
+          selectedRow.chainId,
+          selectedRow.siloAddress,
+          'legacy',
+          [],
+          externalPositionsQuery.data
+        )
         return {
           items: allItems.slice(paginationOffset, paginationOffset + pageLimit),
           totalCount: allItems.length,
@@ -1108,14 +1155,18 @@ function PositionsPageInner() {
       const externalData = externalPositionsQuery.data
       return {
         ...page,
-        items: page.items.map((item) =>
-          mergeExternalIntoGraphPosition(item, selectedRow.chainId, selectedRow.siloAddress, externalData)
+        items: mergeMarketPositionItems(
+          selectedRow.chainId,
+          selectedRow.siloAddress,
+          'v3',
+          page.items,
+          externalData
         ),
       }
     },
     enabled: isClientMounted && selectedRow != null,
     initialData: () => {
-      if (!isClientMounted) return undefined
+      if (!isClientMounted || selectedRow?.marketVersion === 'legacy') return undefined
       if (paginationOffset === 0 && selectedPrefetchedEntry) {
         return {
           items: selectedPrefetchedEntry.items.slice(0, pageLimit),
@@ -1125,13 +1176,14 @@ function PositionsPageInner() {
       }
       return readPersisted<{ items: OpenMarketPosition[]; totalCount: number; hasNextPage: boolean }>(positionsStorageKey)?.data
     },
-    initialDataUpdatedAt: () =>
-      isClientMounted
-        ? paginationOffset === 0 && selectedPrefetchedEntry
-          ? selectedPrefetchedEntry.fetchedAt || prefetchedMarketPositionsQuery.dataUpdatedAt || undefined
-          : readPersisted<{ items: OpenMarketPosition[]; totalCount: number; hasNextPage: boolean }>(positionsStorageKey)
-              ?.fetchedAt
-        : undefined,
+    initialDataUpdatedAt: () => {
+      if (!isClientMounted || selectedRow?.marketVersion === 'legacy') return undefined
+      if (paginationOffset === 0 && selectedPrefetchedEntry) {
+        return selectedPrefetchedEntry.fetchedAt || prefetchedMarketPositionsQuery.dataUpdatedAt || undefined
+      }
+      return readPersisted<{ items: OpenMarketPosition[]; totalCount: number; hasNextPage: boolean }>(positionsStorageKey)
+        ?.fetchedAt
+    },
     staleTime: MARKET_DATA_STALE_TIME_MS,
     gcTime: 1000 * 60 * 60 * 24,
     refetchOnMount: true,
@@ -1140,12 +1192,12 @@ function PositionsPageInner() {
   })
 
   useEffect(() => {
-    if (!positionsQuery.data) return
+    if (!positionsQuery.data || selectedRow?.marketVersion === 'legacy') return
     writePersisted(positionsStorageKey, {
       fetchedAt: positionsQuery.dataUpdatedAt || Date.now(),
       data: positionsQuery.data,
     })
-  }, [positionsQuery.data, positionsQuery.dataUpdatedAt, positionsStorageKey])
+  }, [positionsQuery.data, positionsQuery.dataUpdatedAt, positionsStorageKey, selectedRow?.marketVersion])
 
   useEffect(() => {
     if (!positionsQuery.isError) return
@@ -1201,9 +1253,13 @@ function PositionsPageInner() {
         preferredChainId: walletChainId,
       })
     },
-    enabled: isClientMounted && selectedRow != null && borrowerAddresses.length > 0,
+    enabled:
+      isClientMounted &&
+      selectedRow != null &&
+      selectedRow.marketVersion !== 'legacy' &&
+      borrowerAddresses.length > 0,
     initialData: () => {
-      if (!isClientMounted) return undefined
+      if (!isClientMounted || selectedRow?.marketVersion === 'legacy') return undefined
       if (paginationOffset === 0 && selectedPrefetchedEntry) {
         return new Map<string, boolean>(selectedPrefetchedEntry.solvencyByBorrower)
       }
@@ -1211,12 +1267,13 @@ function PositionsPageInner() {
       const cached = readPersisted<Array<readonly [string, boolean]>>(storageKey)
       return cached ? new Map<string, boolean>(cached.data) : undefined
     },
-    initialDataUpdatedAt: () =>
-      isClientMounted
-        ? paginationOffset === 0 && selectedPrefetchedEntry
-          ? selectedPrefetchedEntry.fetchedAt || prefetchedMarketPositionsQuery.dataUpdatedAt || undefined
-          : readPersisted<Array<readonly [string, boolean]>>(`${positionsStorageKey}:solvency`)?.fetchedAt
-        : undefined,
+    initialDataUpdatedAt: () => {
+      if (!isClientMounted || selectedRow?.marketVersion === 'legacy') return undefined
+      if (paginationOffset === 0 && selectedPrefetchedEntry) {
+        return selectedPrefetchedEntry.fetchedAt || prefetchedMarketPositionsQuery.dataUpdatedAt || undefined
+      }
+      return readPersisted<Array<readonly [string, boolean]>>(`${positionsStorageKey}:solvency`)?.fetchedAt
+    },
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: 1000 * 60 * 60 * 24,
     refetchOnMount: false,
@@ -1225,12 +1282,12 @@ function PositionsPageInner() {
   })
 
   useEffect(() => {
-    if (!solvencyQuery.data) return
+    if (!solvencyQuery.data || selectedRow?.marketVersion === 'legacy') return
     writePersisted(`${positionsStorageKey}:solvency`, {
       fetchedAt: solvencyQuery.dataUpdatedAt || Date.now(),
       data: Array.from(solvencyQuery.data.entries()),
     })
-  }, [solvencyQuery.data, solvencyQuery.dataUpdatedAt, positionsStorageKey])
+  }, [solvencyQuery.data, solvencyQuery.dataUpdatedAt, positionsStorageKey, selectedRow?.marketVersion])
 
   const effectiveLtRaw = useMemo(() => {
     if (!selectedRow) return null
@@ -1258,78 +1315,41 @@ function PositionsPageInner() {
 
   const sortedPositionRows = useMemo(() => {
     const rows = positionsQuery.data?.items ?? []
-    const scored = rows.map((row) => ({
-      row,
-      borrowerAddress: extractBorrowerAddress(row.accountId),
-      effectiveLtvRaw: (() => {
-        const borrowerAddress = extractBorrowerAddress(row.accountId)
-        if (!borrowerAddress) return row.ltv
-        return realtimeLtvByBorrower.get(borrowerAddress) ?? row.ltv
-      })(),
-      ltvRatio: (() => {
-        const borrowerAddress = extractBorrowerAddress(row.accountId)
-        const effectiveLtvRaw = borrowerAddress ? realtimeLtvByBorrower.get(borrowerAddress) ?? row.ltv : row.ltv
-        return parseScaledNumber(effectiveLtvRaw, 18)
-      })(),
-      healthFactor: (() => {
-        const borrowerAddress = extractBorrowerAddress(row.accountId)
-        const effectiveLtvRaw = borrowerAddress ? realtimeLtvByBorrower.get(borrowerAddress) ?? row.ltv : row.ltv
-        const ltvRatio = parseScaledNumber(effectiveLtvRaw, 18)
-        if (ltvRatio == null || positionLtRatio == null || positionLtRatio <= 0) return null
-        return ltvRatio / positionLtRatio
-      })(),
-      debtValueNum: parseScaledNumber(row.debtValue, 18),
-      collateralValueNum: parseScaledNumber(row.collateralValue, 18),
-      isSolvent: (() => {
-        const address = extractBorrowerAddress(row.accountId)
-        if (!address) return null
-        if (selectedRow) {
-          const external = externalPositionsQuery.data?.byPositionKey.get(
-            `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}:${address}`
-          )
-          if (external?.solvent != null) return external.solvent
-        }
-        if (!solvencyQuery.data) return null
-        return solvencyQuery.data.get(address) ?? null
-      })(),
-      isInsolvent: (() => {
-        const borrowerAddress = extractBorrowerAddress(row.accountId)
-        const effectiveLtvRaw = borrowerAddress ? realtimeLtvByBorrower.get(borrowerAddress) ?? row.ltv : row.ltv
-        const ltvRatio = parseScaledNumber(effectiveLtvRaw, 18)
-        const healthFactor =
-          ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
-        const isSolvent = (() => {
-          if (selectedRow && borrowerAddress) {
-            const external = externalPositionsQuery.data?.byPositionKey.get(
-              `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}:${borrowerAddress}`
-            )
-            if (external?.solvent != null) return external.solvent
-          }
-          if (!borrowerAddress || !solvencyQuery.data) return null
-          return solvencyQuery.data.get(borrowerAddress) ?? null
-        })()
-        return isSolvent === false || (healthFactor != null && healthFactor >= 1)
-      })(),
-      isWarning: (() => {
-        const borrowerAddress = extractBorrowerAddress(row.accountId)
-        const effectiveLtvRaw = borrowerAddress ? realtimeLtvByBorrower.get(borrowerAddress) ?? row.ltv : row.ltv
-        const ltvRatio = parseScaledNumber(effectiveLtvRaw, 18)
-        const healthFactor =
-          ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
-        const isSolvent = (() => {
-          if (selectedRow && borrowerAddress) {
-            const external = externalPositionsQuery.data?.byPositionKey.get(
-              `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}:${borrowerAddress}`
-            )
-            if (external?.solvent != null) return external.solvent
-          }
-          if (!borrowerAddress || !solvencyQuery.data) return null
-          return solvencyQuery.data.get(borrowerAddress) ?? null
-        })()
-        const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
-        return isWarningHealthFactor(healthFactor, isInsolvent)
-      })(),
-    }))
+    const scored = rows.map((row) => {
+      const borrowerAddress = extractBorrowerAddress(row.accountId)
+      const hasLiveLtv = Boolean(borrowerAddress && realtimeLtvByBorrower.has(borrowerAddress))
+      const effectiveLtvRaw = resolveEffectiveLtvRaw(row, borrowerAddress, realtimeLtvByBorrower)
+      const ltvRatio = parseScaledNumber(effectiveLtvRaw, 18)
+      const healthFactor =
+        ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
+      const externalKey =
+        selectedRow && borrowerAddress
+          ? buildLiquidationPositionKey(selectedRow.chainId, selectedRow.siloAddress, borrowerAddress)
+          : null
+      const external = externalKey ? externalPositionsQuery.data?.byPositionKey.get(externalKey) : undefined
+      const isSolvent = resolvePositionSolvent({
+        effectiveLtvRaw,
+        positionLtRatio,
+        externalSolvent: external?.solvent,
+        rpcSolvent: borrowerAddress ? solvencyQuery.data?.get(borrowerAddress) : undefined,
+        preferLtvDerivation: hasLiveLtv,
+      })
+      const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
+      const isWarning = isWarningHealthFactor(healthFactor, isInsolvent)
+      return {
+        row,
+        borrowerAddress,
+        effectiveLtvRaw,
+        ltvRatio,
+        healthFactor,
+        debtValueNum: parseScaledNumber(row.debtValue, 18),
+        collateralValueNum: parseScaledNumber(row.collateralValue, 18),
+        isSolvent,
+        isInsolvent,
+        isWarning,
+        hasLiveLtv,
+      }
+    })
     scored.sort((a, b) => {
       const lhs: Record<PositionsSortColumn, number | null> = {
         healthFactor: a.healthFactor,
@@ -1364,19 +1384,34 @@ function PositionsPageInner() {
     for (const row of rows) {
       const borrowerAddress = extractBorrowerAddress(row.accountId)
       if (!borrowerAddress) continue
-      const isSolvent = solvencyQuery.data?.get(borrowerAddress)
-      const externalSolvent = selectedRow
-        ? externalPositionsQuery.data?.byPositionKey.get(
-            `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}:${borrowerAddress}`
-          )?.solvent
+      const hasLiveLtv = realtimeLtvByBorrower.has(borrowerAddress)
+      const effectiveLtvRaw = resolveEffectiveLtvRaw(row, borrowerAddress, realtimeLtvByBorrower)
+      const externalKey = selectedRow
+        ? buildLiquidationPositionKey(selectedRow.chainId, selectedRow.siloAddress, borrowerAddress)
         : null
-      const effectiveSolvent = externalSolvent ?? isSolvent
-      if (shouldMonitorPositionInRealtime({ row, positionLtRatio, isSolvent: effectiveSolvent, nowMs })) {
+      const external = externalKey ? externalPositionsQuery.data?.byPositionKey.get(externalKey) : undefined
+      const effectiveSolvent = resolvePositionSolvent({
+        effectiveLtvRaw,
+        positionLtRatio,
+        externalSolvent: external?.solvent,
+        rpcSolvent: solvencyQuery.data?.get(borrowerAddress),
+        preferLtvDerivation: hasLiveLtv,
+      })
+      const rowForMonitor = hasLiveLtv ? { ...row, ltv: effectiveLtvRaw } : row
+      if (shouldMonitorPositionInRealtime({ row: rowForMonitor, positionLtRatio, isSolvent: effectiveSolvent, nowMs })) {
         addresses.push(borrowerAddress)
       }
     }
     return Array.from(new Set(addresses))
-  }, [positionsQuery.data?.items, positionLtRatio, solvencyQuery.data, nowMs, selectedRow, externalPositionsQuery.data])
+  }, [
+    positionsQuery.data?.items,
+    positionLtRatio,
+    solvencyQuery.data,
+    nowMs,
+    selectedRow,
+    externalPositionsQuery.data,
+    realtimeLtvByBorrower,
+  ])
   const customRealtimeBorrowersStable = useMemo(
     () => Array.from(new Set(customRealtimeBorrowers)),
     [customRealtimeBorrowers]
@@ -1401,6 +1436,54 @@ function PositionsPageInner() {
       Math.max(0, Math.ceil((realtimeNextRefreshAtMs - nowMs) / 1000))
     )
   }, [isRealtimeEnabled, realtimeNextRefreshAtMs, nowMs])
+
+  useEffect(() => {
+    if (!isRealtimeEnabled || !selectedRow) {
+      realtimeSolventBaselineSeededRef.current = false
+      return
+    }
+    if (realtimeSolventBaselineSeededRef.current) return
+    const seed = new Map<string, boolean>()
+    for (const row of positionsQuery.data?.items ?? []) {
+      const borrowerAddress = extractBorrowerAddress(row.accountId)
+      if (!borrowerAddress) continue
+      const externalKey = buildLiquidationPositionKey(selectedRow.chainId, selectedRow.siloAddress, borrowerAddress)
+      const external = externalKey ? externalPositionsQuery.data?.byPositionKey.get(externalKey) : undefined
+      const baseline = resolvePositionSolvent({
+        effectiveLtvRaw: row.ltv,
+        positionLtRatio,
+        externalSolvent: external?.solvent,
+        rpcSolvent: solvencyQuery.data?.get(borrowerAddress),
+        preferLtvDerivation: false,
+      })
+      if (baseline != null) seed.set(borrowerAddress, baseline)
+    }
+    prevSolventByBorrowerRef.current = seed
+    realtimeSolventBaselineSeededRef.current = true
+  }, [
+    isRealtimeEnabled,
+    selectedRow,
+    positionsQuery.data?.items,
+    positionLtRatio,
+    solvencyQuery.data,
+    externalPositionsQuery.data,
+  ])
+
+  useEffect(() => {
+    if (!isRealtimeEnabled || realtimeLtvByBorrower.size === 0 || positionLtRatio == null) return
+    const transitions = new Map<string, 'improved' | 'worsened'>()
+    realtimeLtvByBorrower.forEach((ltvRaw, borrowerAddress) => {
+      const nextSolvent = deriveSolventFromLtvRatio(parseScaledNumber(ltvRaw, 18), positionLtRatio)
+      if (nextSolvent == null) return
+      const prevSolvent = prevSolventByBorrowerRef.current.get(borrowerAddress)
+      if (prevSolvent != null && prevSolvent !== nextSolvent) {
+        transitions.set(borrowerAddress, nextSolvent ? 'improved' : 'worsened')
+      }
+      prevSolventByBorrowerRef.current.set(borrowerAddress, nextSolvent)
+    })
+    // Highlight persists until the next live refresh tick (replaced/cleared each cycle).
+    setSolventFlashByBorrower(transitions)
+  }, [isRealtimeEnabled, realtimeLtvByBorrower, positionLtRatio])
 
   useEffect(() => {
     if (!isRealtimeEnabled || !selectedRow) return
@@ -1505,22 +1588,26 @@ function PositionsPageInner() {
     const marketKey = `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}`
     const allItems =
       selectedRow.marketVersion === 'legacy'
-        ? (externalPositionsQuery.data?.byMarketKey.get(marketKey) ?? []).map(toOpenMarketPositionFromExternal)
-        : (
-            await fetchAllOpenPositionsByMarket(selectedRow.chainId, selectedRow.siloAddress, graphPageLimit)
-          ).map((item) =>
-            mergeExternalIntoGraphPosition(item, selectedRow.chainId, selectedRow.siloAddress, externalPositionsQuery.data)
+        ? mergeMarketPositionItems(
+            selectedRow.chainId,
+            selectedRow.siloAddress,
+            'legacy',
+            [],
+            externalPositionsQuery.data
+          )
+        : mergeMarketPositionItems(
+            selectedRow.chainId,
+            selectedRow.siloAddress,
+            'v3',
+            await fetchAllOpenPositionsByMarket(selectedRow.chainId, selectedRow.siloAddress, graphPageLimit),
+            externalPositionsQuery.data
           )
     const allBorrowerAddresses = Array.from(
       new Set(allItems.map((item) => extractBorrowerAddress(item.accountId)).filter(Boolean))
     ) as string[]
     const solvencyByBorrower =
       selectedRow.marketVersion === 'legacy'
-        ? new Map<string, boolean>(
-            (externalPositionsQuery.data?.byMarketKey.get(marketKey) ?? [])
-              .filter((item) => item.solvent != null)
-              .map((item) => [item.accountId, item.solvent as boolean])
-          )
+        ? solvencyMapFromExternalMarket(externalPositionsQuery.data, marketKey)
         : allBorrowerAddresses.length > 0
           ? await fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, allBorrowerAddresses, {
               preferredProvider: walletProvider,
@@ -1534,10 +1621,11 @@ function PositionsPageInner() {
       const ltvRatio = parseScaledNumber(item.ltv, 18)
       const healthFactor = ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
       const borrowerAddress = extractBorrowerAddress(item.accountId)
-      const externalSolvent = borrowerAddress
-        ? externalPositionsQuery.data?.byPositionKey.get(
-            `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}:${borrowerAddress}`
-          )?.solvent
+      const externalSolventKey = borrowerAddress
+        ? buildLiquidationPositionKey(selectedRow.chainId, selectedRow.siloAddress, borrowerAddress)
+        : null
+      const externalSolvent = externalSolventKey
+        ? externalPositionsQuery.data?.byPositionKey.get(externalSolventKey)?.solvent
         : null
       const isSolvent = externalSolvent ?? (borrowerAddress ? solvencyByBorrower.get(borrowerAddress) : undefined)
       const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
@@ -1764,24 +1852,36 @@ function PositionsPageInner() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedPositionRows.map(({ row, effectiveLtvRaw, healthFactor, isSolvent }) => {
-                      const borrowerAddress = extractBorrowerAddress(row.accountId)
+                    {sortedPositionRows.map(
+                      ({ row, effectiveLtvRaw, healthFactor, isSolvent, isInsolvent, isWarning, hasLiveLtv, borrowerAddress }) => {
                       const isRealtimeMonitored =
                         isRealtimeEnabled && Boolean(borrowerAddress && realtimeMonitoredBorrowerSet.has(borrowerAddress))
                       const canAddRealtimeMonitor =
                         isRealtimeEnabled && Boolean(borrowerAddress && !realtimeMonitoredBorrowerSet.has(borrowerAddress))
-                      const isInsolventByRatio = healthFactor != null && healthFactor >= 1
-                      const isInsolvent = isSolvent === false || isInsolventByRatio
-                      const isNearLt = isWarningHealthFactor(healthFactor, isInsolvent)
+                      const isNearLt = isWarning
                       const hasLtMismatch =
+                        !hasLiveLtv &&
                         isSolvent != null &&
                         healthFactor != null &&
                         ((isSolvent === false && healthFactor < 1) || (isSolvent === true && healthFactor >= 1))
-                      const rowClassName = isInsolvent
-                        ? 'border-t border-[var(--silo-border)] text-[color-mix(in_srgb,var(--silo-danger)_80%,#5b1322)]'
-                        : isNearLt
-                          ? 'border-t border-[var(--silo-border)] text-[color-mix(in_srgb,var(--silo-warning)_80%,#5a3b12)]'
-                          : 'border-t border-[var(--silo-border)]'
+                      const solventFlash = borrowerAddress ? solventFlashByBorrower.get(borrowerAddress) : undefined
+                      const solventFlashClass =
+                        solventFlash === 'worsened'
+                          ? 'bg-[color-mix(in_srgb,var(--silo-danger)_6%,transparent)]'
+                          : solventFlash === 'improved'
+                            ? 'bg-[color-mix(in_srgb,var(--silo-success)_6%,transparent)]'
+                            : ''
+                      const rowClassName = [
+                        'border-t border-[var(--silo-border)]',
+                        solventFlashClass,
+                        isInsolvent
+                          ? 'text-[color-mix(in_srgb,var(--silo-danger)_80%,#5b1322)]'
+                          : isNearLt
+                            ? 'text-[color-mix(in_srgb,var(--silo-warning)_80%,#5a3b12)]'
+                            : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')
                       const symbolToneClass = isInsolvent
                         ? 'text-[11px] text-[color-mix(in_srgb,var(--silo-danger)_62%,#5b1322)]'
                         : isNearLt
