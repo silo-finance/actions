@@ -43,6 +43,7 @@ type MarketRow = {
   tokenSymbol: string | null
   quoteTokenSymbol: string | null
   otherTokenSymbol: string | null
+  otherTokenDecimals: number | null
   ltRaw: string | null
   otherLtRaw: string | null
   marketTokenPair: string
@@ -50,6 +51,9 @@ type MarketRow = {
   totalAssets: bigint | null
   liquidity: bigint | null
   totalDebt: bigint | null
+  otherTotalAssets: bigint | null
+  otherLiquidity: bigint | null
+  otherTotalDebt: bigint | null
   positionsCount: number | null
   warningPositionsCount: number | null
   insolventPositionsCount: number | null
@@ -503,6 +507,63 @@ function InlineLoadingHint() {
   )
 }
 
+/** Faint paired-silo metrics; uses `otherSilo.tokenDecimals` from snapshot, not the row primary token. */
+function OtherSiloMetricSubline({
+  value,
+  decimals,
+  enabled,
+  isLoading,
+  hasError,
+}: {
+  value: bigint | null
+  /** From snapshot `otherSilo.tokenDecimals` (paired token may differ from primary). */
+  decimals: number | null
+  enabled: boolean
+  isLoading: boolean
+  hasError: boolean
+}) {
+  if (!enabled) return null
+  return (
+    <div className="text-xs mt-1 silo-text-faint tabular-nums">
+      {value == null ? (
+        isLoading || !hasError ? (
+          <InlineLoadingHint />
+        ) : (
+          '—'
+        )
+      ) : (
+        formatMetric(value, decimals)
+      )}
+    </div>
+  )
+}
+
+/** Offset to the right of the primary metric; does not shift the numeric value. */
+function LiquidityStressAlertMarkers({
+  count,
+  tone,
+}: {
+  count: 1 | 2
+  tone: 'danger' | 'warning'
+}) {
+  const toneClass =
+    tone === 'danger'
+      ? 'font-bold text-[var(--silo-danger)]'
+      : 'font-bold text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)]'
+  return (
+    <span
+      className="absolute top-1/2 -translate-y-1/2 left-full ml-1 inline-flex gap-px"
+      aria-hidden
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <span key={index} className={toneClass}>
+          !
+        </span>
+      ))}
+    </span>
+  )
+}
+
 function toErrorDump(error: unknown): Record<string, unknown> {
   if (error instanceof Error) {
     const extended = error as Error & Record<string, unknown>
@@ -601,6 +662,7 @@ function PositionsPageInner() {
         tokenSymbol: row.tokenSymbol,
         quoteTokenSymbol: row.quoteTokenSymbol ?? row.tokenSymbol ?? null,
         otherTokenSymbol: row.otherSilo?.tokenSymbol ?? null,
+        otherTokenDecimals: row.otherSilo?.tokenDecimals ?? null,
         ltRaw: row.siloConfig?.lt ?? null,
         otherLtRaw: row.otherSilo?.siloConfig?.lt ?? null,
         marketVersion: normalizeSnapshotMarketVersion(row.marketVersion),
@@ -959,7 +1021,10 @@ function PositionsPageInner() {
     const prefetched = prefetchedMarketPositionsQuery.data ?? new Map()
     return staticMarketRows.map((row) => {
       const key = `${row.chainId}:${row.siloAddress.toLowerCase()}`
+      const otherKey =
+        row.otherSiloAddress != null ? `${row.chainId}:${row.otherSiloAddress.toLowerCase()}` : null
       const d = dynamic.get(key)
+      const otherD = otherKey != null ? dynamic.get(otherKey) : null
       const prefetch = prefetched.get(key)
       const positionsCount = counts.get(key) ?? prefetch?.totalCount ?? null
       const totalDebt = d?.totalDebt ?? null
@@ -968,6 +1033,9 @@ function PositionsPageInner() {
         totalAssets: d?.totalAssets ?? null,
         liquidity: d?.liquidity ?? null,
         totalDebt,
+        otherTotalAssets: otherD?.totalAssets ?? null,
+        otherLiquidity: otherD?.liquidity ?? null,
+        otherTotalDebt: otherD?.totalDebt ?? null,
         positionsCount,
         warningPositionsCount: prefetch?.warningCount ?? null,
         insolventPositionsCount: prefetch?.insolventCount ?? null,
@@ -1009,7 +1077,8 @@ function PositionsPageInner() {
 
       if (filters.token.trim()) {
         const query = filters.token.trim().toLowerCase()
-        const symbolScope = `${row.tokenSymbol ?? ''} ${row.otherTokenSymbol ?? ''} ${row.quoteTokenSymbol ?? ''}`.toLowerCase()
+        // Primary silo only: paired-silo symbol/address ("other silo") is display-only for search.
+        const symbolScope = `${row.tokenSymbol ?? ''} ${row.quoteTokenSymbol ?? ''}`.toLowerCase()
         const addressScope = row.siloAddress.toLowerCase()
         const siloIdScope = row.siloId == null ? '' : String(row.siloId).toLowerCase()
         if (!symbolScope.includes(query) && !addressScope.includes(query) && !siloIdScope.includes(query)) return false
@@ -1041,6 +1110,7 @@ function PositionsPageInner() {
         const cmp = compareTuple(lhs, rhs)
         return sortDirection === 'asc' ? cmp : -cmp
       }
+      // Primary-silo fields only; paired-silo sublines (otherTotal*) are display-only and excluded from sort.
       const byColumn: Record<SortColumn, string | number | bigint | null> = {
         siloId: a.siloId,
         chain: a.chainDisplayName,
@@ -2282,6 +2352,14 @@ function FragmentRow({
   const canOpenPositions = (row.positionsCount ?? 0) > 0
   const warningCount = row.warningPositionsCount ?? 0
   const insolventCount = row.insolventPositionsCount ?? 0
+  const showLiquidityStressAlert =
+    row.liquidity !== null &&
+    row.totalDebt !== null &&
+    row.liquidity === BIGINT_ZERO &&
+    row.totalDebt > BIGINT_ZERO
+  const hasRiskyPositions = warningCount > 0 || insolventCount > 0
+  const liquidityStressAlertCount: 1 | 2 = hasRiskyPositions ? 2 : 1
+  const liquidityStressAlertTone: 'danger' | 'warning' = hasRiskyPositions ? 'danger' : 'warning'
 
   return (
     <>
@@ -2300,32 +2378,97 @@ function FragmentRow({
           </div>
         </td>
         <td className="px-4 py-3">
-          <a
-            href={getExplorerAddressUrl(row.chainId, row.siloAddress)}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm font-mono text-[var(--silo-text)] hover:underline break-all"
-          >
-            {shortenSiloAddress(row.siloAddress)}
-          </a>
+          <p className="text-sm font-mono break-all m-0">
+            <a
+              href={getExplorerAddressUrl(row.chainId, row.siloAddress)}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[var(--silo-text)] hover:underline"
+            >
+              {shortenSiloAddress(row.siloAddress)}
+            </a>
+            {row.otherSiloAddress ? (
+              <>
+                {' '}
+                <a
+                  href={getExplorerAddressUrl(row.chainId, row.otherSiloAddress)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs silo-text-faint hover:underline"
+                >
+                  other silo
+                </a>
+              </>
+            ) : null}
+          </p>
           <div className="text-xs mt-1">
             <span className="silo-text-soft">#{row.siloId ?? '—'}</span>
             <span className="silo-text-faint"> • {row.marketTokenPair}</span>
           </div>
         </td>
-        <td className="px-4 py-3">{row.tokenSymbol ?? 'Unknown'}</td>
+        <td className="px-4 py-3">
+          {row.tokenSymbol ?? 'Unknown'}
+          {row.otherTokenSymbol ? (
+            <div className="text-xs mt-1 silo-text-faint">{row.otherTokenSymbol}</div>
+          ) : null}
+        </td>
         <td className="px-4 py-3 text-right tabular-nums">
           {row.totalAssets == null
             ? isDynamicLoading || !hasDynamicError
               ? <InlineLoadingHint />
               : '—'
             : formatMetric(row.totalAssets, row.tokenDecimals)}
+          <OtherSiloMetricSubline
+            value={row.otherTotalAssets}
+            decimals={row.otherTokenDecimals}
+            enabled={row.otherSiloAddress != null}
+            isLoading={isDynamicLoading}
+            hasError={hasDynamicError}
+          />
         </td>
-        <td className="px-4 py-3 text-right tabular-nums">
-          {row.liquidity == null ? (isDynamicLoading || !hasDynamicError ? <InlineLoadingHint /> : '—') : formatMetric(row.liquidity, row.tokenDecimals)}
+        <td className="px-4 py-3 text-right tabular-nums overflow-visible">
+          <div className="relative w-full">
+            <div className="text-right">
+              {row.liquidity == null
+                ? isDynamicLoading || !hasDynamicError
+                  ? <InlineLoadingHint />
+                  : '—'
+                : formatMetric(row.liquidity, row.tokenDecimals)}
+            </div>
+            {showLiquidityStressAlert ? (
+              <span
+                title={
+                  hasRiskyPositions
+                    ? 'Zero primary liquidity with outstanding debt; warning or insolvent positions'
+                    : 'Zero primary liquidity with outstanding debt'
+                }
+                aria-label={
+                  hasRiskyPositions
+                    ? 'Zero liquidity with debt; risky positions present'
+                    : 'Zero liquidity with debt'
+                }
+              >
+                <LiquidityStressAlertMarkers count={liquidityStressAlertCount} tone={liquidityStressAlertTone} />
+              </span>
+            ) : null}
+          </div>
+          <OtherSiloMetricSubline
+            value={row.otherLiquidity}
+            decimals={row.otherTokenDecimals}
+            enabled={row.otherSiloAddress != null}
+            isLoading={isDynamicLoading}
+            hasError={hasDynamicError}
+          />
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
           {row.totalDebt == null ? (isDynamicLoading || !hasDynamicError ? <InlineLoadingHint /> : '—') : formatMetric(row.totalDebt, row.tokenDecimals)}
+          <OtherSiloMetricSubline
+            value={row.otherTotalDebt}
+            decimals={row.otherTokenDecimals}
+            enabled={row.otherSiloAddress != null}
+            isLoading={isDynamicLoading}
+            hasError={hasDynamicError}
+          />
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
           {row.positionsCount == null ? (
