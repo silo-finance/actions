@@ -56,6 +56,48 @@ jobs:
             --chain "${{ inputs.chainKey }}" \
             --silo-address "${{ inputs.siloAddress }}"
 
+      - name: Resolve market metadata for messages
+        id: market_meta
+        env:
+          CHAIN_KEY: ${{ inputs.chainKey }}
+          SILO_ADDRESS: ${{ inputs.siloAddress }}
+        run: |
+          set -euo pipefail
+
+          chain_upper="$(printf '%s' "$CHAIN_KEY" | tr '[:lower:]' '[:upper:]')"
+          address="$(printf '%s' "$SILO_ADDRESS" | tr '[:upper:]' '[:lower:]')"
+          token_symbol="$(
+            node -e '
+              const fs = require("fs");
+              const chainKey = process.env.CHAIN_KEY;
+              const address = (process.env.SILO_ADDRESS || "").toLowerCase();
+              const file = `src/data/liquidation/silos/${chainKey}.json`;
+              const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+              const silos = Array.isArray(payload?.silos) ? payload.silos : [];
+              let symbol = "";
+              for (const row of silos) {
+                if ((row?.siloAddress || "").toLowerCase() === address) {
+                  symbol = row?.tokenSymbol || "";
+                  break;
+                }
+                if ((row?.otherSilo?.siloAddress || "").toLowerCase() === address) {
+                  symbol = row?.otherSilo?.tokenSymbol || "";
+                  break;
+                }
+              }
+              process.stdout.write(symbol);
+            '
+          )"
+
+          if [ -n "$token_symbol" ]; then
+            title="Remove market (${address}) ${token_symbol} from ${chain_upper}"
+          else
+            title="Remove market (${address}) from ${chain_upper}"
+          fi
+
+          echo "title=${title}" >> "$GITHUB_OUTPUT"
+          echo "commit_message=${title}" >> "$GITHUB_OUTPUT"
+
       - name: Remove single silo
         run: |
           set -euo pipefail
@@ -78,8 +120,8 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           branch: chore/liquidation-remove-silo-${{ inputs.chainKey }}
-          commit-message: 'chore: remove liquidation silo snapshot'
-          title: 'chore: remove liquidation silo snapshot'
+          commit-message: ${{ steps.market_meta.outputs.commit_message }}
+          title: ${{ steps.market_meta.outputs.title }}
           body: |
             Automated removal of a liquidation silo snapshot entry.
 
@@ -102,9 +144,15 @@ jobs:
             exit 0
           fi
 
+          # legacy-positions is data-only; borrow the helper from the workflow commit, then drop it.
+          git checkout "${GITHUB_SHA}" -- scripts/pull_borrowers/legacy_market_removal.py
+
           python3 scripts/pull_borrowers/legacy_market_removal.py prune \
             --chain "${{ inputs.chainKey }}" \
             --silo-address "${{ inputs.siloAddress }}"
+
+          git restore --staged scripts/pull_borrowers/legacy_market_removal.py
+          rm -f scripts/pull_borrowers/legacy_market_removal.py
 
           git add \
             "scripts/pull_borrowers/${{ inputs.chainKey }}_borrowers.json" \
@@ -115,5 +163,5 @@ jobs:
             exit 0
           fi
 
-          git commit -m "chore: prune ${{ inputs.chainKey }} legacy positions for removed market"
+          git commit -m "${{ steps.market_meta.outputs.commit_message }}"
           git push origin "HEAD:${LEGACY_POSITIONS_BRANCH}"
