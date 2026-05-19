@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.25.1] - 2026-05-19
+
+### Fixed
+- ci: fix removal action
+
 ## [0.25.0] - 2026-05-19
 
 ### Added
