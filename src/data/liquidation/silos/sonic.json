@@ -65,6 +65,7 @@
     {
       "chainId": 146,
       "chainKey": "sonic",
+      "marketVersion": "legacy",
       "siloAddress": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
       "siloConfigAddress": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
       "siloId": 20,

@@ -557,8 +557,18 @@ async function runFullRefresh() {
 
   const refreshed = await refreshTargets(targetsByChain)
   for (const [chainKey, rows] of refreshed) {
-    writeChainSnapshot(chainKey, CHAIN_ID_BY_KEY[chainKey], rows)
-    console.log(`[sync-liquidation-silos] full refresh wrote ${rows.length} records for ${chainKey}`)
+    const existingBySilo = new Map(
+      (snapshot.get(chainKey)?.silos ?? [])
+        .map((row) => [normalizeAddress(row?.siloAddress), row])
+        .filter(([address]) => Boolean(address))
+    )
+    const withMarketVersion = rows.map((row) => {
+      const existing = existingBySilo.get(normalizeAddress(row.siloAddress))
+      const marketVersion = existing?.marketVersion === 'legacy' ? 'legacy' : 'v3'
+      return { ...row, marketVersion }
+    })
+    writeChainSnapshot(chainKey, CHAIN_ID_BY_KEY[chainKey], withMarketVersion)
+    console.log(`[sync-liquidation-silos] full refresh wrote ${withMarketVersion.length} records for ${chainKey}`)
   }
 }
 
@@ -590,7 +600,24 @@ async function runAddOrRefreshSingle() {
   const targetsByChain = new Map([[chainKey, targetSet]])
   const refreshed = await refreshTargets(targetsByChain)
   const out = refreshed.get(chainKey) ?? []
-  const targetRows = out.filter((row) => normalizeAddress(row.siloAddress) === siloAddress)
+  const existingBySilo = new Map(
+    current
+      .map((row) => [normalizeAddress(row?.siloAddress), row])
+      .filter(([address]) => Boolean(address))
+  )
+  const outWithVersion = out.map((row) => {
+    const isTarget = normalizeAddress(row.siloAddress) === siloAddress
+    const existing = existingBySilo.get(normalizeAddress(row.siloAddress))
+    const marketVersion = isTarget
+      ? apiMatch
+        ? 'v3'
+        : 'legacy'
+      : existing?.marketVersion === 'legacy'
+        ? 'legacy'
+        : 'v3'
+    return { ...row, marketVersion }
+  })
+  const targetRows = outWithVersion.filter((row) => normalizeAddress(row.siloAddress) === siloAddress)
   if (targetRows.length === 0) {
     throw new Error(
       `Requested address is not a valid Silo market on ${chainKey}: ${siloAddress} (could not resolve silo config/data)`
@@ -605,8 +632,8 @@ async function runAddOrRefreshSingle() {
       `Incomplete Silo data for ${chainKey}:${siloAddress} (missing config/token metadata); refusing to write snapshot`
     )
   }
-  writeChainSnapshot(chainKey, CHAIN_ID_BY_KEY[chainKey], out)
-  console.log(`[sync-liquidation-silos] add/refresh wrote ${out.length} records for ${chainKey}`)
+  writeChainSnapshot(chainKey, CHAIN_ID_BY_KEY[chainKey], outWithVersion)
+  console.log(`[sync-liquidation-silos] add/refresh wrote ${outWithVersion.length} records for ${chainKey}`)
 }
 
 function runRemoveSingle() {

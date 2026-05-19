@@ -21,6 +21,11 @@ import {
   type OpenMarketPosition,
 } from '@/utils/liquidationGraph'
 import {
+  fetchExternalPositionsData,
+  type ExternalPositionRecord,
+  type ExternalPositionsData,
+} from '@/utils/liquidationExternalPositions'
+import {
   fetchBorrowersLtvFromSiloLens,
   fetchBorrowersSolvency,
   fetchMarketsDynamicState,
@@ -51,14 +56,18 @@ type MarketRow = {
   warningPositionsCount: number | null
   insolventPositionsCount: number | null
   needsSanityAlert: boolean
+  marketVersion: 'v3' | 'legacy'
 }
 
 const DEFAULT_GRAPH_PAGE_LIMIT = 1000
 const DEFAULT_POSITIONS_COUNT_CHUNK = 40
 const BIGINT_ZERO = BigInt(0)
 const WARNING_HEALTH_FACTOR_THRESHOLD = 0.95
+const MAX_DISPLAY_HEALTH_FACTOR = 100
+const MAX_DISPLAY_LTV_PERCENT = 999
 const REALTIME_REFRESH_INTERVAL_SECONDS = 60
 const REALTIME_AGE_THRESHOLD_SECONDS = 30 * 60
+const MARKET_DATA_STALE_TIME_MS = 1000 * 60 * 5
 
 type SortColumn =
   | 'siloId'
@@ -104,6 +113,53 @@ type PrefetchedMarketPositionsEntry = {
   solvencyByBorrower: Array<readonly [string, boolean]>
 }
 
+function buildPositionKey(chainId: number, marketId: string, accountId: string): string | null {
+  const borrower = extractBorrowerAddress(accountId)
+  const normalizedMarketId = marketId.trim().toLowerCase()
+  if (!borrower || !/^0x[0-9a-f]{40}$/.test(normalizedMarketId)) return null
+  return `${chainId}:${normalizedMarketId}:${borrower}`
+}
+
+function mergeExternalIntoGraphPosition(
+  row: OpenMarketPosition,
+  chainId: number,
+  marketId: string,
+  externalData: ExternalPositionsData | undefined
+): OpenMarketPosition {
+  if (!externalData) return row
+  const key = buildPositionKey(chainId, marketId, row.accountId)
+  if (!key) return row
+  const external = externalData.byPositionKey.get(key)
+  if (!external) return row
+  return {
+    ...row,
+    ltv: external.ltv ?? row.ltv,
+    debtValue: external.debtValue ?? row.debtValue,
+    collateralValue: external.collateralValue ?? row.collateralValue,
+    lastUpdatedTimestamp: external.lastUpdatedTimestamp ?? row.lastUpdatedTimestamp,
+  }
+}
+
+function toOpenMarketPositionFromExternal(row: ExternalPositionRecord): OpenMarketPosition {
+  return {
+    id: `${row.marketId}-${row.accountId}-external`,
+    chainId: row.chainId,
+    marketId: row.marketId,
+    lastUpdatedTimestamp: row.lastUpdatedTimestamp,
+    accountId: row.accountId,
+    ltv: row.ltv,
+    debtValue: row.debtValue,
+    collateralValue: row.collateralValue,
+    debtAssets: null,
+    collateralAssets: null,
+    isInBadDet: null,
+  }
+}
+
+function normalizeSnapshotMarketVersion(value: unknown): 'v3' | 'legacy' {
+  return value === 'legacy' ? 'legacy' : 'v3'
+}
+
 function shortenAddress(address: string): string {
   if (!address || address.length < 12) return address
   return `${address.slice(0, 6)}…${address.slice(-4)}`
@@ -121,15 +177,25 @@ function parseIntParam(raw: string | null): number | null {
   return n
 }
 
+function capDisplayLtvPercent(percent: number): number {
+  if (!Number.isFinite(percent)) return percent
+  return Math.min(percent, MAX_DISPLAY_LTV_PERCENT)
+}
+
+function capDisplayHealthFactor(value: number): number {
+  if (!Number.isFinite(value)) return value
+  return Math.min(value, MAX_DISPLAY_HEALTH_FACTOR)
+}
+
 function formatPositionLtv(raw: string | null): string {
   const n = parseScaledNumber(raw, 18)
   if (n == null) return '—'
-  return `${(n * 100).toFixed(2)}%`
+  return `${capDisplayLtvPercent(n * 100).toFixed(2)}%`
 }
 
 function formatHealthFactor(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return '—'
-  const roundedDown = Math.floor(value * 100) / 100
+  const roundedDown = Math.floor(capDisplayHealthFactor(value) * 100) / 100
   return roundedDown.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -292,10 +358,12 @@ function isWarningHealthFactor(healthFactor: number | null, isInsolvent: boolean
 
 function formatLtvPercentFromRaw18(ltvRaw18: string): string {
   if (/^-?\d+$/.test(ltvRaw18)) {
-    return formatUnits(BigInt(ltvRaw18), 16)
+    const pct = Number(formatUnits(BigInt(ltvRaw18), 16))
+    if (!Number.isFinite(pct)) return formatUnits(BigInt(ltvRaw18), 16)
+    return `${capDisplayLtvPercent(pct).toFixed(2)}%`
   }
   const parsed = Number(ltvRaw18)
-  if (Number.isFinite(parsed)) return String(parsed * 100)
+  if (Number.isFinite(parsed)) return `${capDisplayLtvPercent(parsed * 100).toFixed(2)}%`
   return ltvRaw18
 }
 
@@ -483,11 +551,11 @@ function PositionsPageInner() {
   )
   const marketsDynamicStorageKey = useMemo(() => `liq:markets:dynamic:v1:${snapshotKey}`, [snapshotKey])
   const marketsCountsStorageKey = useMemo(
-    () => `liq:markets:counts:v1:${snapshotKey}:${config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK}`,
+    () => `liq:markets:counts:v3:${snapshotKey}:${config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK}`,
     [config.testGraphLimit, snapshotKey]
   )
   const marketsPrefetchStorageKey = useMemo(
-    () => `liq:markets:positions-prefetch:v1:${snapshotKey}:${graphPageLimit}`,
+    () => `liq:markets:positions-prefetch:v3:${snapshotKey}:${graphPageLimit}`,
     [snapshotKey, graphPageLimit]
   )
   const marketsTimerStorageKey = useMemo(() => `liq:markets:timer:v1:${snapshotKey}`, [snapshotKey])
@@ -510,6 +578,7 @@ function PositionsPageInner() {
         otherTokenSymbol: row.otherSilo?.tokenSymbol ?? null,
         ltRaw: row.siloConfig?.lt ?? null,
         otherLtRaw: row.otherSilo?.siloConfig?.lt ?? null,
+        marketVersion: normalizeSnapshotMarketVersion(row.marketVersion),
         marketTokenPair:
           row.siloIndex === 1
             ? `${row.otherSilo?.tokenSymbol ?? '?'} / ${row.tokenSymbol ?? '?'}`
@@ -518,6 +587,18 @@ function PositionsPageInner() {
       })),
     [snapshotEntries]
   )
+
+  const externalPositionsQuery = useQuery({
+    queryKey: ['liq', 'positions', 'external', snapshotKey],
+    queryFn: () => fetchExternalPositionsData(snapshotEntries.map((row) => row.chainId)),
+    enabled: isClientMounted && snapshotEntries.length > 0,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: 1000 * 60 * 60 * 24,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+  const externalDataVersion = externalPositionsQuery.dataUpdatedAt || 0
 
   const dynamicStateQuery = useQuery({
     queryKey: ['liq', 'markets', 'dynamic', snapshotKey],
@@ -559,17 +640,30 @@ function PositionsPageInner() {
   })
 
   const positionsCountQuery = useQuery({
-    queryKey: ['liq', 'markets', 'counts', snapshotKey, config.testGraphLimit],
+    queryKey: ['liq', 'markets', 'counts', snapshotKey, config.testGraphLimit, externalDataVersion],
     queryFn: async () => {
       const out = new Map<string, number>()
-      const countsByChainAndMarket = await fetchOpenPositionCountsByChainAndMarket(
-        snapshotEntries.map((row) => ({
-          chainId: row.chainId,
-          marketId: row.siloAddress.toLowerCase(),
-        })),
-        config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK
-      )
+      const v3Markets = snapshotEntries.filter((row) => (row.marketVersion ?? 'v3') === 'v3')
+      const countsByChainAndMarket =
+        v3Markets.length > 0
+          ? await fetchOpenPositionCountsByChainAndMarket(
+              v3Markets.map((row) => ({
+                chainId: row.chainId,
+                marketId: row.siloAddress.toLowerCase(),
+              })),
+              config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK
+            )
+          : new Map<string, number>()
       countsByChainAndMarket.forEach((count, key) => out.set(key, count))
+      const external = externalPositionsQuery.data
+      if (external) {
+        snapshotEntries.forEach((row) => {
+          if ((row.marketVersion ?? 'v3') !== 'legacy') return
+          const key = `${row.chainId}:${row.siloAddress.toLowerCase()}`
+          const items = external.byMarketKey.get(key) ?? []
+          out.set(key, items.length)
+        })
+      }
       return out
     },
     enabled: isClientMounted && snapshotEntries.length > 0,
@@ -580,36 +674,55 @@ function PositionsPageInner() {
     },
     initialDataUpdatedAt: () =>
       isClientMounted ? readPersisted<Array<readonly [string, number]>>(marketsCountsStorageKey)?.fetchedAt : undefined,
-    staleTime: Number.POSITIVE_INFINITY,
+    staleTime: MARKET_DATA_STALE_TIME_MS,
     gcTime: 1000 * 60 * 60 * 24,
-    refetchOnMount: false,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   })
 
   const prefetchedMarketPositionsQuery = useQuery({
-    queryKey: ['liq', 'markets', 'positions-prefetch', snapshotKey, graphPageLimit],
+    queryKey: ['liq', 'markets', 'positions-prefetch', snapshotKey, graphPageLimit, externalDataVersion],
     queryFn: async () => {
+      const externalData = externalPositionsQuery.data
       const out = new Map<string, PrefetchedMarketPositionsEntry>()
       const marketChunkSize = config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK
-      const positionsByChainAndMarket = await fetchAllOpenPositionsByChainAndMarket(
-        staticMarketRows.map((row) => ({
+      const v3MarketRefs = staticMarketRows
+        .filter((row) => row.marketVersion === 'v3')
+        .map((row) => ({
           chainId: row.chainId,
           marketId: row.siloAddress.toLowerCase(),
-        })),
-        graphPageLimit,
-        marketChunkSize
-      )
+        }))
+      const positionsByChainAndMarket =
+        v3MarketRefs.length > 0
+          ? await fetchAllOpenPositionsByChainAndMarket(v3MarketRefs, graphPageLimit, marketChunkSize)
+          : new Map<string, OpenMarketPosition[]>()
       for (const row of staticMarketRows) {
         const key = `${row.chainId}:${row.siloAddress.toLowerCase()}`
-        const items = positionsByChainAndMarket.get(key) ?? []
+        const items =
+          row.marketVersion === 'legacy'
+            ? (externalData?.byMarketKey.get(key) ?? []).map(toOpenMarketPositionFromExternal)
+            : (positionsByChainAndMarket.get(key) ?? []).map((item) =>
+                mergeExternalIntoGraphPosition(item, row.chainId, row.siloAddress, externalData)
+              )
+        if (row.marketVersion === 'legacy') {
+          console.info(
+            `[positions-legacy] market=${key} source=external count=${items.length} hasExternal=${Boolean(externalData)}`
+          )
+        }
         const borrowerAddresses = Array.from(
           new Set(items.map((item) => extractBorrowerAddress(item.accountId)).filter(Boolean))
         ) as string[]
         const solvencyByBorrower =
-          borrowerAddresses.length > 0
-            ? await fetchBorrowersSolvency(row.chainId, row.siloAddress, borrowerAddresses)
-            : new Map<string, boolean>()
+          row.marketVersion === 'legacy'
+            ? new Map<string, boolean>(
+                (externalData?.byMarketKey.get(key) ?? [])
+                  .filter((item) => item.solvent != null)
+                  .map((item) => [item.accountId, item.solvent as boolean])
+              )
+            : borrowerAddresses.length > 0
+              ? await fetchBorrowersSolvency(row.chainId, row.siloAddress, borrowerAddresses)
+              : new Map<string, boolean>()
         const ltRatio = parseScaledNumber(resolveEffectiveLtRawForMarket(row), 18)
         let warningCount = 0
         let insolventCount = 0
@@ -617,7 +730,9 @@ function PositionsPageInner() {
           const ltvRatio = parseScaledNumber(item.ltv, 18)
           const healthFactor = ltvRatio != null && ltRatio != null && ltRatio > 0 ? ltvRatio / ltRatio : null
           const borrowerAddress = extractBorrowerAddress(item.accountId)
-          const isSolvent = borrowerAddress ? solvencyByBorrower.get(borrowerAddress) : undefined
+          const positionKey = borrowerAddress ? `${row.chainId}:${row.siloAddress.toLowerCase()}:${borrowerAddress}` : null
+          const externalSolvent = positionKey ? externalData?.byPositionKey.get(positionKey)?.solvent : null
+          const isSolvent = externalSolvent ?? (borrowerAddress ? solvencyByBorrower.get(borrowerAddress) : undefined)
           const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
           const isWarning = isWarningHealthFactor(healthFactor, isInsolvent)
           if (isInsolvent) insolventCount += 1
@@ -646,9 +761,9 @@ function PositionsPageInner() {
       isClientMounted
         ? readPersisted<Array<readonly [string, PrefetchedMarketPositionsEntry]>>(marketsPrefetchStorageKey)?.fetchedAt
         : undefined,
-    staleTime: Number.POSITIVE_INFINITY,
+    staleTime: MARKET_DATA_STALE_TIME_MS,
     gcTime: 1000 * 60 * 60 * 24,
-    refetchOnMount: false,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   })
@@ -691,7 +806,7 @@ function PositionsPageInner() {
       const [chainIdRaw, siloAddress] = key.split(':')
       const chainId = Number(chainIdRaw)
       if (!Number.isFinite(chainId) || !siloAddress) return
-      const pageKey = `liq:positions:list:v1:${chainId}:${siloAddress}:${graphPageLimit}:0`
+      const pageKey = `liq:positions:list:v3:${chainId}:${siloAddress}:${graphPageLimit}:0`
       writePersisted(pageKey, {
         fetchedAt,
         data: {
@@ -815,7 +930,12 @@ function PositionsPageInner() {
         positionsCount,
         warningPositionsCount: prefetch?.warningCount ?? null,
         insolventPositionsCount: prefetch?.insolventCount ?? null,
-        needsSanityAlert: totalDebt != null && positionsCount != null && totalDebt > BIGINT_ZERO && positionsCount === 0,
+        needsSanityAlert:
+          row.marketVersion === 'v3' &&
+          totalDebt != null &&
+          positionsCount != null &&
+          totalDebt > BIGINT_ZERO &&
+          positionsCount === 0,
       }
     })
   }, [dynamicStateQuery.data, positionsCountQuery.data, prefetchedMarketPositionsQuery.data, staticMarketRows])
@@ -837,7 +957,7 @@ function PositionsPageInner() {
   const paginationOffset = config.testDisablePagination ? 0 : paginationOffsetRaw ?? 0
   const pageLimit = config.testDisablePagination ? graphPageLimit : graphPageLimit
   const positionsStorageKey = useMemo(
-    () => `liq:positions:list:v1:${selectedChainId ?? 'na'}:${selectedSiloAddress || 'na'}:${pageLimit}:${paginationOffset}`,
+    () => `liq:positions:list:v3:${selectedChainId ?? 'na'}:${selectedSiloAddress || 'na'}:${pageLimit}:${paginationOffset}`,
     [selectedChainId, selectedSiloAddress, pageLimit, paginationOffset]
   )
 
@@ -964,10 +1084,34 @@ function PositionsPageInner() {
   }, [isRealtimeEnabled])
 
   const positionsQuery = useQuery({
-    queryKey: ['liq', 'positions', selectedChainId, selectedSiloAddress, pageLimit, paginationOffset],
+    queryKey: [
+      'liq',
+      'positions',
+      selectedChainId,
+      selectedSiloAddress,
+      pageLimit,
+      paginationOffset,
+      externalDataVersion,
+    ],
     queryFn: async () => {
       if (!selectedRow) return { items: [] as OpenMarketPosition[], totalCount: 0, hasNextPage: false }
-      return fetchOpenPositionsByMarket(selectedRow.chainId, selectedRow.siloAddress, pageLimit, paginationOffset)
+      if (selectedRow.marketVersion === 'legacy') {
+        const key = `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}`
+        const allItems = (externalPositionsQuery.data?.byMarketKey.get(key) ?? []).map(toOpenMarketPositionFromExternal)
+        return {
+          items: allItems.slice(paginationOffset, paginationOffset + pageLimit),
+          totalCount: allItems.length,
+          hasNextPage: paginationOffset + pageLimit < allItems.length,
+        }
+      }
+      const page = await fetchOpenPositionsByMarket(selectedRow.chainId, selectedRow.siloAddress, pageLimit, paginationOffset)
+      const externalData = externalPositionsQuery.data
+      return {
+        ...page,
+        items: page.items.map((item) =>
+          mergeExternalIntoGraphPosition(item, selectedRow.chainId, selectedRow.siloAddress, externalData)
+        ),
+      }
     },
     enabled: isClientMounted && selectedRow != null,
     initialData: () => {
@@ -988,9 +1132,9 @@ function PositionsPageInner() {
           : readPersisted<{ items: OpenMarketPosition[]; totalCount: number; hasNextPage: boolean }>(positionsStorageKey)
               ?.fetchedAt
         : undefined,
-    staleTime: Number.POSITIVE_INFINITY,
+    staleTime: MARKET_DATA_STALE_TIME_MS,
     gcTime: 1000 * 60 * 60 * 24,
-    refetchOnMount: false,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   })
@@ -1139,6 +1283,12 @@ function PositionsPageInner() {
       isSolvent: (() => {
         const address = extractBorrowerAddress(row.accountId)
         if (!address) return null
+        if (selectedRow) {
+          const external = externalPositionsQuery.data?.byPositionKey.get(
+            `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}:${address}`
+          )
+          if (external?.solvent != null) return external.solvent
+        }
         if (!solvencyQuery.data) return null
         return solvencyQuery.data.get(address) ?? null
       })(),
@@ -1149,6 +1299,12 @@ function PositionsPageInner() {
         const healthFactor =
           ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
         const isSolvent = (() => {
+          if (selectedRow && borrowerAddress) {
+            const external = externalPositionsQuery.data?.byPositionKey.get(
+              `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}:${borrowerAddress}`
+            )
+            if (external?.solvent != null) return external.solvent
+          }
           if (!borrowerAddress || !solvencyQuery.data) return null
           return solvencyQuery.data.get(borrowerAddress) ?? null
         })()
@@ -1161,6 +1317,12 @@ function PositionsPageInner() {
         const healthFactor =
           ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
         const isSolvent = (() => {
+          if (selectedRow && borrowerAddress) {
+            const external = externalPositionsQuery.data?.byPositionKey.get(
+              `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}:${borrowerAddress}`
+            )
+            if (external?.solvent != null) return external.solvent
+          }
           if (!borrowerAddress || !solvencyQuery.data) return null
           return solvencyQuery.data.get(borrowerAddress) ?? null
         })()
@@ -1192,6 +1354,8 @@ function PositionsPageInner() {
     solvencyQuery.data,
     positionLtRatio,
     realtimeLtvByBorrower,
+    selectedRow,
+    externalPositionsQuery.data,
   ])
 
   const filteredRealtimeBorrowersToMonitor = useMemo(() => {
@@ -1201,12 +1365,18 @@ function PositionsPageInner() {
       const borrowerAddress = extractBorrowerAddress(row.accountId)
       if (!borrowerAddress) continue
       const isSolvent = solvencyQuery.data?.get(borrowerAddress)
-      if (shouldMonitorPositionInRealtime({ row, positionLtRatio, isSolvent, nowMs })) {
+      const externalSolvent = selectedRow
+        ? externalPositionsQuery.data?.byPositionKey.get(
+            `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}:${borrowerAddress}`
+          )?.solvent
+        : null
+      const effectiveSolvent = externalSolvent ?? isSolvent
+      if (shouldMonitorPositionInRealtime({ row, positionLtRatio, isSolvent: effectiveSolvent, nowMs })) {
         addresses.push(borrowerAddress)
       }
     }
     return Array.from(new Set(addresses))
-  }, [positionsQuery.data?.items, positionLtRatio, solvencyQuery.data, nowMs])
+  }, [positionsQuery.data?.items, positionLtRatio, solvencyQuery.data, nowMs, selectedRow, externalPositionsQuery.data])
   const customRealtimeBorrowersStable = useMemo(
     () => Array.from(new Set(customRealtimeBorrowers)),
     [customRealtimeBorrowers]
@@ -1333,17 +1503,30 @@ function PositionsPageInner() {
   const syncMarketCachesFromPositionsRefresh = async () => {
     if (!selectedRow || selectedChainId == null || !selectedSiloAddress) return
     const marketKey = `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}`
-    const allItems = await fetchAllOpenPositionsByMarket(selectedRow.chainId, selectedRow.siloAddress, graphPageLimit)
+    const allItems =
+      selectedRow.marketVersion === 'legacy'
+        ? (externalPositionsQuery.data?.byMarketKey.get(marketKey) ?? []).map(toOpenMarketPositionFromExternal)
+        : (
+            await fetchAllOpenPositionsByMarket(selectedRow.chainId, selectedRow.siloAddress, graphPageLimit)
+          ).map((item) =>
+            mergeExternalIntoGraphPosition(item, selectedRow.chainId, selectedRow.siloAddress, externalPositionsQuery.data)
+          )
     const allBorrowerAddresses = Array.from(
       new Set(allItems.map((item) => extractBorrowerAddress(item.accountId)).filter(Boolean))
     ) as string[]
     const solvencyByBorrower =
-      allBorrowerAddresses.length > 0
-        ? await fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, allBorrowerAddresses, {
-            preferredProvider: walletProvider,
-            preferredChainId: walletChainId,
-          })
-        : new Map<string, boolean>()
+      selectedRow.marketVersion === 'legacy'
+        ? new Map<string, boolean>(
+            (externalPositionsQuery.data?.byMarketKey.get(marketKey) ?? [])
+              .filter((item) => item.solvent != null)
+              .map((item) => [item.accountId, item.solvent as boolean])
+          )
+        : allBorrowerAddresses.length > 0
+          ? await fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, allBorrowerAddresses, {
+              preferredProvider: walletProvider,
+              preferredChainId: walletChainId,
+            })
+          : new Map<string, boolean>()
 
     let warningCount = 0
     let insolventCount = 0
@@ -1351,7 +1534,12 @@ function PositionsPageInner() {
       const ltvRatio = parseScaledNumber(item.ltv, 18)
       const healthFactor = ltvRatio != null && positionLtRatio != null && positionLtRatio > 0 ? ltvRatio / positionLtRatio : null
       const borrowerAddress = extractBorrowerAddress(item.accountId)
-      const isSolvent = borrowerAddress ? solvencyByBorrower.get(borrowerAddress) : undefined
+      const externalSolvent = borrowerAddress
+        ? externalPositionsQuery.data?.byPositionKey.get(
+            `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}:${borrowerAddress}`
+          )?.solvent
+        : null
+      const isSolvent = externalSolvent ?? (borrowerAddress ? solvencyByBorrower.get(borrowerAddress) : undefined)
       const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
       const isWarning = isWarningHealthFactor(healthFactor, isInsolvent)
       if (isInsolvent) insolventCount += 1
@@ -1359,7 +1547,7 @@ function PositionsPageInner() {
     }
 
     queryClient.setQueryData<Map<string, number>>(
-      ['liq', 'markets', 'counts', snapshotKey, config.testGraphLimit],
+      ['liq', 'markets', 'counts', snapshotKey, config.testGraphLimit, externalDataVersion],
       (prev) => {
         const next = new Map(prev ?? [])
         next.set(marketKey, allItems.length)
@@ -1368,7 +1556,7 @@ function PositionsPageInner() {
     )
 
     queryClient.setQueryData<Map<string, PrefetchedMarketPositionsEntry>>(
-      ['liq', 'markets', 'positions-prefetch', snapshotKey, graphPageLimit],
+      ['liq', 'markets', 'positions-prefetch', snapshotKey, graphPageLimit, externalDataVersion],
       (prev) => {
         const next = new Map(prev ?? [])
         next.set(marketKey, {
@@ -1386,7 +1574,7 @@ function PositionsPageInner() {
     )
 
     queryClient.setQueryData<{ items: OpenMarketPosition[]; totalCount: number; hasNextPage: boolean }>(
-      ['liq', 'positions', selectedChainId, selectedSiloAddress, pageLimit, paginationOffset],
+      ['liq', 'positions', selectedChainId, selectedSiloAddress, pageLimit, paginationOffset, externalDataVersion],
       {
         items: allItems.slice(paginationOffset, paginationOffset + pageLimit),
         totalCount: allItems.length,
