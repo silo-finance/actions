@@ -3,6 +3,11 @@ name: Borrowers Export
 on:
   workflow_dispatch:
     inputs:
+      source_ref:
+        description: "Source ref to run scripts from (branch, tag, or SHA)"
+        required: false
+        default: "master"
+        type: string
       chain:
         description: 'Chain to export borrowers for'
         required: true
@@ -20,18 +25,37 @@ permissions:
   contents: write
 
 concurrency:
-  group: borrowers-export-${{ github.ref }}
+  group: borrowers-export-${{ inputs.source_ref || github.ref_name || 'master' }}-${{ inputs.chain || 'sonic' }}
   cancel-in-progress: true
 
 env:
-  DATA_BRANCH: borrowers-data
+  TARGET_BRANCH: legacy-positions
 
 jobs:
   export-borrowers:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve inputs
+        run: |
+          set -euo pipefail
+          CHAIN="${{ inputs.chain }}"
+          SOURCE_REF="${{ inputs.source_ref }}"
+          if [ -z "$CHAIN" ]; then
+            # Scheduled runs default to sonic to keep one stable output file per chain.
+            CHAIN="sonic"
+          fi
+          if [ -z "$SOURCE_REF" ]; then
+            # Scheduled runs use master unless explicitly overridden via workflow_dispatch.
+            SOURCE_REF="master"
+          fi
+          echo "CHAIN=$CHAIN" >> "$GITHUB_ENV"
+          echo "SOURCE_REF=$SOURCE_REF" >> "$GITHUB_ENV"
+
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -50,45 +74,65 @@ jobs:
       - name: Export borrowers JSON
         run: |
           set -euo pipefail
-          CHAIN="${{ inputs.chain }}"
-          if [ -z "$CHAIN" ]; then
-            # Scheduled runs default to sonic to keep one stable output file.
-            CHAIN="sonic"
-          fi
           python3 scripts/pull_borrowers/fetch_sonic_borrowers.py \
             --chain "$CHAIN"
-          echo "CHAIN=$CHAIN" >> "$GITHUB_ENV"
         env:
           THE_GRAPH_API_KEY: ${{ secrets.THE_GRAPH_API_KEY }}
 
-      - name: Prepare publish directory
+      - name: Build positions JSON
         run: |
           set -euo pipefail
-          mkdir -p publish/data
-          cp "scripts/pull_borrowers/${CHAIN}_borrowers.json" publish/data/borrowers.json
-          cp "scripts/pull_borrowers/${CHAIN}_borrowers.json" "publish/data/${CHAIN}_borrowers.json"
-          printf '%s\n' "$CHAIN" > publish/data/latest-chain.txt
-          cp "scripts/pull_borrowers/${CHAIN}_borrowers.json" "scripts/pull_borrowers/borrowers_latest.json"
+          python3 scripts/pull_borrowers/build_positions_from_borrowers.py \
+            --chain "$CHAIN"
 
-      - name: Upload borrowers artifact
+      - name: Prepare output bundle
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-export
+          cp "scripts/pull_borrowers/${CHAIN}_borrowers.json" ".ci-export/${CHAIN}_borrowers.json"
+          cp "scripts/pull_borrowers/${CHAIN}_positions.json" ".ci-export/${CHAIN}_positions.json"
+
+      - name: Upload export artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.CHAIN }}-borrowers-json
-          path: scripts/pull_borrowers/${{ env.CHAIN }}_borrowers.json
+          name: ${{ env.CHAIN }}-legacy-export
+          path: .ci-export/
           if-no-files-found: error
 
-      - name: Publish data branch
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: ${{ env.DATA_BRANCH }}
-          publish_dir: ./publish
-          keep_files: true
-          force_orphan: false
-          commit_message: "chore: update ${{ env.CHAIN }} borrowers export"
-
-      - name: Log published file paths
+      - name: Commit export files to target branch
         run: |
-          echo "::notice::Published borrowers file to branch '${DATA_BRANCH}'."
-          echo "::notice::Stable file path: data/borrowers.json"
-          echo "::notice::Chain specific file path: data/${CHAIN}_borrowers.json"
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin "${TARGET_BRANCH}" || true
+          if git show-ref --verify --quiet "refs/remotes/origin/${TARGET_BRANCH}"; then
+            git checkout -B "${TARGET_BRANCH}" "origin/${TARGET_BRANCH}"
+          else
+            git checkout -B "${TARGET_BRANCH}"
+          fi
+
+          mkdir -p scripts/pull_borrowers
+          cp ".ci-export/${CHAIN}_borrowers.json" "scripts/pull_borrowers/${CHAIN}_borrowers.json"
+          cp ".ci-export/${CHAIN}_positions.json" "scripts/pull_borrowers/${CHAIN}_positions.json"
+
+          git add \
+            "scripts/pull_borrowers/${CHAIN}_borrowers.json" \
+            "scripts/pull_borrowers/${CHAIN}_positions.json"
+
+          if git diff --staged --quiet; then
+            echo "::notice::No data changes to commit for ${CHAIN}."
+            exit 0
+          fi
+
+          git commit -m "chore: refresh ${CHAIN} legacy borrowers and positions"
+          git push origin "HEAD:${TARGET_BRANCH}"
+
+      - name: Log exported paths
+        run: |
+          echo "::notice::Source ref: ${SOURCE_REF}"
+          echo "::notice::Target branch: ${TARGET_BRANCH}"
+          echo "::notice::Updated files:"
+          echo "::notice:: - scripts/pull_borrowers/${CHAIN}_borrowers.json"
+          echo "::notice:: - scripts/pull_borrowers/${CHAIN}_positions.json"
