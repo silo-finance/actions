@@ -1,4 +1,4 @@
-name: Borrowers Export
+name: Pull Positions
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
         default: "master"
         type: string
       chain:
-        description: 'Chain to export borrowers for'
+        description: 'Chain to pull positions for'
         required: true
         type: choice
         options:
@@ -25,14 +25,14 @@ permissions:
   contents: write
 
 concurrency:
-  group: borrowers-export-${{ inputs.source_ref || github.ref_name || 'master' }}-${{ inputs.chain || 'sonic' }}
+  group: pull-positions-${{ inputs.source_ref || github.ref_name || 'master' }}-${{ inputs.chain || 'sonic' }}
   cancel-in-progress: true
 
 env:
   TARGET_BRANCH: legacy-positions
 
 jobs:
-  export-borrowers:
+  pull-positions:
     runs-on: ubuntu-latest
     steps:
       - name: Resolve inputs
@@ -71,7 +71,7 @@ jobs:
         env:
           THE_GRAPH_API_KEY: ${{ secrets.THE_GRAPH_API_KEY }}
 
-      - name: Export borrowers JSON
+      - name: Fetch borrowers
         run: |
           set -euo pipefail
           python3 scripts/pull_borrowers/fetch_sonic_borrowers.py \
@@ -79,7 +79,7 @@ jobs:
         env:
           THE_GRAPH_API_KEY: ${{ secrets.THE_GRAPH_API_KEY }}
 
-      - name: Build positions JSON
+      - name: Build positions
         run: |
           set -euo pipefail
           python3 scripts/pull_borrowers/build_positions_from_borrowers.py \
@@ -88,25 +88,32 @@ jobs:
       - name: Prepare output bundle
         run: |
           set -euo pipefail
-          mkdir -p ci-export
-          cp "scripts/pull_borrowers/${CHAIN}_borrowers.json" "ci-export/${CHAIN}_borrowers.json"
-          cp "scripts/pull_borrowers/${CHAIN}_positions.json" "ci-export/${CHAIN}_positions.json"
+          EXPORT_DIR="${RUNNER_TEMP}/legacy-positions-sync"
+          mkdir -p "${EXPORT_DIR}"
+          cp "scripts/pull_borrowers/${CHAIN}_borrowers.json" "${EXPORT_DIR}/${CHAIN}_borrowers.json"
+          cp "scripts/pull_borrowers/${CHAIN}_positions.json" "${EXPORT_DIR}/${CHAIN}_positions.json"
+          echo "EXPORT_DIR=${EXPORT_DIR}" >> "$GITHUB_ENV"
 
-      - name: Upload export artifacts
+      - name: Upload sync artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.CHAIN }}-legacy-export
-          path: ci-export/
+          name: ${{ env.CHAIN }}-positions-sync
+          path: ${{ env.EXPORT_DIR }}/
           if-no-files-found: error
 
-      - name: Commit export files to target branch
+      - name: Commit positions to target branch
         run: |
           set -euo pipefail
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Generated files were already copied to ci-export; clean workspace before branch switch.
+          if [ -z "${EXPORT_DIR:-}" ] || [ ! -f "${EXPORT_DIR}/${CHAIN}_borrowers.json" ] || [ ! -f "${EXPORT_DIR}/${CHAIN}_positions.json" ]; then
+            echo "::error::Sync bundle missing in ${EXPORT_DIR:-<unset>}"
+            exit 1
+          fi
+
+          # Clean workspace before branch switch; bundle lives outside the repo in RUNNER_TEMP.
           git reset --hard HEAD
           git clean -fd
 
@@ -118,8 +125,8 @@ jobs:
           fi
 
           mkdir -p scripts/pull_borrowers
-          cp "ci-export/${CHAIN}_borrowers.json" "scripts/pull_borrowers/${CHAIN}_borrowers.json"
-          cp "ci-export/${CHAIN}_positions.json" "scripts/pull_borrowers/${CHAIN}_positions.json"
+          cp "${EXPORT_DIR}/${CHAIN}_borrowers.json" "scripts/pull_borrowers/${CHAIN}_borrowers.json"
+          cp "${EXPORT_DIR}/${CHAIN}_positions.json" "scripts/pull_borrowers/${CHAIN}_positions.json"
 
           git add \
             "scripts/pull_borrowers/${CHAIN}_borrowers.json" \
@@ -130,10 +137,10 @@ jobs:
             exit 0
           fi
 
-          git commit -m "chore: refresh ${CHAIN} legacy borrowers and positions"
+          git commit -m "chore: sync ${CHAIN} legacy positions"
           git push origin "HEAD:${TARGET_BRANCH}"
 
-      - name: Log exported paths
+      - name: Log published URLs
         run: |
           echo "::notice::Source ref: ${SOURCE_REF}"
           echo "::notice::Target branch: ${TARGET_BRANCH}"
