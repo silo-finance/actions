@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.24.5] - 2026-05-19
+
+### Fixed
+- ci: fix positions synchronization
+
 ## [0.24.4] - 2026-05-19
 
 ### Fixed
