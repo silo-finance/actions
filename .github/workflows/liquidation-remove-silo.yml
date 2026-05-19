@@ -23,9 +23,6 @@ permissions:
   contents: write
   pull-requests: write
 
-env:
-  LEGACY_POSITIONS_BRANCH: legacy-positions
-
 jobs:
   remove-silo:
     runs-on: ubuntu-latest
@@ -40,21 +37,8 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
-
-      - name: Check legacy primary market removal
-        id: legacy_check
-        run: |
-          set -euo pipefail
-          python3 scripts/pull_borrowers/legacy_market_removal.py check \
-            --chain "${{ inputs.chainKey }}" \
-            --silo-address "${{ inputs.siloAddress }}"
 
       - name: Resolve market metadata for messages
         id: market_meta
@@ -90,29 +74,39 @@ jobs:
           )"
 
           if [ -n "$token_symbol" ]; then
-            title="Remove market (${address}) ${token_symbol} from ${chain_upper}"
+            title="Remove \`${address}\` (${token_symbol}) from ${chain_upper}"
           else
-            title="Remove market (${address}) from ${chain_upper}"
+            title="Remove \`${address}\` from ${chain_upper}"
           fi
 
           echo "title=${title}" >> "$GITHUB_OUTPUT"
           echo "commit_message=${title}" >> "$GITHUB_OUTPUT"
 
-      - name: Remove single silo
+      - name: Remove from observed markets and legacy whitelist
         run: |
           set -euo pipefail
           node ./scripts/sync-liquidation-silos.mjs remove \
             --chainKey=${{ inputs.chainKey }} \
             --siloAddress=${{ inputs.siloAddress }}
 
-      - name: Detect snapshot changes
+      - name: Detect changes
         id: detect
         run: |
-          if git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/liquidation/silos; then
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No snapshot changes detected (or only generatedAt changed)."
-          else
+          snapshot_changed=false
+          legacy_whitelist_changed=false
+
+          if ! git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/liquidation/silos; then
+            snapshot_changed=true
+          fi
+          if ! git diff --quiet -- src/data/positions; then
+            legacy_whitelist_changed=true
+          fi
+
+          if [ "${snapshot_changed}" = true ] || [ "${legacy_whitelist_changed}" = true ]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No snapshot or legacy whitelist changes detected (or only generatedAt changed)."
           fi
 
       - name: Create PR with silo removal
@@ -123,45 +117,9 @@ jobs:
           commit-message: ${{ steps.market_meta.outputs.commit_message }}
           title: ${{ steps.market_meta.outputs.title }}
           body: |
-            Automated removal of a liquidation silo snapshot entry.
+            Removes a market from the liquidation snapshot and legacy positions whitelist.
+
+            Positions for this market are dropped on the next `Pull Positions` run.
 
             - chain: `${{ inputs.chainKey }}`
             - silo: `${{ inputs.siloAddress }}`
-
-      - name: Prune legacy positions on data branch
-        if: steps.legacy_check.outputs.should_prune_legacy == 'true'
-        run: |
-          set -euo pipefail
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git fetch origin "${LEGACY_POSITIONS_BRANCH}" || true
-          if git show-ref --verify --quiet "refs/remotes/origin/${LEGACY_POSITIONS_BRANCH}"; then
-            git checkout -B "${LEGACY_POSITIONS_BRANCH}" "origin/${LEGACY_POSITIONS_BRANCH}"
-          else
-            echo "::notice::${LEGACY_POSITIONS_BRANCH} branch does not exist yet; skipping legacy JSON prune."
-            exit 0
-          fi
-
-          # legacy-positions is data-only; borrow the helper from the workflow commit, then drop it.
-          git checkout "${GITHUB_SHA}" -- scripts/pull_borrowers/legacy_market_removal.py
-
-          python3 scripts/pull_borrowers/legacy_market_removal.py prune \
-            --chain "${{ inputs.chainKey }}" \
-            --silo-address "${{ inputs.siloAddress }}"
-
-          git restore --staged scripts/pull_borrowers/legacy_market_removal.py
-          rm -f scripts/pull_borrowers/legacy_market_removal.py
-
-          git add \
-            "scripts/pull_borrowers/${{ inputs.chainKey }}_borrowers.json" \
-            "scripts/pull_borrowers/${{ inputs.chainKey }}_positions.json" || true
-
-          if git diff --staged --quiet; then
-            echo "::notice::No legacy JSON changes to commit for ${{ inputs.chainKey }}:${{ inputs.siloAddress }}."
-            exit 0
-          fi
-
-          git commit -m "${{ steps.market_meta.outputs.commit_message }}"
-          git push origin "HEAD:${LEGACY_POSITIONS_BRANCH}"

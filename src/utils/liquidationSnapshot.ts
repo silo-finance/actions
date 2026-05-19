@@ -115,7 +115,9 @@ export function getLiquidationSnapshotEntries(): LiquidationSnapshotEntry[] {
   )
   const filtered =
     config.filteredSiloAddresses.size > 0
-      ? out.filter((row) => config.filteredSiloAddresses.has(row.siloAddress.toLowerCase()))
+      ? out.filter((row) =>
+          config.filteredSiloAddresses.has(row.siloAddress.toLowerCase())
+        )
       : out
   if (config.testApiLimit == null) return filtered
   return filtered.slice(0, config.testApiLimit)

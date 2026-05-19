@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.25.2] - 2026-05-19
+
+### Fixed
+- ci: remove market from whitelist and static list, fix flow
+
 ## [0.25.1] - 2026-05-19
 
 ### Fixed
