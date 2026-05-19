@@ -208,11 +208,13 @@ def run_multicall(
   multicall_address: str,
   calls: list[dict[str, Any]],
   chunk_size: int,
+  label: str,
 ) -> list[tuple[bool, bytes]]:
   if not calls:
     return []
   out: list[tuple[bool, bytes]] = []
   total = len(calls)
+  total_chunks = (total + chunk_size - 1) // chunk_size
   for start in range(0, total, chunk_size):
     chunk = calls[start : start + chunk_size]
     call_data = encode_aggregate3_calls(chunk)
@@ -227,7 +229,8 @@ def run_multicall(
     if len(decoded) != len(chunk):
       raise RpcError(f"Multicall result length mismatch: {len(decoded)} vs {len(chunk)}")
     out.extend(decoded)
-    print(f"Multicall chunk {start // chunk_size + 1}: {len(chunk)} calls processed.")
+    chunk_idx = start // chunk_size + 1
+    print(f"[{label}] chunk {chunk_idx}/{total_chunks}: {len(chunk)} calls.")
   return out
 
 
@@ -372,7 +375,7 @@ def main() -> None:
     }
     for silo_address in unique_silos
   ]
-  lt_results = run_multicall(rpc_url, multicall_address, lt_calls, args.chunk_size)
+  lt_results = run_multicall(rpc_url, multicall_address, lt_calls, args.chunk_size, "market LT")
   lt_by_silo: dict[str, str] = {}
   for i, (success, payload) in enumerate(lt_results):
     if not success:
@@ -416,7 +419,7 @@ def main() -> None:
     )
     metric_refs.append((index, "ltv"))
 
-  metric_results = run_multicall(rpc_url, multicall_address, metric_calls, args.chunk_size)
+  metric_results = run_multicall(rpc_url, multicall_address, metric_calls, args.chunk_size, "borrower metrics")
   for i, (success, payload) in enumerate(metric_results):
     row_idx, field = metric_refs[i]
     if not success:
