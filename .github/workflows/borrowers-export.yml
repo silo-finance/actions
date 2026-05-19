@@ -106,6 +106,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          # Generated files were already copied to ci-export; clean workspace before branch switch.
+          git reset --hard HEAD
+          git clean -fd
+
           git fetch origin "${TARGET_BRANCH}" || true
           if git show-ref --verify --quiet "refs/remotes/origin/${TARGET_BRANCH}"; then
             git checkout -B "${TARGET_BRANCH}" "origin/${TARGET_BRANCH}"

@@ -55,13 +55,56 @@ jobs:
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Build PR title and commit message
+        id: pr_meta
+        if: steps.detect.outputs.has_changes == 'true'
+        env:
+          CHAIN_KEY: ${{ inputs.chainKey }}
+          SILO_ADDRESS: ${{ inputs.siloAddress }}
+        run: |
+          set -euo pipefail
+
+          chain_name="$(tr '[:lower:]' '[:upper:]' <<< "${CHAIN_KEY:0:1}")${CHAIN_KEY:1}"
+          address="$(printf '%s' "$SILO_ADDRESS" | tr '[:upper:]' '[:lower:]')"
+          token_symbol="$(
+            node -e '
+              const fs = require("fs");
+              const chainKey = process.env.CHAIN_KEY;
+              const address = (process.env.SILO_ADDRESS || "").toLowerCase();
+              const file = `src/data/liquidation/silos/${chainKey}.json`;
+              const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+              const silos = Array.isArray(payload?.silos) ? payload.silos : [];
+              let symbol = "";
+              for (const row of silos) {
+                if ((row?.siloAddress || "").toLowerCase() === address) {
+                  symbol = row?.tokenSymbol || "";
+                  break;
+                }
+                if ((row?.otherSilo?.siloAddress || "").toLowerCase() === address) {
+                  symbol = row?.otherSilo?.tokenSymbol || "";
+                  break;
+                }
+              }
+              process.stdout.write(symbol);
+            '
+          )"
+
+          suffix=""
+          if [ -n "$token_symbol" ]; then
+            suffix=" (${token_symbol})"
+          fi
+
+          title="Add ${address} on ${chain_name}${suffix}"
+          echo "title=${title}" >> "$GITHUB_OUTPUT"
+          echo "commit_message=${title}" >> "$GITHUB_OUTPUT"
+
       - name: Create PR with silo refresh
         if: steps.detect.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
           branch: chore/liquidation-add-silo-${{ inputs.chainKey }}
-          commit-message: 'chore: add or refresh liquidation silo snapshot'
-          title: 'chore: add or refresh liquidation silo snapshot'
+          commit-message: ${{ steps.pr_meta.outputs.commit_message }}
+          title: ${{ steps.pr_meta.outputs.title }}
           body: |
             Automated add/refresh for a single liquidation silo snapshot entry.
 
