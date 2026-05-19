@@ -23,20 +23,38 @@ permissions:
   contents: write
   pull-requests: write
 
+env:
+  LEGACY_POSITIONS_BRANCH: legacy-positions
+
 jobs:
   remove-silo:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
+
+      - name: Check legacy primary market removal
+        id: legacy_check
+        run: |
+          set -euo pipefail
+          python3 scripts/pull_borrowers/legacy_market_removal.py check \
+            --chain "${{ inputs.chainKey }}" \
+            --silo-address "${{ inputs.siloAddress }}"
 
       - name: Remove single silo
         run: |
@@ -67,3 +85,35 @@ jobs:
 
             - chain: `${{ inputs.chainKey }}`
             - silo: `${{ inputs.siloAddress }}`
+
+      - name: Prune legacy positions on data branch
+        if: steps.legacy_check.outputs.should_prune_legacy == 'true'
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin "${LEGACY_POSITIONS_BRANCH}" || true
+          if git show-ref --verify --quiet "refs/remotes/origin/${LEGACY_POSITIONS_BRANCH}"; then
+            git checkout -B "${LEGACY_POSITIONS_BRANCH}" "origin/${LEGACY_POSITIONS_BRANCH}"
+          else
+            echo "::notice::${LEGACY_POSITIONS_BRANCH} branch does not exist yet; skipping legacy JSON prune."
+            exit 0
+          fi
+
+          python3 scripts/pull_borrowers/legacy_market_removal.py prune \
+            --chain "${{ inputs.chainKey }}" \
+            --silo-address "${{ inputs.siloAddress }}"
+
+          git add \
+            "scripts/pull_borrowers/${{ inputs.chainKey }}_borrowers.json" \
+            "scripts/pull_borrowers/${{ inputs.chainKey }}_positions.json" || true
+
+          if git diff --staged --quiet; then
+            echo "::notice::No legacy JSON changes to commit for ${{ inputs.chainKey }}:${{ inputs.siloAddress }}."
+            exit 0
+          fi
+
+          git commit -m "chore: prune ${{ inputs.chainKey }} legacy positions for removed market"
+          git push origin "HEAD:${LEGACY_POSITIONS_BRANCH}"
