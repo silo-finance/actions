@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.24.2] - 2026-05-19
+
+### Fixed
+- ci: fix output directory and better logs
+
 ## [0.24.1] - 2026-05-19
 
 ### Fixed
