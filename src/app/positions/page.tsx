@@ -1831,6 +1831,7 @@ function PositionsPageInner() {
               </button>
               <span className="ml-4">{selectedRow.marketTokenPair}</span>
               <span className="ml-4 text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] font-semibold">LT {positionLtLabel}</span>
+              <span className="ml-4">{selectedRow.marketVersion === 'legacy' ? 'Legacy Market' : 'V3 Market'}</span>
             </p>
           </div>
 
