@@ -1,0 +1,94 @@
+name: Borrowers Export
+
+on:
+  workflow_dispatch:
+    inputs:
+      chain:
+        description: 'Chain to export borrowers for'
+        required: true
+        type: choice
+        options:
+          - sonic
+          - ethereum
+          - avalanche
+          - arbitrum
+  schedule:
+    # Every day at 02:15 UTC
+    - cron: '15 2 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: borrowers-export-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATA_BRANCH: borrowers-data
+
+jobs:
+  export-borrowers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate The Graph API key secret
+        run: |
+          if [ -z "${THE_GRAPH_API_KEY:-}" ]; then
+            echo "::error::Missing THE_GRAPH_API_KEY secret."
+            exit 1
+          fi
+        env:
+          THE_GRAPH_API_KEY: ${{ secrets.THE_GRAPH_API_KEY }}
+
+      - name: Export borrowers JSON
+        run: |
+          set -euo pipefail
+          CHAIN="${{ inputs.chain }}"
+          if [ -z "$CHAIN" ]; then
+            # Scheduled runs default to sonic to keep one stable output file.
+            CHAIN="sonic"
+          fi
+          python3 scripts/pull_borrowers/fetch_sonic_borrowers.py \
+            --chain "$CHAIN"
+          echo "CHAIN=$CHAIN" >> "$GITHUB_ENV"
+        env:
+          THE_GRAPH_API_KEY: ${{ secrets.THE_GRAPH_API_KEY }}
+
+      - name: Prepare publish directory
+        run: |
+          set -euo pipefail
+          mkdir -p publish/data
+          cp "scripts/pull_borrowers/${CHAIN}_borrowers.json" publish/data/borrowers.json
+          cp "scripts/pull_borrowers/${CHAIN}_borrowers.json" "publish/data/${CHAIN}_borrowers.json"
+          printf '%s\n' "$CHAIN" > publish/data/latest-chain.txt
+          cp "scripts/pull_borrowers/${CHAIN}_borrowers.json" "scripts/pull_borrowers/borrowers_latest.json"
+
+      - name: Upload borrowers artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.CHAIN }}-borrowers-json
+          path: scripts/pull_borrowers/${{ env.CHAIN }}_borrowers.json
+          if-no-files-found: error
+
+      - name: Publish data branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: ${{ env.DATA_BRANCH }}
+          publish_dir: ./publish
+          keep_files: true
+          force_orphan: false
+          commit_message: "chore: update ${{ env.CHAIN }} borrowers export"
+
+      - name: Log published file paths
+        run: |
+          echo "::notice::Published borrowers file to branch '${DATA_BRANCH}'."
+          echo "::notice::Stable file path: data/borrowers.json"
+          echo "::notice::Chain specific file path: data/${CHAIN}_borrowers.json"
