@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.24.3] - 2026-05-19
+
+### Fixed
+- fix positions url
+- do not commit local positions files
+
 ## [0.24.2] - 2026-05-19
 
 ### Fixed
