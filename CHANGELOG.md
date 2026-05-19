@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## [0.23.0] - 2026-05-18
 
 ### Added
@@ -14,11 +16,6 @@
 - hide live when no positions
 - rpc policy
 - live LTV monitoring
-
-## [Unreleased]
-
-### Updated
-- expand LIVE monitoring candidates to include rows older than 30 minutes
 
 ## [0.22.3] - 2026-05-15
 

@@ -63,6 +63,8 @@ const BIGINT_ZERO = BigInt(0)
 const WARNING_HEALTH_FACTOR_THRESHOLD = 0.95
 const MAX_DISPLAY_HEALTH_FACTOR = 100
 const MAX_DISPLAY_LTV_PERCENT = 999
+/** Applied to table columns not refreshed by LIVE (collateral, debt, age). */
+const POSITIONS_LIVE_STALE_COLUMN_CLASS = 'opacity-40 transition-opacity'
 const REALTIME_REFRESH_INTERVAL_SECONDS = 60
 const REALTIME_AGE_THRESHOLD_SECONDS = 30 * 60
 const MARKET_DATA_STALE_TIME_MS = 1000 * 60 * 5
@@ -1715,7 +1717,7 @@ function PositionsPageInner() {
           <div className="silo-panel p-5">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
               <h2 className="text-xl font-semibold silo-text-main m-0">
-                {selectedRow.marketTokenPair}
+                {selectedRow.tokenSymbol ?? selectedRow.quoteTokenSymbol ?? 'Unknown'}
               </h2>
               <button type="button" onClick={backToMarkets} className="silo-btn-secondary">
                 Back to markets
@@ -1803,18 +1805,32 @@ function PositionsPageInner() {
                 <table className="min-w-full text-sm">
                   <thead className="bg-[color-mix(in_srgb,var(--silo-soft-purple)_40%,var(--silo-surface-2))]">
                     <tr>
-                      <th className="text-left px-4 py-3 font-semibold">Borrower</th>
-                      <th className="text-left px-4 py-3 font-semibold">
+                      <th
+                        className={`text-left px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
+                        title={isRealtimeEnabled ? 'Not updated during LIVE refresh' : undefined}
+                      >
+                        Borrower
+                      </th>
+                      <th
+                        className={`text-left px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
+                        title={isRealtimeEnabled ? 'Not updated during LIVE refresh' : undefined}
+                      >
                         <button type="button" onClick={() => togglePositionsSort('collateralValue')}>
                           Collateral Value{positionsSortIndicator('collateralValue')}
                         </button>
                       </th>
-                      <th className="text-left px-4 py-3 font-semibold">
+                      <th
+                        className={`text-left px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
+                        title={isRealtimeEnabled ? 'Not updated during LIVE refresh' : undefined}
+                      >
                         <button type="button" onClick={() => togglePositionsSort('debtValue')}>
                           Debt Value{positionsSortIndicator('debtValue')}
                         </button>
                       </th>
-                      <th className="text-left px-4 py-3 font-semibold">
+                      <th
+                        className="text-left px-4 py-3 font-semibold"
+                        title={isRealtimeEnabled ? 'Updated during LIVE refresh (with Health Factor and Solvent)' : undefined}
+                      >
                         <span className="inline-flex items-center gap-2">
                           <button type="button" onClick={() => togglePositionsSort('ltv')}>
                             LTV{positionsSortIndicator('ltv')}
@@ -1842,13 +1858,26 @@ function PositionsPageInner() {
                           </button>
                         </span>
                       </th>
-                      <th className="text-left px-4 py-3 font-semibold">
+                      <th
+                        className="text-left px-4 py-3 font-semibold"
+                        title={isRealtimeEnabled ? 'Updated during LIVE refresh (derived from LTV)' : undefined}
+                      >
                         <button type="button" onClick={() => togglePositionsSort('healthFactor')}>
                           Health Factor{positionsSortIndicator('healthFactor')}
                         </button>
                       </th>
-                      <th className="text-left px-4 py-3 font-semibold">Solvent</th>
-                      <th className="text-left px-4 py-3 font-semibold">Age</th>
+                      <th
+                        className="text-left px-4 py-3 font-semibold"
+                        title={isRealtimeEnabled ? 'Updated during LIVE refresh (derived from LTV)' : undefined}
+                      >
+                        Solvent
+                      </th>
+                      <th
+                        className={`text-left px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
+                        title={isRealtimeEnabled ? 'Not updated during LIVE refresh' : undefined}
+                      >
+                        Age
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1887,10 +1916,13 @@ function PositionsPageInner() {
                         : isNearLt
                           ? 'text-[11px] text-[color-mix(in_srgb,var(--silo-warning)_52%,#5a3b12)]'
                           : 'text-[11px] silo-text-soft'
+                      const staleColumnClass = isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''
+                      const liveMetricClass =
+                        isRealtimeEnabled && hasLiveLtv ? 'transition-opacity' : isRealtimeEnabled ? 'opacity-70 transition-opacity' : ''
                       return (
                         <Fragment key={row.id}>
                           <tr className={rowClassName}>
-                            <td className="px-4 py-3 font-mono">
+                            <td className={`px-4 py-3 font-mono ${staleColumnClass}`}>
                               <div className="inline-flex items-center gap-2">
                                 {borrowerAddress ? (
                                   <a
@@ -1920,7 +1952,7 @@ function PositionsPageInner() {
                                 ) : null}
                               </div>
                             </td>
-                            <td className="px-4 py-3">
+                            <td className={`px-4 py-3 ${staleColumnClass}`}>
                               {formatScaledValue(row.collateralValue, 18, 2)}
                               {row.collateralValue ? (
                                 <span className={`ml-1 ${symbolToneClass}`}>
@@ -1928,7 +1960,7 @@ function PositionsPageInner() {
                                 </span>
                               ) : null}
                             </td>
-                            <td className="px-4 py-3">
+                            <td className={`px-4 py-3 ${staleColumnClass}`}>
                               {formatScaledValue(row.debtValue, 18, 2)}
                               {row.debtValue ? (
                                 <span className={`ml-1 ${symbolToneClass}`}>
@@ -1936,7 +1968,7 @@ function PositionsPageInner() {
                                 </span>
                               ) : null}
                             </td>
-                            <td className="px-4 py-3">
+                            <td className={`px-4 py-3 ${liveMetricClass}`}>
                               <span className="inline-flex items-center gap-1.5">
                                 {isRealtimeMonitored ? (
                                   <span
@@ -1960,8 +1992,8 @@ function PositionsPageInner() {
                                 <span>{formatPositionLtv(effectiveLtvRaw)}</span>
                               </span>
                             </td>
-                            <td className="px-4 py-3">{formatHealthFactor(healthFactor)}</td>
-                            <td className="px-4 py-3">
+                            <td className={`px-4 py-3 ${liveMetricClass}`}>{formatHealthFactor(healthFactor)}</td>
+                            <td className={`px-4 py-3 ${liveMetricClass}`}>
                               {isSolvent == null ? (
                                 <span className="silo-text-soft">—</span>
                               ) : isSolvent ? (
@@ -1970,7 +2002,7 @@ function PositionsPageInner() {
                                 <span className="text-[color-mix(in_srgb,var(--silo-danger)_85%,#4f0f1c)] font-semibold">no</span>
                               )}
                             </td>
-                            <td className="px-4 py-3">{formatPositionAge(row.lastUpdatedTimestamp, nowMs)}</td>
+                            <td className={`px-4 py-3 ${staleColumnClass}`}>{formatPositionAge(row.lastUpdatedTimestamp, nowMs)}</td>
                           </tr>
                           {hasLtMismatch ? (
                             <tr className="border-t border-[var(--silo-border)]">
