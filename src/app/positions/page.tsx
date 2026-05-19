@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import PositionPriorityTicks from '@/components/PositionPriorityTicks'
 import { useWeb3 } from '@/contexts/Web3Context'
 import {
   getExplorerAddressUrl,
@@ -30,7 +31,15 @@ import {
   getSiloLensAddressForChain,
 } from '@/utils/liquidationRpc'
 import { formatUnits } from 'ethers'
-import { capDisplayHealthFactor, computeHealthFactor } from '@/utils/healthFactor'
+import {
+  capDisplayHealthFactor,
+  computeHealthFactor,
+  computePositionPriority,
+  positionRiskSortTier,
+  priorityScaleForRiskTier,
+  resolvePositionPriorityScaleByTier,
+  type PositionPriorityScaleByTier,
+} from '@/utils/healthFactor'
 
 type MarketRow = {
   chainId: number
@@ -83,7 +92,7 @@ type SortColumn =
   | 'positions'
 
 type SortDirection = 'asc' | 'desc'
-type PositionsSortColumn = 'healthFactor' | 'ltv' | 'debtValue' | 'collateralValue'
+type PositionsSortColumn = 'healthFactor' | 'priority' | 'ltv' | 'debtValue' | 'collateralValue'
 
 type ColumnFilters = {
   token: string
@@ -358,6 +367,68 @@ function formatLtvPercentFromRaw18(ltvRaw18: string): string {
   return ltvRaw18
 }
 
+type ScoredPositionRow = {
+  row: OpenMarketPosition
+  borrowerAddress: string | null
+  effectiveLtvRaw: string | null
+  ltvRatio: number | null
+  healthFactor: number | null
+  priority: number | null
+  debtValueNum: number | null
+  collateralValueNum: number | null
+  isSolvent: boolean | null
+  isInsolvent: boolean
+  isWarning: boolean
+  hasLiveLtv: boolean
+}
+
+function scoreOpenMarketPosition(
+  row: OpenMarketPosition,
+  options: {
+    selectedRow: { chainId: number; siloAddress: string } | null
+    positionLtRatio: number | null
+    realtimeLtvByBorrower: Map<string, string>
+    externalByPositionKey: Map<string, { solvent?: boolean | null }> | undefined
+    solvencyByBorrower: Map<string, boolean> | undefined
+  }
+): ScoredPositionRow {
+  const borrowerAddress = extractBorrowerAddress(row.accountId)
+  const hasLiveLtv = Boolean(borrowerAddress && options.realtimeLtvByBorrower.has(borrowerAddress))
+  const effectiveLtvRaw = resolveEffectiveLtvRaw(row, borrowerAddress, options.realtimeLtvByBorrower)
+  const ltvRatio = parseScaledNumber(effectiveLtvRaw, 18)
+  const healthFactor = computeHealthFactor(ltvRatio, options.positionLtRatio)
+  const externalKey =
+    options.selectedRow && borrowerAddress
+      ? buildLiquidationPositionKey(options.selectedRow.chainId, options.selectedRow.siloAddress, borrowerAddress)
+      : null
+  const external = externalKey ? options.externalByPositionKey?.get(externalKey) : undefined
+  const isSolvent = resolvePositionSolvent({
+    effectiveLtvRaw,
+    positionLtRatio: options.positionLtRatio,
+    externalSolvent: external?.solvent,
+    rpcSolvent: borrowerAddress ? options.solvencyByBorrower?.get(borrowerAddress) : undefined,
+    preferLtvDerivation: hasLiveLtv,
+  })
+  const debtValueNum = parseScaledNumber(row.debtValue, 18)
+  const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
+  const isWarning = isWarningHealthFactor(healthFactor, isInsolvent)
+  const priority = computePositionPriority(debtValueNum, healthFactor)
+  return {
+    row,
+    borrowerAddress,
+    effectiveLtvRaw,
+    ltvRatio,
+    healthFactor,
+    priority,
+    debtValueNum,
+    collateralValueNum: parseScaledNumber(row.collateralValue, 18),
+    isSolvent,
+    isInsolvent,
+    isWarning,
+    hasLiveLtv,
+  }
+}
+
 function shouldMonitorPositionInRealtime({
   row,
   positionLtRatio,
@@ -595,7 +666,7 @@ function PositionsPageInner() {
   const config = getLiquidationSnapshotConfig()
   const [sortColumn, setSortColumn] = useState<SortColumn>('positions')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
-  const [positionsSortColumn, setPositionsSortColumn] = useState<PositionsSortColumn>('healthFactor')
+  const [positionsSortColumn, setPositionsSortColumn] = useState<PositionsSortColumn>('priority')
   const [positionsSortDirection, setPositionsSortDirection] = useState<SortDirection>('desc')
   const [selectedChains, setSelectedChains] = useState<Set<number>>(new Set())
   const [filters, setFilters] = useState<ColumnFilters>({
@@ -1380,51 +1451,72 @@ function PositionsPageInner() {
   const positionsTotalPages = Math.max(1, Math.ceil(Math.max(positionsTotalRecords, 1) / pageLimit))
   const positionsPageLabel = !config.testDisablePagination ? `Page ${positionsCurrentPage} of ${positionsTotalPages}` : null
 
+  const positionScoreContext = useMemo(
+    () => ({
+      selectedRow: selectedRow
+        ? { chainId: selectedRow.chainId, siloAddress: selectedRow.siloAddress }
+        : null,
+      positionLtRatio,
+      realtimeLtvByBorrower,
+      externalByPositionKey: externalPositionsQuery.data?.byPositionKey,
+      solvencyByBorrower: new Map<string, boolean>([
+        ...(selectedPrefetchedEntry?.solvencyByBorrower ?? []),
+        ...Array.from(solvencyQuery.data?.entries() ?? []),
+      ]),
+    }),
+    [
+      selectedRow,
+      positionLtRatio,
+      realtimeLtvByBorrower,
+      externalPositionsQuery.data?.byPositionKey,
+      selectedPrefetchedEntry?.solvencyByBorrower,
+      solvencyQuery.data,
+    ]
+  )
+
+  const positionItemsForPriorityScale = useMemo(() => {
+    if (selectedPrefetchedEntry?.items.length) return selectedPrefetchedEntry.items
+    if (selectedRow?.marketVersion === 'legacy') {
+      return mergeMarketPositionItems(
+        selectedRow.chainId,
+        selectedRow.siloAddress,
+        'legacy',
+        [],
+        externalPositionsQuery.data
+      )
+    }
+    return positionsQuery.data?.items ?? []
+  }, [
+    selectedPrefetchedEntry?.items,
+    selectedRow,
+    externalPositionsQuery.data,
+    positionsQuery.data?.items,
+  ])
+
+  const positionPriorityScaleByTier = useMemo((): PositionPriorityScaleByTier => {
+    const scoredForScale = positionItemsForPriorityScale.map((item) =>
+      scoreOpenMarketPosition(item, positionScoreContext)
+    )
+    return resolvePositionPriorityScaleByTier(scoredForScale)
+  }, [positionItemsForPriorityScale, positionScoreContext])
+
   const sortedPositionRows = useMemo(() => {
     const rows = positionsQuery.data?.items ?? []
-    const scored = rows.map((row) => {
-      const borrowerAddress = extractBorrowerAddress(row.accountId)
-      const hasLiveLtv = Boolean(borrowerAddress && realtimeLtvByBorrower.has(borrowerAddress))
-      const effectiveLtvRaw = resolveEffectiveLtvRaw(row, borrowerAddress, realtimeLtvByBorrower)
-      const ltvRatio = parseScaledNumber(effectiveLtvRaw, 18)
-      const healthFactor = computeHealthFactor(ltvRatio, positionLtRatio)
-      const externalKey =
-        selectedRow && borrowerAddress
-          ? buildLiquidationPositionKey(selectedRow.chainId, selectedRow.siloAddress, borrowerAddress)
-          : null
-      const external = externalKey ? externalPositionsQuery.data?.byPositionKey.get(externalKey) : undefined
-      const isSolvent = resolvePositionSolvent({
-        effectiveLtvRaw,
-        positionLtRatio,
-        externalSolvent: external?.solvent,
-        rpcSolvent: borrowerAddress ? solvencyQuery.data?.get(borrowerAddress) : undefined,
-        preferLtvDerivation: hasLiveLtv,
-      })
-      const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
-      const isWarning = isWarningHealthFactor(healthFactor, isInsolvent)
-      return {
-        row,
-        borrowerAddress,
-        effectiveLtvRaw,
-        ltvRatio,
-        healthFactor,
-        debtValueNum: parseScaledNumber(row.debtValue, 18),
-        collateralValueNum: parseScaledNumber(row.collateralValue, 18),
-        isSolvent,
-        isInsolvent,
-        isWarning,
-        hasLiveLtv,
-      }
-    })
+    const scored = rows.map((row) => scoreOpenMarketPosition(row, positionScoreContext))
     scored.sort((a, b) => {
+      const tierCmp = positionRiskSortTier(a.isInsolvent, a.isWarning) - positionRiskSortTier(b.isInsolvent, b.isWarning)
+      if (tierCmp !== 0) return tierCmp
+
       const lhs: Record<PositionsSortColumn, number | null> = {
         healthFactor: a.healthFactor,
+        priority: a.priority,
         ltv: a.ltvRatio,
         debtValue: a.debtValueNum,
         collateralValue: a.collateralValueNum,
       }
       const rhs: Record<PositionsSortColumn, number | null> = {
         healthFactor: b.healthFactor,
+        priority: b.priority,
         ltv: b.ltvRatio,
         debtValue: b.debtValueNum,
         collateralValue: b.collateralValueNum,
@@ -1437,12 +1529,19 @@ function PositionsPageInner() {
     positionsQuery.data?.items,
     positionsSortColumn,
     positionsSortDirection,
-    solvencyQuery.data,
-    positionLtRatio,
-    realtimeLtvByBorrower,
-    selectedRow,
-    externalPositionsQuery.data,
+    positionScoreContext,
   ])
+
+  const solventSummary = useMemo(() => {
+    let insolvent = 0
+    let warning = 0
+    for (const row of sortedPositionRows) {
+      if (row.isInsolvent) insolvent += 1
+      else if (row.isWarning) warning += 1
+    }
+    const normal = Math.max(0, sortedPositionRows.length - insolvent - warning)
+    return { normal, warning, insolvent }
+  }, [sortedPositionRows])
 
   const filteredRealtimeBorrowersToMonitor = useMemo(() => {
     const rows = positionsQuery.data?.items ?? []
@@ -1932,10 +2031,43 @@ function PositionsPageInner() {
                         </button>
                       </th>
                       <th
+                        className="text-right px-4 py-3 font-semibold"
+                        title="Debt value × health factor; insolvent and warning rows stay on top"
+                      >
+                        <button type="button" onClick={() => togglePositionsSort('priority')}>
+                          Priority{positionsSortIndicator('priority')}
+                        </button>
+                      </th>
+                      <th
                         className="text-left px-4 py-3 font-semibold"
                         title={isRealtimeEnabled ? 'Updated during LIVE refresh (derived from LTV)' : undefined}
                       >
-                        Solvent
+                        <div className="inline-flex flex-col items-start leading-tight">
+                          <span>Solvent</span>
+                          <span className="mt-1 inline-flex items-center gap-2 text-[11px] font-normal tabular-nums">
+                            <span className={solventSummary.normal === 0 ? 'silo-text-soft opacity-30' : 'silo-text-soft'}>
+                              {solventSummary.normal}
+                            </span>
+                            <span
+                              className={
+                                solventSummary.warning === 0
+                                  ? 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)] opacity-30'
+                                  : 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)]'
+                              }
+                            >
+                              {solventSummary.warning}
+                            </span>
+                            <span
+                              className={
+                                solventSummary.insolvent === 0
+                                  ? 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] opacity-30'
+                                  : 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)]'
+                              }
+                            >
+                              {solventSummary.insolvent}
+                            </span>
+                          </span>
+                        </div>
                       </th>
                       <th
                         className={`text-left px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
@@ -1947,12 +2079,27 @@ function PositionsPageInner() {
                   </thead>
                   <tbody>
                     {sortedPositionRows.map(
-                      ({ row, effectiveLtvRaw, healthFactor, isSolvent, isInsolvent, isWarning, hasLiveLtv, borrowerAddress }) => {
+                      ({
+                        row,
+                        effectiveLtvRaw,
+                        healthFactor,
+                        priority,
+                        isSolvent,
+                        isInsolvent,
+                        isWarning,
+                        hasLiveLtv,
+                        borrowerAddress,
+                      }) => {
                       const isRealtimeMonitored =
                         isRealtimeEnabled && Boolean(borrowerAddress && realtimeMonitoredBorrowerSet.has(borrowerAddress))
                       const canAddRealtimeMonitor =
                         isRealtimeEnabled && Boolean(borrowerAddress && !realtimeMonitoredBorrowerSet.has(borrowerAddress))
                       const isNearLt = isWarning
+                      const priorityScale = priorityScaleForRiskTier(
+                        positionPriorityScaleByTier,
+                        isInsolvent,
+                        isWarning
+                      )
                       const hasLtMismatch =
                         !hasLiveLtv &&
                         isSolvent != null &&
@@ -2058,6 +2205,15 @@ function PositionsPageInner() {
                               </span>
                             </td>
                             <td className={`px-4 py-3 ${liveMetricClass}`}>{formatHealthFactor(healthFactor)}</td>
+                            <td className={`px-4 py-3 text-right ${liveMetricClass}`}>
+                              <PositionPriorityTicks
+                                priority={priority}
+                                minPriority={priorityScale.min}
+                                maxPriority={priorityScale.max}
+                                isInsolvent={isInsolvent}
+                                isWarning={isWarning}
+                              />
+                            </td>
                             <td className={`px-4 py-3 ${liveMetricClass}`}>
                               {isSolvent == null ? (
                                 <span className="silo-text-soft">—</span>
@@ -2071,7 +2227,7 @@ function PositionsPageInner() {
                           </tr>
                           {hasLtMismatch ? (
                             <tr className="border-t border-[var(--silo-border)]">
-                              <td colSpan={7} className="px-4 py-2 text-xs text-[color-mix(in_srgb,var(--silo-warning)_88%,#5a3b12)]">
+                              <td colSpan={8} className="px-4 py-2 text-xs text-[color-mix(in_srgb,var(--silo-warning)_88%,#5a3b12)]">
                                 Warning: `isSolvent` and Health Factor threshold are divergent for this borrower (possible rounding or pricing mismatch).
                               </td>
                             </tr>
@@ -2081,7 +2237,7 @@ function PositionsPageInner() {
                     })}
                     {(positionsQuery.data?.items ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-4 py-4 text-sm silo-text-soft">
+                        <td colSpan={8} className="px-4 py-4 text-sm silo-text-soft">
                           No open positions returned for this market.
                         </td>
                       </tr>
