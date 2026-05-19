@@ -5,7 +5,6 @@ import {
   MAX_HEALTH_FACTOR,
   positionRiskSortTier,
   priorityFilledTickCount,
-  resolvePositionPriorityScale,
   resolvePositionPriorityScaleByTier,
   resolveTrimmedPriorityScale,
 } from '@/utils/healthFactor'
