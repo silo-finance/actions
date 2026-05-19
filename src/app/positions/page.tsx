@@ -1,10 +1,11 @@
 'use client'
 
-import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import HotValueFlame from '@/components/HotValueFlame'
 import PositionPriorityTicks from '@/components/PositionPriorityTicks'
 import { useWeb3 } from '@/contexts/Web3Context'
 import {
@@ -18,11 +19,11 @@ import {
   fetchAllOpenPositionsByMarket,
   fetchAllOpenPositionsByChainAndMarket,
   fetchOpenPositionCountsByChainAndMarket,
-  fetchOpenPositionsByMarket,
   type OpenMarketPosition,
 } from '@/utils/liquidationGraph'
 import { fetchExternalPositionsData } from '@/utils/liquidationExternalPositions'
 import { buildLiquidationPositionKey, extractBorrowerAddress } from '@/utils/liquidationPositionIdentity'
+import { resolveHotValuePositionIds } from '@/utils/positionHotValue'
 import { mergeMarketPositionItems, solvencyMapFromExternalMarket } from '@/utils/liquidationPositionMerge'
 import {
   fetchBorrowersLtvFromSiloLens,
@@ -72,6 +73,8 @@ type MarketRow = {
 }
 
 const DEFAULT_GRAPH_PAGE_LIMIT = 1000
+const POSITIONS_VIEW_PAGE_LIMIT = 1000
+const DEFAULT_POSITION_MIN_DEBT_VALUE = '1.0'
 const DEFAULT_POSITIONS_COUNT_CHUNK = 40
 const BIGINT_ZERO = BigInt(0)
 const WARNING_HEALTH_FACTOR_THRESHOLD = 0.95
@@ -97,6 +100,83 @@ type PositionsSortColumn = 'healthFactor' | 'priority' | 'ltv' | 'debtValue' | '
 type ColumnFilters = {
   token: string
   hideZeroPositions: boolean
+}
+
+type PositionListFilters = {
+  borrowerAddress: string
+  minDebtValueInput: string
+}
+
+const DEFAULT_MARKET_SORT_COLUMN: SortColumn = 'positions'
+const DEFAULT_POSITIONS_SORT_COLUMN: PositionsSortColumn = 'priority'
+const MIN_DEBT_URL_OFF = 'off'
+
+const MARKET_SORT_COLUMNS = new Set<SortColumn>([
+  'siloId',
+  'chain',
+  'token',
+  'totalAssets',
+  'liquidity',
+  'totalDebt',
+  'positions',
+])
+
+const POSITIONS_SORT_COLUMNS = new Set<PositionsSortColumn>([
+  'healthFactor',
+  'priority',
+  'ltv',
+  'debtValue',
+  'collateralValue',
+])
+
+function parseSortDirection(raw: string | null): SortDirection {
+  return raw === 'asc' ? 'asc' : 'desc'
+}
+
+function parseMarketSortColumn(raw: string | null): SortColumn | null {
+  if (!raw || !MARKET_SORT_COLUMNS.has(raw as SortColumn)) return null
+  return raw as SortColumn
+}
+
+function parsePositionsSortColumn(raw: string | null): PositionsSortColumn | null {
+  if (!raw || !POSITIONS_SORT_COLUMNS.has(raw as PositionsSortColumn)) return null
+  return raw as PositionsSortColumn
+}
+
+function parseChainsParam(raw: string | null): Set<number> {
+  if (!raw?.trim()) return new Set()
+  const out = new Set<number>()
+  for (const part of raw.split(',')) {
+    const chainId = Number(part.trim())
+    if (Number.isFinite(chainId) && Number.isInteger(chainId) && chainId > 0) out.add(chainId)
+  }
+  return out
+}
+
+function serializeChainsParam(chains: Set<number>): string | null {
+  if (chains.size === 0) return null
+  return Array.from(chains)
+    .sort((a, b) => a - b)
+    .join(',')
+}
+
+function parseMinDebtUrlParam(raw: string | null): string {
+  if (raw === MIN_DEBT_URL_OFF) return ''
+  if (raw == null) return DEFAULT_POSITION_MIN_DEBT_VALUE
+  return raw
+}
+
+function writeMinDebtUrlParam(params: URLSearchParams, value: string): void {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    params.set('minDebt', MIN_DEBT_URL_OFF)
+    return
+  }
+  if (trimmed === DEFAULT_POSITION_MIN_DEBT_VALUE) {
+    params.delete('minDebt')
+    return
+  }
+  params.set('minDebt', trimmed)
 }
 
 type DynamicStateType = Awaited<ReturnType<typeof fetchMarketsDynamicState>> extends Map<string, infer T> ? T : never
@@ -181,6 +261,28 @@ function parseScaledNumber(raw: string | null, decimals = 18): number | null {
   if (!raw) return null
   const parsed = /^-?\d+$/.test(raw) ? Number(formatUnits(BigInt(raw), decimals)) : Number(raw)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+/** Parses a human-entered decimal (`.` or `,` as the decimal separator). */
+function parseDecimalFilterInput(raw: string): number | null {
+  const normalized = raw.trim().replace(',', '.')
+  if (!normalized) return null
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function normalizeBorrowerSearchText(raw: string): string {
+  return raw.trim().toLowerCase().replace(/^0x/, '')
+}
+
+function borrowerTextForFilter(scored: ScoredPositionRow): string {
+  return (scored.borrowerAddress ?? scored.row.accountId).toLowerCase()
+}
+
+function positionMatchesBorrowerFilter(scored: ScoredPositionRow, normalizedQuery: string): boolean {
+  if (!normalizedQuery) return true
+  const haystack = borrowerTextForFilter(scored).replace(/^0x/, '')
+  return haystack.includes(normalizedQuery)
 }
 
 function formatScaledValue(raw: string | null, decimals = 18, maxFractionDigits = 2): string {
@@ -664,15 +766,41 @@ function PositionsPageInner() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const config = getLiquidationSnapshotConfig()
-  const [sortColumn, setSortColumn] = useState<SortColumn>('positions')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
-  const [positionsSortColumn, setPositionsSortColumn] = useState<PositionsSortColumn>('priority')
-  const [positionsSortDirection, setPositionsSortDirection] = useState<SortDirection>('desc')
-  const [selectedChains, setSelectedChains] = useState<Set<number>>(new Set())
-  const [filters, setFilters] = useState<ColumnFilters>({
-    token: '',
-    hideZeroPositions: true,
-  })
+  const view = searchParams.get('view') === 'positions' ? 'positions' : 'markets'
+  const sortDirection = parseSortDirection(searchParams.get('dir'))
+  const sortColumn =
+    view === 'markets'
+      ? (parseMarketSortColumn(searchParams.get('sort')) ?? DEFAULT_MARKET_SORT_COLUMN)
+      : DEFAULT_MARKET_SORT_COLUMN
+  const positionsSortColumn =
+    view === 'positions'
+      ? (parsePositionsSortColumn(searchParams.get('sort')) ?? DEFAULT_POSITIONS_SORT_COLUMN)
+      : DEFAULT_POSITIONS_SORT_COLUMN
+  const selectedChains = useMemo(() => parseChainsParam(searchParams.get('chains')), [searchParams])
+  const filters = useMemo(
+    (): ColumnFilters => ({
+      token: searchParams.get('q') ?? '',
+      hideZeroPositions: searchParams.get('hideEmpty') !== '0',
+    }),
+    [searchParams]
+  )
+  const positionFilters = useMemo(
+    (): PositionListFilters => ({
+      borrowerAddress: searchParams.get('borrower') ?? '',
+      minDebtValueInput: parseMinDebtUrlParam(searchParams.get('minDebt')),
+    }),
+    [searchParams]
+  )
+
+  const replaceSearchParams = useCallback(
+    (mutate: (params: URLSearchParams) => void) => {
+      const next = new URLSearchParams(searchParams.toString())
+      mutate(next)
+      const qs = next.toString()
+      void router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    },
+    [pathname, router, searchParams]
+  )
   const [isClientMounted, setIsClientMounted] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [isRealtimeEnabled, setIsRealtimeEnabled] = useState(false)
@@ -1127,10 +1255,9 @@ function PositionsPageInner() {
 
   const selectedChainId = parseIntParam(searchParams.get('chain'))
   const selectedSiloAddress = (searchParams.get('silo') ?? '').trim().toLowerCase()
-  const view = searchParams.get('view') === 'positions' ? 'positions' : 'markets'
   const paginationOffsetRaw = parseIntParam(searchParams.get('offset'))
   const paginationOffset = config.testDisablePagination ? 0 : paginationOffsetRaw ?? 0
-  const pageLimit = config.testDisablePagination ? graphPageLimit : graphPageLimit
+  const pageLimit = POSITIONS_VIEW_PAGE_LIMIT
   const positionsStorageKey = useMemo(
     () => `liq:positions:list:v3:${selectedChainId ?? 'na'}:${selectedSiloAddress || 'na'}:${pageLimit}:${paginationOffset}`,
     [selectedChainId, selectedSiloAddress, pageLimit, paginationOffset]
@@ -1201,6 +1328,15 @@ function PositionsPageInner() {
 
     return sorted
   }, [filters, marketRows, selectedChains, sortColumn, sortDirection])
+
+  const hiddenMarketsWithoutPositionsCount = useMemo(() => {
+    if (!filters.hideZeroPositions) return 0
+    let hidden = 0
+    for (const row of marketRows) {
+      if (row.positionsCount === 0) hidden += 1
+    }
+    return hidden
+  }, [marketRows, filters.hideZeroPositions])
 
   useEffect(() => {
     if (snapshotEntries.length === 0) return
@@ -1289,17 +1425,18 @@ function PositionsPageInner() {
           hasNextPage: paginationOffset + pageLimit < allItems.length,
         }
       }
-      const page = await fetchOpenPositionsByMarket(selectedRow.chainId, selectedRow.siloAddress, pageLimit, paginationOffset)
       const externalData = externalPositionsQuery.data
+      const allItems = mergeMarketPositionItems(
+        selectedRow.chainId,
+        selectedRow.siloAddress,
+        'v3',
+        await fetchAllOpenPositionsByMarket(selectedRow.chainId, selectedRow.siloAddress, pageLimit),
+        externalData
+      )
       return {
-        ...page,
-        items: mergeMarketPositionItems(
-          selectedRow.chainId,
-          selectedRow.siloAddress,
-          'v3',
-          page.items,
-          externalData
-        ),
+        items: allItems.slice(paginationOffset, paginationOffset + pageLimit),
+        totalCount: allItems.length,
+        hasNextPage: paginationOffset + pageLimit < allItems.length,
       }
     },
     enabled: isClientMounted && selectedRow != null,
@@ -1307,7 +1444,7 @@ function PositionsPageInner() {
       if (!isClientMounted || selectedRow?.marketVersion === 'legacy') return undefined
       if (paginationOffset === 0 && selectedPrefetchedEntry) {
         return {
-          items: selectedPrefetchedEntry.items.slice(0, pageLimit),
+          items: selectedPrefetchedEntry.items,
           totalCount: selectedPrefetchedEntry.totalCount,
           hasNextPage: selectedPrefetchedEntry.totalCount > pageLimit,
         }
@@ -1504,8 +1641,11 @@ function PositionsPageInner() {
     const rows = positionsQuery.data?.items ?? []
     const scored = rows.map((row) => scoreOpenMarketPosition(row, positionScoreContext))
     scored.sort((a, b) => {
-      const tierCmp = positionRiskSortTier(a.isInsolvent, a.isWarning) - positionRiskSortTier(b.isInsolvent, b.isWarning)
-      if (tierCmp !== 0) return tierCmp
+      if (positionsSortColumn === 'priority') {
+        const tierCmp =
+          positionRiskSortTier(a.isInsolvent, a.isWarning) - positionRiskSortTier(b.isInsolvent, b.isWarning)
+        if (tierCmp !== 0) return tierCmp
+      }
 
       const lhs: Record<PositionsSortColumn, number | null> = {
         healthFactor: a.healthFactor,
@@ -1522,26 +1662,84 @@ function PositionsPageInner() {
         collateralValue: b.collateralValueNum,
       }
       const cmp = compareValues(lhs[positionsSortColumn], rhs[positionsSortColumn])
-      return positionsSortDirection === 'asc' ? cmp : -cmp
+      return sortDirection === 'asc' ? cmp : -cmp
     })
     return scored
   }, [
     positionsQuery.data?.items,
     positionsSortColumn,
-    positionsSortDirection,
+    sortDirection,
     positionScoreContext,
+  ])
+
+  const minDebtValueThreshold = useMemo(
+    () => parseDecimalFilterInput(positionFilters.minDebtValueInput),
+    [positionFilters.minDebtValueInput]
+  )
+
+  const hiddenByDebtValueCount = useMemo(() => {
+    if (minDebtValueThreshold == null) return 0
+    let hidden = 0
+    for (const scored of sortedPositionRows) {
+      const debt = scored.debtValueNum
+      if (debt == null || debt < minDebtValueThreshold) hidden += 1
+    }
+    return hidden
+  }, [sortedPositionRows, minDebtValueThreshold])
+
+  const normalizedBorrowerQuery = useMemo(
+    () => normalizeBorrowerSearchText(positionFilters.borrowerAddress),
+    [positionFilters.borrowerAddress]
+  )
+
+  const filteredPositionRows = useMemo(() => {
+    return sortedPositionRows.filter((scored) => {
+      if (!positionMatchesBorrowerFilter(scored, normalizedBorrowerQuery)) return false
+      if (minDebtValueThreshold != null) {
+        const debt = scored.debtValueNum
+        if (debt == null || debt < minDebtValueThreshold) return false
+      }
+      return true
+    })
+  }, [sortedPositionRows, normalizedBorrowerQuery, minDebtValueThreshold])
+
+  const hotDebtPositionIds = useMemo(
+    () =>
+      resolveHotValuePositionIds(
+        sortedPositionRows.map((scored) => ({
+          id: scored.row.id,
+          value: scored.debtValueNum,
+        }))
+      ),
+    [sortedPositionRows]
+  )
+
+  const hasBorrowerAddressFilter = normalizedBorrowerQuery.length > 0
+  const hasDebtValueFilter = minDebtValueThreshold != null
+
+  const positionsCountLabel = useMemo(() => {
+    if (hasBorrowerAddressFilter || hasDebtValueFilter) {
+      return `${filteredPositionRows.length} of ${sortedPositionRows.length} positions`
+    }
+    return `${positionsTotalRecords} positions`
+  }, [
+    hasBorrowerAddressFilter,
+    hasDebtValueFilter,
+    filteredPositionRows.length,
+    sortedPositionRows.length,
+    positionsTotalRecords,
   ])
 
   const solventSummary = useMemo(() => {
     let insolvent = 0
     let warning = 0
-    for (const row of sortedPositionRows) {
+    for (const row of filteredPositionRows) {
       if (row.isInsolvent) insolvent += 1
       else if (row.isWarning) warning += 1
     }
-    const normal = Math.max(0, sortedPositionRows.length - insolvent - warning)
+    const normal = Math.max(0, filteredPositionRows.length - insolvent - warning)
     return { normal, warning, insolvent }
-  }, [sortedPositionRows])
+  }, [filteredPositionRows])
 
   const filteredRealtimeBorrowersToMonitor = useMemo(() => {
     const rows = positionsQuery.data?.items ?? []
@@ -1717,16 +1915,56 @@ function PositionsPageInner() {
   }, [isRealtimeEnabled, selectedRow, realtimeMonitorKey, realtimeBorrowersToMonitorStable, walletProvider, walletChainId])
 
   const toggleSort = (column: SortColumn) => {
-    if (sortColumn !== column) {
-      setSortColumn(column)
-      setSortDirection('asc')
-      return
-    }
-    setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    replaceSearchParams((params) => {
+      const current = parseMarketSortColumn(params.get('sort')) ?? DEFAULT_MARKET_SORT_COLUMN
+      const currentDir = parseSortDirection(params.get('dir'))
+      params.set('sort', column)
+      if (current !== column) params.set('dir', 'asc')
+      else params.set('dir', currentDir === 'asc' ? 'desc' : 'asc')
+    })
   }
 
-  const updateFilter = (key: keyof ColumnFilters, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
+  const updateFilter = (key: keyof ColumnFilters, value: string | boolean) => {
+    replaceSearchParams((params) => {
+      if (key === 'token') {
+        const trimmed = String(value).trim()
+        if (trimmed) params.set('q', trimmed)
+        else params.delete('q')
+        return
+      }
+      if (value === true) params.delete('hideEmpty')
+      else params.set('hideEmpty', '0')
+    })
+  }
+
+  const toggleChainFilter = (chainId: number) => {
+    replaceSearchParams((params) => {
+      const next = new Set(selectedChains)
+      if (next.has(chainId)) next.delete(chainId)
+      else next.add(chainId)
+      const serialized = serializeChainsParam(next)
+      if (serialized) params.set('chains', serialized)
+      else params.delete('chains')
+    })
+  }
+
+  const clearChainFilter = () => {
+    replaceSearchParams((params) => {
+      params.delete('chains')
+    })
+  }
+
+  const setPositionBorrowerFilter = (value: string) => {
+    replaceSearchParams((params) => {
+      if (value.trim()) params.set('borrower', value)
+      else params.delete('borrower')
+    })
+  }
+
+  const setPositionMinDebtFilter = (value: string) => {
+    replaceSearchParams((params) => {
+      writeMinDebtUrlParam(params, value)
+    })
   }
 
   const sortIndicator = (column: SortColumn): string => {
@@ -1736,16 +1974,20 @@ function PositionsPageInner() {
 
   const positionsSortIndicator = (column: PositionsSortColumn): string => {
     if (positionsSortColumn !== column) return ''
-    return positionsSortDirection === 'asc' ? ' ↑' : ' ↓'
+    return sortDirection === 'asc' ? ' ↑' : ' ↓'
   }
 
   const togglePositionsSort = (column: PositionsSortColumn) => {
-    if (positionsSortColumn !== column) {
-      setPositionsSortColumn(column)
-      setPositionsSortDirection('desc')
-      return
-    }
-    setPositionsSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    replaceSearchParams((params) => {
+      const current = parsePositionsSortColumn(params.get('sort')) ?? DEFAULT_POSITIONS_SORT_COLUMN
+      const currentDir = parseSortDirection(params.get('dir'))
+      params.set('sort', column)
+      if (current === column) {
+        params.set('dir', currentDir === 'asc' ? 'desc' : 'asc')
+      } else {
+        params.set('dir', 'desc')
+      }
+    })
   }
 
   const syncMarketCachesFromPositionsRefresh = async () => {
@@ -1842,29 +2084,38 @@ function PositionsPageInner() {
   }
 
   const openPositionsView = (row: MarketRow) => {
-    const next = new URLSearchParams(searchParams.toString())
-    next.set('view', 'positions')
-    next.set('chain', String(row.chainId))
-    next.set('silo', row.siloAddress)
-    next.delete('offset')
-    void router.replace(`${pathname}?${next.toString()}`, { scroll: false })
+    replaceSearchParams((params) => {
+      params.set('view', 'positions')
+      params.set('chain', String(row.chainId))
+      params.set('silo', row.siloAddress)
+      params.delete('offset')
+      params.delete('borrower')
+      const posSort = parsePositionsSortColumn(params.get('sort'))
+      params.set('sort', posSort ?? DEFAULT_POSITIONS_SORT_COLUMN)
+      if (!posSort) params.set('dir', 'desc')
+    })
   }
 
   const backToMarkets = () => {
-    const next = new URLSearchParams(searchParams.toString())
-    next.delete('view')
-    next.delete('chain')
-    next.delete('silo')
-    next.delete('offset')
-    void router.replace(next.toString() ? `${pathname}?${next.toString()}` : pathname, { scroll: false })
+    replaceSearchParams((params) => {
+      params.delete('view')
+      params.delete('chain')
+      params.delete('silo')
+      params.delete('offset')
+      params.delete('borrower')
+      params.delete('minDebt')
+      const marketSort = parseMarketSortColumn(params.get('sort'))
+      params.set('sort', marketSort ?? DEFAULT_MARKET_SORT_COLUMN)
+      if (!marketSort) params.set('dir', 'desc')
+    })
   }
 
   const jumpPage = (nextOffset: number) => {
     if (config.testDisablePagination) return
     const safe = Math.max(0, nextOffset)
-    const next = new URLSearchParams(searchParams.toString())
-    next.set('offset', String(safe))
-    void router.replace(`${pathname}?${next.toString()}`, { scroll: false })
+    replaceSearchParams((params) => {
+      params.set('offset', String(safe))
+    })
   }
 
   return (
@@ -1928,6 +2179,65 @@ function PositionsPageInner() {
             </p>
           </div>
 
+          <div className="silo-panel p-4 sm:p-5">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="block flex-1 min-w-[12rem] sm:max-w-md">
+                <span className="block text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">
+                  Borrower address
+                </span>
+                <div className="relative">
+                  <input
+                    className="silo-input silo-input--sm w-full pr-7 font-mono"
+                    placeholder="Full or partial address"
+                    value={positionFilters.borrowerAddress}
+                    onChange={(e) => setPositionBorrowerFilter(e.target.value)}
+                  />
+                  {positionFilters.borrowerAddress.trim() ? (
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-3xl leading-none text-[color-mix(in_srgb,var(--silo-text)_45%,transparent)] hover:text-[color-mix(in_srgb,var(--silo-text)_75%,transparent)]"
+                      onClick={() => setPositionBorrowerFilter('')}
+                      aria-label="Clear borrower address filter"
+                      title="Clear"
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </div>
+              </label>
+              <div className="flex items-end gap-2 shrink-0">
+                <label className="block w-28">
+                  <span className="block text-xs font-semibold uppercase tracking-wide silo-text-soft mb-1">
+                    Min debt value
+                  </span>
+                  <div className="relative">
+                    <input
+                      className="silo-input silo-input--sm w-full pr-7 tabular-nums"
+                      inputMode="decimal"
+                      placeholder={DEFAULT_POSITION_MIN_DEBT_VALUE}
+                      value={positionFilters.minDebtValueInput}
+                      onChange={(e) => setPositionMinDebtFilter(e.target.value)}
+                    />
+                    {positionFilters.minDebtValueInput.trim() ? (
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-3xl leading-none text-[color-mix(in_srgb,var(--silo-text)_45%,transparent)] hover:text-[color-mix(in_srgb,var(--silo-text)_75%,transparent)]"
+                        onClick={() => setPositionMinDebtFilter('')}
+                        aria-label="Clear min debt value filter"
+                        title="Clear"
+                      >
+                        ×
+                      </button>
+                    ) : null}
+                  </div>
+                </label>
+                <span className="pb-2 text-xs silo-text-soft whitespace-nowrap tabular-nums">
+                  ({hiddenByDebtValueCount} hidden)
+                </span>
+              </div>
+            </div>
+          </div>
+
           {positionsQuery.isLoading ? (
             <div className="silo-panel p-5">
               <p className="text-sm silo-text-soft m-0">Loading positions…</p>
@@ -1940,7 +2250,7 @@ function PositionsPageInner() {
             <>
               <div className="flex items-center justify-between gap-3 px-1">
                 <span className="text-xs text-[color-mix(in_srgb,var(--silo-text)_74%,#1f2430)]">
-                  {positionsTotalRecords} positions
+                  {positionsCountLabel}
                   {positionsPageLabel ? ` • ${positionsPageLabel}` : ''}
                 </span>
                 <div className="inline-flex items-center gap-3">
@@ -1976,18 +2286,18 @@ function PositionsPageInner() {
                         Borrower
                       </th>
                       <th
-                        className={`text-left px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
+                        className={`text-right px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
                         title={isRealtimeEnabled ? 'Not updated during LIVE refresh' : undefined}
                       >
-                        <button type="button" onClick={() => togglePositionsSort('collateralValue')}>
+                        <button type="button" onClick={() => togglePositionsSort('collateralValue')} className="w-full text-right">
                           Collateral Value{positionsSortIndicator('collateralValue')}
                         </button>
                       </th>
                       <th
-                        className={`text-left px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
+                        className={`text-right px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
                         title={isRealtimeEnabled ? 'Not updated during LIVE refresh' : undefined}
                       >
-                        <button type="button" onClick={() => togglePositionsSort('debtValue')}>
+                        <button type="button" onClick={() => togglePositionsSort('debtValue')} className="w-full text-right">
                           Debt Value{positionsSortIndicator('debtValue')}
                         </button>
                       </th>
@@ -2078,7 +2388,7 @@ function PositionsPageInner() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedPositionRows.map(
+                    {filteredPositionRows.map(
                       ({
                         row,
                         effectiveLtvRaw,
@@ -2164,21 +2474,30 @@ function PositionsPageInner() {
                                 ) : null}
                               </div>
                             </td>
-                            <td className={`px-4 py-3 ${staleColumnClass}`}>
-                              {formatScaledValue(row.collateralValue, 18, 2)}
-                              {row.collateralValue ? (
-                                <span className={`ml-1 ${symbolToneClass}`}>
-                                  {selectedRow.quoteTokenSymbol ?? selectedRow.tokenSymbol ?? ''}
+                            <td className={`px-4 py-3 text-right ${staleColumnClass}`}>
+                              <span className="inline-flex flex-wrap items-baseline justify-end gap-x-1.5 w-full tabular-nums leading-none">
+                                <span className="inline-flex items-baseline gap-1">
+                                  <span>{formatScaledValue(row.collateralValue, 18, 2)}</span>
                                 </span>
-                              ) : null}
+                                {row.collateralValue ? (
+                                  <span className={symbolToneClass}>
+                                    {selectedRow.quoteTokenSymbol ?? selectedRow.tokenSymbol ?? ''}
+                                  </span>
+                                ) : null}
+                              </span>
                             </td>
-                            <td className={`px-4 py-3 ${staleColumnClass}`}>
-                              {formatScaledValue(row.debtValue, 18, 2)}
-                              {row.debtValue ? (
-                                <span className={`ml-1 ${symbolToneClass}`}>
-                                  {selectedRow.quoteTokenSymbol ?? selectedRow.tokenSymbol ?? ''}
+                            <td className={`px-4 py-3 text-right ${staleColumnClass}`}>
+                              <span className="inline-flex flex-wrap items-baseline justify-end gap-x-1.5 w-full tabular-nums leading-none">
+                                <span className="inline-flex items-baseline gap-1">
+                                  {hotDebtPositionIds.has(row.id) ? <HotValueFlame /> : null}
+                                  <span>{formatScaledValue(row.debtValue, 18, 2)}</span>
                                 </span>
-                              ) : null}
+                                {row.debtValue ? (
+                                  <span className={symbolToneClass}>
+                                    {selectedRow.quoteTokenSymbol ?? selectedRow.tokenSymbol ?? ''}
+                                  </span>
+                                ) : null}
+                              </span>
                             </td>
                             <td className={`px-4 py-3 ${liveMetricClass}`}>
                               <span className="inline-flex items-center gap-1.5">
@@ -2239,6 +2558,12 @@ function PositionsPageInner() {
                       <tr>
                         <td colSpan={8} className="px-4 py-4 text-sm silo-text-soft">
                           No open positions returned for this market.
+                        </td>
+                      </tr>
+                    ) : filteredPositionRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-4 text-sm silo-text-soft">
+                          No positions match the current filters.
                         </td>
                       </tr>
                     ) : null}
@@ -2314,9 +2639,12 @@ function PositionsPageInner() {
                           <input
                             type="checkbox"
                             checked={filters.hideZeroPositions}
-                            onChange={(e) => setFilters((prev) => ({ ...prev, hideZeroPositions: e.target.checked }))}
+                            onChange={(e) => updateFilter('hideZeroPositions', e.target.checked)}
                           />
-                          <span>Hide markets without positions</span>
+                          <span>
+                            Hide markets without positions
+                            <span className="silo-text-faint"> ({hiddenMarketsWithoutPositionsCount} hidden)</span>
+                          </span>
                         </label>
                       </div>
                     </label>
@@ -2334,14 +2662,7 @@ function PositionsPageInner() {
                               type="button"
                               className="silo-btn-secondary text-xs inline-flex items-center gap-2"
                               aria-pressed={isSelected}
-                              onClick={() =>
-                                setSelectedChains((prev) => {
-                                  const next = new Set(prev)
-                                  if (next.has(chainId)) next.delete(chainId)
-                                  else next.add(chainId)
-                                  return next
-                                })
-                              }
+                              onClick={() => toggleChainFilter(chainId)}
                             >
                               {iconPath ? (
                                 <Image
@@ -2360,7 +2681,7 @@ function PositionsPageInner() {
                           type="button"
                           className="silo-btn-secondary text-xs"
                           aria-pressed={selectedChains.size === 0}
-                          onClick={() => setSelectedChains(new Set())}
+                          onClick={clearChainFilter}
                         >
                           All networks
                         </button>

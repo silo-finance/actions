@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.25.0] - 2026-05-19
+
+### Added
+- fix sorting by values
+- improve filters
+
 ## [0.24.6] - 2026-05-19
 
 ### Fixed
