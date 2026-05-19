@@ -314,6 +314,40 @@ def get_default_borrowers_input(chain: str) -> str:
   return str(Path(__file__).with_name(f"{chain}_borrowers.json"))
 
 
+def load_legacy_whitelist_market_ids(chain: str) -> set[str] | None:
+  path = (
+    Path(__file__).resolve().parents[2]
+    / "src"
+    / "data"
+    / "positions"
+    / f"legacy_whitelist_{chain}.json"
+  )
+  if not path.exists():
+    return None
+  payload = json.loads(path.read_text(encoding="utf-8"))
+  items: list[str]
+  if isinstance(payload, list):
+    items = [str(entry) for entry in payload]
+  elif isinstance(payload, dict) and isinstance(payload.get("silos"), list):
+    items = [str(entry) for entry in payload["silos"]]
+  else:
+    raise ValueError(f"Invalid whitelist format in {path}")
+  normalized = {
+    entry.strip().lower()
+    for entry in items
+    if isinstance(entry, str) and len(entry.strip()) == 42 and entry.strip().lower().startswith("0x")
+  }
+  return normalized
+
+
+def filter_borrowers_by_legacy_whitelist(
+  borrowers: list[dict[str, Any]], legacy_whitelist: set[str] | None
+) -> list[dict[str, Any]]:
+  if legacy_whitelist is None:
+    return borrowers
+  return [row for row in borrowers if row.get("debt_market_id") in legacy_whitelist]
+
+
 def get_default_positions_output(chain: str) -> str:
   return str(Path(__file__).with_name(f"{chain}_positions.json"))
 
@@ -332,6 +366,8 @@ def main() -> None:
   output_path = get_default_positions_output(chain)
   public_output_path = get_default_public_positions_output(chain)
   borrowers = read_borrowers(input_path)
+  legacy_whitelist = load_legacy_whitelist_market_ids(chain)
+  borrowers = filter_borrowers_by_legacy_whitelist(borrowers, legacy_whitelist)
   generated_at = int(time.time())
 
   if not borrowers:
