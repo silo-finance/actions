@@ -61,7 +61,7 @@
           "callBeforeQuote": false
         }
       },
-      "marketVersion": "legacy"
+      "marketVersion": "v3"
     },
     {
       "chainId": 146,
