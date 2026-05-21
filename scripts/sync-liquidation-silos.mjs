@@ -609,10 +609,14 @@ async function runAddOrRefreshSingle() {
   const outWithVersion = out.map((row) => {
     const isTarget = normalizeAddress(row.siloAddress) === siloAddress
     const existing = existingBySilo.get(normalizeAddress(row.siloAddress))
+    const siloId = Number(row.siloId)
+    const forceV3BySiloId = Number.isFinite(siloId) && siloId > 3000
     const marketVersion = isTarget
-      ? apiMatch
+      ? forceV3BySiloId
         ? 'v3'
-        : 'legacy'
+        : apiMatch
+          ? 'v3'
+          : 'legacy'
       : existing?.marketVersion === 'legacy'
         ? 'legacy'
         : 'v3'
