@@ -2818,7 +2818,6 @@ function FragmentRow({
   hasCountsError: boolean
   hasPrefetchError: boolean
 }) {
-  const canOpenPositions = (row.positionsCount ?? 0) > 0
   const warningCount = row.warningPositionsCount ?? 0
   const insolventCount = row.insolventPositionsCount ?? 0
   const showLiquidityStressAlert =
@@ -2940,50 +2939,34 @@ function FragmentRow({
           />
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
-          {row.positionsCount == null ? (
-            isCountsLoading || !hasCountsError ? <InlineLoadingHint /> : '—'
-          ) : canOpenPositions ? (
-            <button
-              type="button"
-              onClick={onOpenPositions}
-              className="inline-flex items-center gap-2 font-semibold hover:underline"
-              title="Open positions"
-            >
-              <span className="text-[var(--silo-text)]">{row.positionsCount}</span>
-              <span className={warningCount === 0 ? 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)] opacity-30' : 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)]'}>
-                {row.warningPositionsCount == null
-                  ? isPrefetchLoading || !hasPrefetchError
-                    ? <InlineLoadingHint />
-                    : warningCount
-                  : warningCount}
-              </span>
-              <span className={insolventCount === 0 ? 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] opacity-30' : 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)]'}>
-                {row.insolventPositionsCount == null
-                  ? isPrefetchLoading || !hasPrefetchError
-                    ? <InlineLoadingHint />
-                    : insolventCount
-                  : insolventCount}
-              </span>
-            </button>
-          ) : (
-            <span className="inline-flex items-center gap-2">
-              <span className="silo-text-soft">{row.positionsCount ?? '—'}</span>
-              <span className={warningCount === 0 ? 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)] opacity-30' : 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)]'}>
-                {row.warningPositionsCount == null
-                  ? isPrefetchLoading || !hasPrefetchError
-                    ? <InlineLoadingHint />
-                    : warningCount
-                  : warningCount}
-              </span>
-              <span className={insolventCount === 0 ? 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] opacity-30' : 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)]'}>
-                {row.insolventPositionsCount == null
-                  ? isPrefetchLoading || !hasPrefetchError
-                    ? <InlineLoadingHint />
-                    : insolventCount
-                  : insolventCount}
-              </span>
+          <button
+            type="button"
+            onClick={onOpenPositions}
+            className="inline-flex items-center gap-2 font-semibold hover:underline"
+            title="Open positions"
+          >
+            <span className="text-[var(--silo-text)]">
+              {row.positionsCount == null
+                ? isCountsLoading || !hasCountsError
+                  ? <InlineLoadingHint />
+                  : '—'
+                : row.positionsCount}
             </span>
-          )}
+            <span className={warningCount === 0 ? 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)] opacity-30' : 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)]'}>
+              {row.warningPositionsCount == null
+                ? isPrefetchLoading || !hasPrefetchError
+                  ? <InlineLoadingHint />
+                  : warningCount
+                : warningCount}
+            </span>
+            <span className={insolventCount === 0 ? 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] opacity-30' : 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)]'}>
+              {row.insolventPositionsCount == null
+                ? isPrefetchLoading || !hasPrefetchError
+                  ? <InlineLoadingHint />
+                  : insolventCount
+                : insolventCount}
+            </span>
+          </button>
         </td>
       </tr>
       {row.needsSanityAlert ? (
