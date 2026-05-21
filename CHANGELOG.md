@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.25.3] - 2026-05-21
+
+### Fixed
+- always show possitions page
+- fix condition for v3 markets
+
 ## [0.25.2] - 2026-05-19
 
 ### Fixed
