@@ -2892,25 +2892,52 @@ function FragmentRow({
         </td>
         <td className="px-4 py-3">
           <p className="text-sm font-mono break-all m-0">
-            <a
-              href={getExplorerAddressUrl(row.chainId, row.siloAddress)}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[var(--silo-text)] hover:underline"
-            >
-              {shortenSiloAddress(row.siloAddress)}
-            </a>
+            <span className="inline-flex items-center gap-1.5">
+              <a
+                href={getExplorerAddressUrl(row.chainId, row.siloAddress)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[var(--silo-text)] hover:underline"
+              >
+                {shortenSiloAddress(row.siloAddress)}
+              </a>
+              <button
+                type="button"
+                className="text-xs silo-text-soft hover:silo-text-main"
+                aria-label="Copy silo address"
+                title="Copy silo address"
+                onClick={() => {
+                  void copyToClipboard(row.siloAddress)
+                }}
+              >
+                ⧉
+              </button>
+            </span>
             {row.otherSiloAddress ? (
               <>
                 {' '}
-                <a
-                  href={getExplorerAddressUrl(row.chainId, row.otherSiloAddress)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs silo-text-faint hover:underline"
-                >
-                  other silo
-                </a>
+                <span className="inline-flex items-center gap-1">
+                  <a
+                    href={getExplorerAddressUrl(row.chainId, row.otherSiloAddress)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs silo-text-faint hover:underline"
+                  >
+                    other silo
+                  </a>
+                  <button
+                    type="button"
+                    className="text-xs silo-text-faint hover:silo-text-main"
+                    aria-label="Copy other silo address"
+                    title="Copy other silo address"
+                    onClick={() => {
+                      if (!row.otherSiloAddress) return
+                      void copyToClipboard(row.otherSiloAddress)
+                    }}
+                  >
+                    ⧉
+                  </button>
+                </span>
               </>
             ) : null}
           </p>
