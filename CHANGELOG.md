@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.27.0] - 2026-05-22
+
+### Added
+- update readme
+- add copy buttons for silo addresses
+- fix path
+- rename workflows
+
 ## [0.26.0] - 2026-05-22
 
 ### Added

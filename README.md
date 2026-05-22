@@ -38,9 +38,9 @@ The `Positions` page reads static market metadata from local snapshot files in `
 
 Snapshot maintenance is CI-driven:
 
-- `.github/workflows/liquidation-full-refresh.yml`
-- `.github/workflows/liquidation-add-silo.yml`
-- `.github/workflows/liquidation-remove-silo.yml`
+- `.github/workflows/full-refresh-silos.yml`
+- `.github/workflows/add-any-silo.yml`
+- `.github/workflows/remove-any-silo.yml`
 
 Local sync commands:
 
