@@ -62,8 +62,17 @@ type MarketRow = {
   marketTokenPair: string
   tokenDecimals: number | null
   totalAssets: bigint | null
-  liquidity: bigint | null
   totalDebt: bigint | null
+  liquidity: bigint | null
+  externalLiquidity: bigint | null
+  hasExternalLiquiditySource: boolean | null
+  externalLiquiditySources:
+    | Array<{
+        sourceAddress: string
+        amount: bigint
+        version: string
+      }>
+    | null
   otherTotalAssets: bigint | null
   otherLiquidity: bigint | null
   otherTotalDebt: bigint | null
@@ -196,6 +205,13 @@ type PersistedDynamicState = {
   interest: string
   liquidity: string
   totalDebt: string
+  externalLiquidity: string
+  hasExternalLiquiditySource: boolean
+  externalLiquiditySources: Array<{
+    sourceAddress: string
+    amount: string
+    version: string
+  }>
 }
 
 type PrefetchedMarketPositionsEntry = {
@@ -359,14 +375,42 @@ function formatPositionAge(rawTimestamp: string | null, nowMs: number): string {
   return formatEnglishCount(ageYears, 'year')
 }
 
-function formatMetric(value: bigint | null, decimals: number | null): string {
+function formatMetric(value: bigint | null, decimals: number | null, maximumFractionDigits = 3): string {
   if (value == null) return '—'
   const parsed = Number(formatUnits(value, decimals ?? 18))
   if (!Number.isFinite(parsed)) return '—'
   return parsed.toLocaleString(undefined, {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 3,
+    maximumFractionDigits,
   })
+}
+
+function formatMetricFixed(value: bigint | null, decimals: number | null, fractionDigits: number): string {
+  if (value == null) return '—'
+  const parsed = Number(formatUnits(value, decimals ?? 18))
+  if (!Number.isFinite(parsed)) return '—'
+  return parsed.toLocaleString(undefined, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })
+}
+
+function formatWholeTokenMetric(value: bigint | null, decimals: number | null): string {
+  if (value == null) return '—'
+  const normalized = formatUnits(value, Math.max(0, decimals ?? 18))
+  const [wholePartRaw] = normalized.split('.')
+  const wholeTokens = BigInt(wholePartRaw ?? '0')
+  return wholeTokens.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })
+}
+
+function formatExternalSourceName(versionLabel: string): string {
+  const normalized = versionLabel.trim()
+  if (!normalized) return '?'
+  const [name] = normalized.split(/\s+/)
+  return name || '?'
 }
 
 function compareValues(a: string | number | bigint | null, b: string | number | bigint | null): number {
@@ -555,9 +599,58 @@ function shouldMonitorPositionInRealtime({
   return isWarning || isInsolvent || isOlderThanThreshold
 }
 
-async function copyToClipboard(value: string): Promise<void> {
-  if (typeof navigator === 'undefined' || !navigator.clipboard) return
-  await navigator.clipboard.writeText(value)
+async function copyToClipboard(value: string): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.clipboard) return false
+  try {
+    await navigator.clipboard.writeText(value)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function InlineCopyIconButton({
+  value,
+  copyLabel,
+  className = '',
+}: {
+  value: string
+  copyLabel: string
+  className?: string
+}) {
+  const [copied, setCopied] = useState(false)
+
+  const handleClick = useCallback(async () => {
+    const didCopy = await copyToClipboard(value)
+    if (!didCopy) return
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
+  }, [value])
+
+  return (
+    <button
+      type="button"
+      className={`${className} inline-flex items-center justify-center min-w-4`}
+      aria-label={copyLabel}
+      title={copied ? 'Copied' : copyLabel}
+      onClick={() => {
+        void handleClick()
+      }}
+    >
+      {copied ? (
+        <svg
+          className="w-3.5 h-3.5 text-[color-mix(in_srgb,var(--silo-success)_96%,#0b5d3f)]"
+          viewBox="0 0 16 16"
+          fill="none"
+          aria-hidden
+        >
+          <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : (
+        '⧉'
+      )}
+    </button>
+  )
 }
 
 function isZeroLt(raw: string | null): boolean {
@@ -614,6 +707,13 @@ function serializeDynamicStateMap(map: Map<string, DynamicStateType>) {
       interest: value.interest.toString(),
       liquidity: value.liquidity.toString(),
       totalDebt: value.totalDebt.toString(),
+      externalLiquidity: value.externalLiquidity.toString(),
+      hasExternalLiquiditySource: value.hasExternalLiquiditySource,
+      externalLiquiditySources: value.externalLiquiditySources.map((source) => ({
+        sourceAddress: source.sourceAddress,
+        amount: source.amount.toString(),
+        version: source.version,
+      })),
     } satisfies PersistedDynamicState,
   ] as const)
 }
@@ -665,6 +765,13 @@ function deserializeDynamicStateMap(
       interest: BigInt(value.interest),
       liquidity: BigInt(value.liquidity),
       totalDebt: BigInt(value.totalDebt),
+      externalLiquidity: BigInt(value.externalLiquidity ?? '0'),
+      hasExternalLiquiditySource: Boolean(value.hasExternalLiquiditySource),
+      externalLiquiditySources: (value.externalLiquiditySources ?? []).map((source) => ({
+        sourceAddress: source.sourceAddress,
+        amount: BigInt(source.amount ?? '0'),
+        version: source.version ?? '?',
+      })),
     })
   }
   return out
@@ -682,6 +789,7 @@ function InlineLoadingHint() {
 function OtherSiloMetricSubline({
   value,
   decimals,
+  maximumFractionDigits = 3,
   enabled,
   isLoading,
   hasError,
@@ -689,11 +797,12 @@ function OtherSiloMetricSubline({
   value: bigint | null
   /** From snapshot `otherSilo.tokenDecimals` (paired token may differ from primary). */
   decimals: number | null
+  maximumFractionDigits?: number
   enabled: boolean
   isLoading: boolean
   hasError: boolean
 }) {
-  if (!enabled) return null
+  if (!enabled) return <MetricSublineSpacer />
   return (
     <div className="text-xs mt-1 silo-text-faint tabular-nums">
       {value == null ? (
@@ -703,8 +812,16 @@ function OtherSiloMetricSubline({
           '—'
         )
       ) : (
-        formatMetric(value, decimals)
+        formatMetric(value, decimals, maximumFractionDigits)
       )}
+    </div>
+  )
+}
+
+function MetricSublineSpacer() {
+  return (
+    <div className="text-xs mt-1 tabular-nums select-none" aria-hidden>
+      &nbsp;
     </div>
   )
 }
@@ -1236,8 +1353,11 @@ function PositionsPageInner() {
       return {
         ...row,
         totalAssets: d?.totalAssets ?? null,
-        liquidity: d?.liquidity ?? null,
         totalDebt,
+        liquidity: d?.liquidity ?? null,
+        externalLiquidity: d?.externalLiquidity ?? null,
+        hasExternalLiquiditySource: d ? d.hasExternalLiquiditySource : null,
+        externalLiquiditySources: d?.externalLiquiditySources ?? null,
         otherTotalAssets: otherD?.totalAssets ?? null,
         otherLiquidity: otherD?.liquidity ?? null,
         otherTotalDebt: otherD?.totalDebt ?? null,
@@ -2173,9 +2293,17 @@ function PositionsPageInner() {
         <div className="space-y-4">
           <div className="silo-panel p-5">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-              <h2 className="text-xl font-semibold silo-text-main m-0">
-                {selectedRow.tokenSymbol ?? selectedRow.quoteTokenSymbol ?? 'Unknown'}
-              </h2>
+              <div className="inline-flex flex-wrap items-center gap-3">
+                <h2 className="text-xl font-semibold silo-text-main m-0">
+                  {selectedRow.tokenSymbol ?? selectedRow.quoteTokenSymbol ?? 'Unknown'}
+                </h2>
+                <span className="ml-6 text-sm text-[var(--silo-text)]">
+                  total assets {formatMetricFixed(selectedRow.totalAssets, selectedRow.tokenDecimals, 4)}
+                </span>
+                <span className="text-sm text-[var(--silo-text)]">
+                  total debt {formatMetricFixed(selectedRow.totalDebt, selectedRow.tokenDecimals, 4)}
+                </span>
+              </div>
               <button type="button" onClick={backToMarkets} className="silo-btn-secondary">
                 Back to markets
               </button>
@@ -2205,17 +2333,11 @@ function PositionsPageInner() {
               >
                 <span>{shortenAddress(selectedRow.siloAddress)}</span>
               </a>
-              <button
-                type="button"
+              <InlineCopyIconButton
+                value={selectedRow.siloAddress}
+                copyLabel="Copy market address"
                 className="text-xs ml-1 silo-text-soft hover:silo-text-main"
-                aria-label="Copy market address"
-                title="Copy market address"
-                onClick={() => {
-                  void copyToClipboard(selectedRow.siloAddress)
-                }}
-              >
-                ⧉
-              </button>
+              />
               <span className="ml-4">{selectedRow.marketTokenPair}</span>
               <span className="ml-4 text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] font-semibold">LT {positionLtLabel}</span>
               <span className="ml-4">{selectedRow.marketVersion === 'legacy' ? 'Legacy Market' : 'V3 Market'}</span>
@@ -2525,17 +2647,11 @@ function PositionsPageInner() {
                                   <span>{shortenAddress(row.accountId)}</span>
                                 )}
                                 {borrowerAddress ? (
-                                  <button
-                                    type="button"
+                                  <InlineCopyIconButton
+                                    value={borrowerAddress}
+                                    copyLabel="Copy borrower address"
                                     className="text-xs silo-text-soft hover:silo-text-main"
-                                    aria-label="Copy borrower address"
-                                    title="Copy borrower address"
-                                    onClick={() => {
-                                      void copyToClipboard(borrowerAddress)
-                                    }}
-                                  >
-                                    ⧉
-                                  </button>
+                                  />
                                 ) : null}
                               </div>
                             </td>
@@ -2799,15 +2915,16 @@ function PositionsPageInner() {
                         </button>
                       </th>
                       <th className="text-right px-4 py-3 font-semibold">
-                        <button type="button" onClick={() => toggleSort('liquidity')}>
-                          Liquidity{sortIndicator('liquidity')}
-                        </button>
-                      </th>
-                      <th className="text-right px-4 py-3 font-semibold">
                         <button type="button" onClick={() => toggleSort('totalDebt')}>
                           Total Debt{sortIndicator('totalDebt')}
                         </button>
                       </th>
+                      <th className="text-right px-4 py-3 font-semibold">
+                        <button type="button" onClick={() => toggleSort('liquidity')}>
+                          Liquidity{sortIndicator('liquidity')}
+                        </button>
+                      </th>
+                      <th className="text-right px-4 py-3 font-semibold">External Liquidity</th>
                       <th className="text-right px-4 py-3 font-semibold">
                         <button type="button" onClick={() => toggleSort('positions')}>
                           Positions{sortIndicator('positions')}
@@ -2835,7 +2952,7 @@ function PositionsPageInner() {
                     ))}
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-4 py-5 text-sm silo-text-soft">
+                        <td colSpan={8} className="px-4 py-5 text-sm silo-text-soft">
                           {marketRows.length === 0 ? 'No markets available in snapshot.' : 'No markets match this filter.'}
                         </td>
                       </tr>
@@ -2873,7 +2990,8 @@ function FragmentRow({
     row.liquidity !== null &&
     row.totalDebt !== null &&
     row.liquidity === BIGINT_ZERO &&
-    row.totalDebt > BIGINT_ZERO
+    row.totalDebt > BIGINT_ZERO &&
+    !(row.hasExternalLiquiditySource === true && row.externalLiquidity != null && row.externalLiquidity > BIGINT_ZERO)
   const hasRiskyPositions = warningCount > 0 || insolventCount > 0
   const liquidityStressAlertCount: 1 | 2 = hasRiskyPositions ? 2 : 1
   const liquidityStressAlertTone: 'danger' | 'warning' = hasRiskyPositions ? 'danger' : 'warning'
@@ -2905,17 +3023,11 @@ function FragmentRow({
               >
                 {shortenSiloAddress(row.siloAddress)}
               </a>
-              <button
-                type="button"
+              <InlineCopyIconButton
+                value={row.siloAddress}
+                copyLabel="Copy silo address"
                 className="text-xs silo-text-soft hover:silo-text-main"
-                aria-label="Copy silo address"
-                title="Copy silo address"
-                onClick={() => {
-                  void copyToClipboard(row.siloAddress)
-                }}
-              >
-                ⧉
-              </button>
+              />
             </span>
             {row.otherSiloAddress ? (
               <>
@@ -2929,18 +3041,11 @@ function FragmentRow({
                   >
                     other silo
                   </a>
-                  <button
-                    type="button"
+                  <InlineCopyIconButton
+                    value={row.otherSiloAddress}
+                    copyLabel="Copy other silo address"
                     className="text-xs silo-text-faint hover:silo-text-main"
-                    aria-label="Copy other silo address"
-                    title="Copy other silo address"
-                    onClick={() => {
-                      if (!row.otherSiloAddress) return
-                      void copyToClipboard(row.otherSiloAddress)
-                    }}
-                  >
-                    ⧉
-                  </button>
+                  />
                 </span>
               </>
             ) : null}
@@ -2967,21 +3072,14 @@ function FragmentRow({
                 <span>{row.tokenSymbol ?? 'Unknown'}</span>
               )}
               {row.tokenAddress ? (
-                <button
-                  type="button"
+                <InlineCopyIconButton
+                  value={row.tokenAddress}
+                  copyLabel="Copy token address"
                   className="text-xs silo-text-soft hover:silo-text-main"
-                  aria-label="Copy token address"
-                  title="Copy token address"
-                  onClick={() => {
-                    if (!row.tokenAddress) return
-                    void copyToClipboard(row.tokenAddress)
-                  }}
-                >
-                  ⧉
-                </button>
+                />
               ) : null}
             </div>
-          {row.otherTokenSymbol ? (
+            {row.otherTokenSymbol ? (
               <div className="text-xs mt-1 silo-text-faint inline-flex items-center gap-1.5">
                 {row.otherTokenAddress ? (
                   <a
@@ -2997,21 +3095,14 @@ function FragmentRow({
                   <span>{row.otherTokenSymbol}</span>
                 )}
                 {row.otherTokenAddress ? (
-                  <button
-                    type="button"
+                  <InlineCopyIconButton
+                    value={row.otherTokenAddress}
+                    copyLabel="Copy other token address"
                     className="text-xs silo-text-faint hover:silo-text-main"
-                    aria-label="Copy other token address"
-                    title="Copy other token address"
-                    onClick={() => {
-                      if (!row.otherTokenAddress) return
-                      void copyToClipboard(row.otherTokenAddress)
-                    }}
-                  >
-                    ⧉
-                  </button>
+                  />
                 ) : null}
               </div>
-          ) : null}
+            ) : null}
           </div>
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
@@ -3019,10 +3110,24 @@ function FragmentRow({
             ? isDynamicLoading || !hasDynamicError
               ? <InlineLoadingHint />
               : '—'
-            : formatMetric(row.totalAssets, row.tokenDecimals)}
+            : formatMetric(row.totalAssets, row.tokenDecimals, 0)}
           <OtherSiloMetricSubline
             value={row.otherTotalAssets}
             decimals={row.otherTokenDecimals}
+            maximumFractionDigits={0}
+            enabled={row.otherSiloAddress != null}
+            isLoading={isDynamicLoading}
+            hasError={hasDynamicError}
+          />
+        </td>
+        <td className="px-4 py-3 text-right tabular-nums">
+          {row.totalDebt == null
+            ? (isDynamicLoading || !hasDynamicError ? <InlineLoadingHint /> : '—')
+            : formatMetric(row.totalDebt, row.tokenDecimals, 0)}
+          <OtherSiloMetricSubline
+            value={row.otherTotalDebt}
+            decimals={row.otherTokenDecimals}
+            maximumFractionDigits={0}
             enabled={row.otherSiloAddress != null}
             isLoading={isDynamicLoading}
             hasError={hasDynamicError}
@@ -3063,14 +3168,33 @@ function FragmentRow({
           />
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
-          {row.totalDebt == null ? (isDynamicLoading || !hasDynamicError ? <InlineLoadingHint /> : '—') : formatMetric(row.totalDebt, row.tokenDecimals)}
-          <OtherSiloMetricSubline
-            value={row.otherTotalDebt}
-            decimals={row.otherTokenDecimals}
-            enabled={row.otherSiloAddress != null}
-            isLoading={isDynamicLoading}
-            hasError={hasDynamicError}
-          />
+          {row.hasExternalLiquiditySource === false ? (
+            'N/A'
+          ) : row.externalLiquiditySources != null && row.externalLiquiditySources.length > 0 ? (
+            row.externalLiquiditySources.map((source) => (
+              <div
+                key={source.sourceAddress}
+                className="mt-1 tabular-nums inline-flex flex-col items-end w-full"
+              >
+                <span className="text-sm text-[var(--silo-text)]">
+                  {formatWholeTokenMetric(source.amount, row.tokenDecimals)}
+                </span>
+                <a
+                  href={getExplorerAddressUrl(row.chainId, source.sourceAddress)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs silo-text-faint hover:underline"
+                  title={source.sourceAddress}
+                >
+                  {formatExternalSourceName(source.version)}
+                </a>
+              </div>
+            ))
+          ) : row.externalLiquidity == null ? (
+            isDynamicLoading || !hasDynamicError ? <InlineLoadingHint /> : '—'
+          ) : (
+            formatWholeTokenMetric(row.externalLiquidity, row.tokenDecimals)
+          )}
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
           <button
@@ -3105,7 +3229,7 @@ function FragmentRow({
       </tr>
       {row.needsSanityAlert ? (
         <tr className="border-t border-[var(--silo-border)] bg-[color-mix(in_srgb,var(--silo-danger)_10%,var(--silo-surface))]">
-          <td colSpan={7} className="px-4 py-2 text-xs text-[color-mix(in_srgb,var(--silo-danger)_75%,var(--silo-text))]">
+          <td colSpan={8} className="px-4 py-2 text-xs text-[color-mix(in_srgb,var(--silo-danger)_75%,var(--silo-text))]">
             Sanity check: Graph returns zero open positions while on-chain debt is greater than zero.
           </td>
         </tr>

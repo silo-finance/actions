@@ -1,7 +1,7 @@
 import { Contract, JsonRpcProvider, type InterfaceAbi, type Provider, formatUnits } from 'ethers'
 import SiloAbi from '@/abis/Silo.json'
 import SiloLensAbi from '@/abis/ISiloLens.json'
-import { executeReadMulticall, buildReadMulticallCall } from '@/utils/readMulticall'
+import { executeReadMulticall, buildReadMulticallCall, type ReadMulticallCall } from '@/utils/readMulticall'
 import { NETWORK_CONFIGS } from '@/utils/networks'
 import type { LiquidationSnapshotEntry } from '@/utils/liquidationSnapshot'
 
@@ -13,6 +13,19 @@ const BIGINT_ZERO = BigInt(0)
 const SiloLensInterfaceAbi = (SiloLensAbi as { abi?: InterfaceAbi }).abi ?? []
 const SILO_LENS_DEPLOYMENTS_BASE_URL =
   'https://raw.githubusercontent.com/silo-finance/silo-contracts-v3/develop/silo-core/deployments'
+const FLASHLOAN_SOURCES_URL =
+  'https://raw.githubusercontent.com/silo-finance/silo-contracts-v3/refs/heads/master/common/externalFlashloan/flashloanSources.json'
+const externalFlashloanSourcesPromiseCache = new Map<number, Promise<Map<string, string[]>>>()
+
+type ExternalFlashloanSourcesPayload = Record<string, Record<string, string[]>>
+
+function resolveExternalFlashloanChainKeys(chainName: string): string[] {
+  const normalized = chainName.trim().toLowerCase()
+  if (!normalized) return []
+  const variants = new Set<string>([normalized, normalized.replace(/_/g, '-')])
+  if (normalized === 'arbitrum_one') variants.add('arbitrum-one')
+  return Array.from(variants)
+}
 
 function getRpcOverrideUrl(chainId: number): string | null {
   const envByChain: Record<number, Array<string | undefined>> = {
@@ -114,6 +127,13 @@ export type LiquidationMarketDynamicState = {
   interest: bigint
   liquidity: bigint
   totalDebt: bigint
+  externalLiquidity: bigint
+  hasExternalLiquiditySource: boolean
+  externalLiquiditySources: Array<{
+    sourceAddress: string
+    amount: bigint
+    version: string
+  }>
 }
 
 /** Primary silo plus paired `otherSilo` addresses, deduped by lowercase key. */
@@ -127,6 +147,71 @@ function collectUniqueSiloAddresses(entries: LiquidationSnapshotEntry[]): string
   return Array.from(byLower.values())
 }
 
+function normalizeAddress(raw: string): string | null {
+  const trimmed = raw.trim()
+  return /^0x[0-9a-fA-F]{40}$/.test(trimmed) ? trimmed.toLowerCase() : null
+}
+
+function collectPrimaryTokenAddresses(entries: LiquidationSnapshotEntry[]): string[] {
+  const out = new Map<string, string>()
+  for (const entry of entries) {
+    const normalized = entry.tokenAddress ? normalizeAddress(entry.tokenAddress) : null
+    if (normalized) out.set(normalized, normalized)
+  }
+  return Array.from(out.values())
+}
+
+function buildTokenAddressBySilo(entries: LiquidationSnapshotEntry[]): Map<string, string | null> {
+  const out = new Map<string, string | null>()
+  for (const entry of entries) {
+    const siloAddress = normalizeAddress(entry.siloAddress)
+    if (siloAddress) {
+      out.set(siloAddress, entry.tokenAddress ? normalizeAddress(entry.tokenAddress) : null)
+    }
+    const otherSiloAddress = entry.otherSilo?.siloAddress ? normalizeAddress(entry.otherSilo.siloAddress) : null
+    if (otherSiloAddress) {
+      out.set(
+        otherSiloAddress,
+        entry.otherSilo?.tokenAddress ? normalizeAddress(entry.otherSilo.tokenAddress) : null
+      )
+    }
+  }
+  return out
+}
+
+async function fetchExternalFlashloanSourcesForChain(chainId: number): Promise<Map<string, string[]>> {
+  const cached = externalFlashloanSourcesPromiseCache.get(chainId)
+  if (cached) return cached
+  const promise = (async () => {
+    const chainName = NETWORK_CONFIGS.find((row) => row.chainId === chainId)?.chainName?.toLowerCase()
+    if (!chainName) return new Map<string, string[]>()
+    try {
+      const response = await fetch(FLASHLOAN_SOURCES_URL)
+      if (!response.ok) return new Map<string, string[]>()
+      const payload = (await response.json()) as ExternalFlashloanSourcesPayload
+      const chainKeys = resolveExternalFlashloanChainKeys(chainName)
+      const rawByToken = chainKeys
+        .map((key) => payload?.[key])
+        .find((candidate) => candidate && typeof candidate === 'object')
+      if (!rawByToken || typeof rawByToken !== 'object') return new Map<string, string[]>()
+      const out = new Map<string, string[]>()
+      for (const [rawTokenAddress, rawSources] of Object.entries(rawByToken)) {
+        const tokenAddress = normalizeAddress(rawTokenAddress)
+        if (!tokenAddress || !Array.isArray(rawSources)) continue
+        const sources = rawSources
+          .map((sourceAddress) => normalizeAddress(sourceAddress))
+          .filter((sourceAddress): sourceAddress is string => sourceAddress != null)
+        out.set(tokenAddress, sources)
+      }
+      return out
+    } catch {
+      return new Map<string, string[]>()
+    }
+  })()
+  externalFlashloanSourcesPromiseCache.set(chainId, promise)
+  return promise
+}
+
 export async function fetchMarketsDynamicState(
   chainId: number,
   entries: LiquidationSnapshotEntry[]
@@ -134,12 +219,19 @@ export async function fetchMarketsDynamicState(
   const provider = getReadonlyProvider(chainId)
   const states = new Map<string, LiquidationMarketDynamicState>()
   const siloAddresses = collectUniqueSiloAddresses(entries)
+  const tokenAddressBySilo = buildTokenAddressBySilo(entries)
+  const primaryTokenAddresses = collectPrimaryTokenAddresses(entries)
+  const externalSourcesByToken = await fetchExternalFlashloanSourcesForChain(chainId)
+  const lensAddress = await getSiloLensAddressForChain(chainId)
+  const canUseLensVersionLookup = Boolean(
+    lensAddress && Array.isArray(SiloLensInterfaceAbi) && SiloLensInterfaceAbi.length > 0
+  )
   if (siloAddresses.length === 0) return states
 
-  const calls = siloAddresses.flatMap((marketAddress) => {
+  const marketCalls: ReadMulticallCall<bigint | string>[] = siloAddresses.flatMap((marketAddress) => {
     const direct = new Contract(marketAddress, SiloAbi, provider)
     return [
-      buildReadMulticallCall({
+      buildReadMulticallCall<bigint | string>({
         target: marketAddress,
         abi: SiloAbi,
         functionName: 'getCollateralAndProtectedTotalsStorage',
@@ -152,21 +244,21 @@ export async function fetchMarketsDynamicState(
           return tuple[0] + tuple[1]
         },
       }),
-      buildReadMulticallCall({
+      buildReadMulticallCall<bigint | string>({
         target: marketAddress,
         abi: SiloAbi,
         functionName: 'totalAssets',
         fallback: async () => (await direct.totalAssets()) as bigint,
         decodeResult: (decoded) => decoded as bigint,
       }),
-      buildReadMulticallCall({
+      buildReadMulticallCall<bigint | string>({
         target: marketAddress,
         abi: SiloAbi,
         functionName: 'getLiquidity',
         fallback: async () => (await direct.getLiquidity()) as bigint,
         decodeResult: (decoded) => decoded as bigint,
       }),
-      buildReadMulticallCall({
+      buildReadMulticallCall<bigint | string>({
         target: marketAddress,
         abi: SiloAbi,
         functionName: 'getDebtAssets',
@@ -175,12 +267,113 @@ export async function fetchMarketsDynamicState(
       }),
     ]
   })
+  const externalCallDescriptors: Array<{
+    tokenAddress: string
+    sourceAddress: string
+    amountCallOffset: number
+    versionCallOffset: number
+  }> = []
+  const externalCalls: ReadMulticallCall<bigint | string>[] = []
+  for (const tokenAddress of primaryTokenAddresses) {
+    const sourceAddresses = externalSourcesByToken.get(tokenAddress) ?? []
+    for (const sourceAddress of sourceAddresses) {
+      const source = new Contract(sourceAddress, SiloAbi, provider)
+      const lens = canUseLensVersionLookup ? new Contract(lensAddress!, SiloLensInterfaceAbi, provider) : null
+      const amountCallOffset = externalCalls.length
+      externalCalls.push(
+        buildReadMulticallCall<bigint | string>({
+          target: sourceAddress,
+          abi: SiloAbi,
+          functionName: 'maxFlashLoan',
+          args: [tokenAddress],
+          allowFailure: true,
+          fallback: async () => {
+            try {
+              return (await source.maxFlashLoan(tokenAddress)) as bigint
+            } catch {
+              return BIGINT_ZERO
+            }
+          },
+          decodeResult: (decoded) => decoded as bigint,
+        })
+      )
+      const versionCallOffset = externalCalls.length
+      externalCalls.push(
+        canUseLensVersionLookup
+          ? buildReadMulticallCall<bigint | string>({
+              target: lensAddress!,
+              abi: SiloLensInterfaceAbi,
+              functionName: 'getVersion',
+              args: [sourceAddress],
+              allowFailure: true,
+              fallback: async () => {
+                try {
+                  return lens ? ((await lens.getVersion(sourceAddress)) as string) : ''
+                } catch {
+                  return ''
+                }
+              },
+              decodeResult: (decoded) => String(decoded ?? ''),
+            })
+          : buildReadMulticallCall<bigint | string>({
+              target: sourceAddress,
+              abi: SiloAbi,
+              functionName: 'eip712Domain',
+              allowFailure: true,
+              fallback: async () => {
+                try {
+                  const domain = (await source.eip712Domain()) as { version?: unknown } | unknown[]
+                  if (Array.isArray(domain)) return String(domain[2] ?? '')
+                  return String(domain?.version ?? '')
+                } catch {
+                  return ''
+                }
+              },
+              decodeResult: (decoded) => {
+                const tuple = decoded as [unknown, unknown, unknown, unknown, unknown, unknown, unknown]
+                return String(tuple[2] ?? '')
+              },
+            })
+      )
+      externalCallDescriptors.push({
+        tokenAddress,
+        sourceAddress,
+        amountCallOffset,
+        versionCallOffset,
+      })
+    }
+  }
+  const calls = [...marketCalls, ...externalCalls]
 
   const results = await executeReadMulticall(provider, calls, {
     chainId,
     chunkSize: 128,
     debugLabel: `liq:${chainId}`,
   })
+  const externalLiquidityByToken = new Map<string, bigint>()
+  const externalLiquiditySourcesByToken = new Map<
+    string,
+    Array<{
+      sourceAddress: string
+      amount: bigint
+      version: string
+    }>
+  >()
+  for (let descriptorIndex = 0; descriptorIndex < externalCallDescriptors.length; descriptorIndex += 1) {
+    const descriptor = externalCallDescriptors[descriptorIndex]!
+    const amount = (results[marketCalls.length + descriptor.amountCallOffset] as bigint | null) ?? BIGINT_ZERO
+    const versionRaw = results[marketCalls.length + descriptor.versionCallOffset]
+    const version = typeof versionRaw === 'string' && versionRaw.trim() ? versionRaw.trim() : '?'
+    const current = externalLiquidityByToken.get(descriptor.tokenAddress) ?? BIGINT_ZERO
+    externalLiquidityByToken.set(descriptor.tokenAddress, current + amount)
+    const currentSources = externalLiquiditySourcesByToken.get(descriptor.tokenAddress) ?? []
+    currentSources.push({
+      sourceAddress: descriptor.sourceAddress,
+      amount,
+      version,
+    })
+    externalLiquiditySourcesByToken.set(descriptor.tokenAddress, currentSources)
+  }
 
   for (let i = 0; i < siloAddresses.length; i += 1) {
     const baseIndex = i * 4
@@ -190,6 +383,10 @@ export async function fetchMarketsDynamicState(
     const totalDebt = (results[baseIndex + 3] as bigint | null) ?? BIGINT_ZERO
     const interest = totalAssets > totalAssetsStorage ? totalAssets - totalAssetsStorage : BIGINT_ZERO
     const siloAddress = siloAddresses[i]!.toLowerCase()
+    const tokenAddress = tokenAddressBySilo.get(siloAddress) ?? null
+    const hasExternalLiquiditySource = tokenAddress ? externalSourcesByToken.has(tokenAddress) : false
+    const externalLiquidity = tokenAddress ? (externalLiquidityByToken.get(tokenAddress) ?? BIGINT_ZERO) : BIGINT_ZERO
+    const externalLiquiditySources = tokenAddress ? (externalLiquiditySourcesByToken.get(tokenAddress) ?? []) : []
     states.set(siloAddress, {
       siloAddress,
       totalAssetsStorage,
@@ -197,6 +394,9 @@ export async function fetchMarketsDynamicState(
       interest,
       liquidity,
       totalDebt,
+      externalLiquidity,
+      hasExternalLiquiditySource,
+      externalLiquiditySources,
     })
   }
 
