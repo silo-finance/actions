@@ -1,7 +1,7 @@
 {
   "chainId": 146,
   "chainKey": "sonic",
-  "generatedAt": "2026-05-21T19:24:25.536Z",
+  "generatedAt": "2026-05-22T10:02:35.076Z",
   "silos": [
     {
       "chainId": 146,
@@ -122,6 +122,66 @@
         }
       },
       "marketVersion": "v3"
+    },
+    {
+      "chainId": 146,
+      "chainKey": "sonic",
+      "siloAddress": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
+      "siloConfigAddress": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
+      "siloId": 25,
+      "siloIndex": 1,
+      "tokenAddress": "0x039e2fb66102314ce7b64ce5ce3e5183bc94ad38",
+      "tokenSymbol": "wS",
+      "quoteTokenSymbol": "wS",
+      "tokenDecimals": 18,
+      "siloConfig": {
+        "daoFee": "150000000000000000",
+        "deployerFee": "0",
+        "silo": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
+        "token": "0x039e2fb66102314ce7b64ce5ce3e5183bc94ad38",
+        "protectedShareToken": "0x7f11b35102a74ba6b5597fa5495f6b93627e7d86",
+        "collateralShareToken": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
+        "debtShareToken": "0x3f5fa5642afea358d65f818102008f6f88bf5cae",
+        "solvencyOracle": "0x0000000000000000000000000000000000000000",
+        "maxLtvOracle": "0x0000000000000000000000000000000000000000",
+        "interestRateModel": "0xc9979d7de95a0609548c7900a499dfe11beeafab",
+        "maxLtv": "0",
+        "lt": "0",
+        "liquidationTargetLtv": "0",
+        "liquidationFee": "0",
+        "flashloanFee": "0",
+        "hookReceiver": "0x5ca218e3f32744e9f2729ec8c0f414ddaf6079ab",
+        "callBeforeQuote": false
+      },
+      "otherSilo": {
+        "siloAddress": "0x21580de05c4f3d6d6a5345b03a898c33b872ab51",
+        "siloConfigAddress": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
+        "siloId": 25,
+        "tokenAddress": "0xfa85fe5a8f5560e9039c04f2b0a90de1415abd70",
+        "tokenSymbol": "wanS",
+        "quoteTokenSymbol": "anS",
+        "tokenDecimals": 18,
+        "siloConfig": {
+          "daoFee": "150000000000000000",
+          "deployerFee": "0",
+          "silo": "0x21580de05c4f3d6d6a5345b03a898c33b872ab51",
+          "token": "0xfa85fe5a8f5560e9039c04f2b0a90de1415abd70",
+          "protectedShareToken": "0x42526fedd57706d73ebd3ffb0a7a299d6b36deb7",
+          "collateralShareToken": "0x21580de05c4f3d6d6a5345b03a898c33b872ab51",
+          "debtShareToken": "0x71edf73739d5e1eed396e38096baa972449ac50f",
+          "solvencyOracle": "0x7fa198e15b697deb4589f4c688b6b0653abb1ddb",
+          "maxLtvOracle": "0x7fa198e15b697deb4589f4c688b6b0653abb1ddb",
+          "interestRateModel": "0xc9979d7de95a0609548c7900a499dfe11beeafab",
+          "maxLtv": "900000000000000000",
+          "lt": "950000000000000000",
+          "liquidationTargetLtv": "940000000000000000",
+          "liquidationFee": "35000000000000000",
+          "flashloanFee": "0",
+          "hookReceiver": "0x5ca218e3f32744e9f2729ec8c0f414ddaf6079ab",
+          "callBeforeQuote": false
+        }
+      },
+      "marketVersion": "legacy"
     },
     {
       "chainId": 146,
