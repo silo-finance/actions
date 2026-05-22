@@ -1,15 +1,15 @@
-name: Pull Positions
+name: Pull Legacy Positions
 
 on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: "Source ref to run scripts from (branch, tag, or SHA)"
+        description: "Source ref to run legacy positions scripts from (branch, tag, or SHA)"
         required: false
         default: "master"
         type: string
       chain:
-        description: 'Chain to pull positions for'
+        description: "Chain to pull legacy positions for (legacy whitelist only)"
         required: true
         type: choice
         options:
@@ -19,20 +19,20 @@ on:
           - arbitrum
   schedule:
     # Every day at 02:15 UTC
-    - cron: '15 2 * * *'
+    - cron: "15 2 * * *"
 
 permissions:
   contents: write
 
 concurrency:
-  group: pull-positions-${{ inputs.source_ref || github.ref_name || 'master' }}-${{ inputs.chain || 'sonic' }}
+  group: pull-legacy-positions-${{ inputs.source_ref || github.ref_name || 'master' }}-${{ inputs.chain || 'sonic' }}
   cancel-in-progress: true
 
 env:
   TARGET_BRANCH: legacy-positions
 
 jobs:
-  pull-positions:
+  pull-legacy-positions:
     runs-on: ubuntu-latest
     steps:
       - name: Resolve inputs
@@ -60,7 +60,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Validate The Graph API key secret
         run: |
@@ -71,7 +71,7 @@ jobs:
         env:
           THE_GRAPH_API_KEY: ${{ secrets.THE_GRAPH_API_KEY }}
 
-      - name: Fetch borrowers
+      - name: Fetch legacy borrowers
         run: |
           set -euo pipefail
           python3 scripts/pull_borrowers/fetch_sonic_borrowers.py \
@@ -79,7 +79,7 @@ jobs:
         env:
           THE_GRAPH_API_KEY: ${{ secrets.THE_GRAPH_API_KEY }}
 
-      - name: Build positions
+      - name: Build legacy positions
         run: |
           set -euo pipefail
           python3 scripts/pull_borrowers/build_positions_from_borrowers.py \

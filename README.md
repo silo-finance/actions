@@ -34,7 +34,7 @@ GitHub Pages deployment is configured in `.github/workflows/deploy-pages.yml`.
 
 ## Positions dashboard snapshot
 
-The `Positions` page reads static market metadata from local snapshot files in `src/data/liquidation/silos/`.
+The `Positions` page reads static market metadata from local snapshot files in `src/data/silos/`.
 
 Snapshot maintenance is CI-driven:
 
