@@ -1,0 +1,24 @@
+---
+description: Enforce code reuse and practical API/component composition limits to avoid duplication.
+alwaysApply: true
+---
+
+# Reuse and Composition Limits — `actions`
+
+Apply this rule for every code-change task.
+
+## Reuse first
+
+- Before creating new logic/UI, check if an existing function, hook, utility, or component can be reused or extended.
+- Prefer shared, parameterized building blocks instead of duplicated near-identical implementations.
+
+## Parameter and complexity limits
+
+- Functions should preferably have up to 3 arguments.
+- Absolute function limit is 5 arguments. Beyond that, redesign by splitting responsibilities and/or introducing a typed options object.
+- If a component requires around 15 independent props/controls, split it into two or more focused components.
+
+## Practical guidance
+
+- Do not create a "god" component/function controlled by many toggles.
+- When in doubt, choose composability: smaller pieces with clear contracts.

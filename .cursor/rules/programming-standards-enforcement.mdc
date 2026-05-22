@@ -13,7 +13,9 @@ This is the umbrella rule. Specialized companion rules cover:
 - web3 transaction and ABI safety,
 - UI/brand consistency,
 - branch-aware changelog/version policy,
-- vault contract context (reading `SiloVault.sol` and dependent libraries before implementing vault features).
+- vault contract context (reading `SiloVault.sol` and dependent libraries before implementing vault features),
+- reuse-first implementation and composition limits (argument/prop complexity thresholds),
+- directory organization and scaling thresholds (split/re-categorize before folders become unmanageable).
 
 ## How to apply
 

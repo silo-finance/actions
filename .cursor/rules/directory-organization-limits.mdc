@@ -1,0 +1,25 @@
+---
+description: Keep project folders scalable with domain-based categorization and reorganization thresholds.
+alwaysApply: true
+---
+
+# Directory Organization Limits — `actions`
+
+Apply this rule for all code-change tasks.
+
+## Structure principles
+
+- Avoid large flat folders with many mixed files.
+- Group files by domain/responsibility and keep related code together.
+- Do not use a single catch-all `utils` directory for unrelated helpers.
+- Prefer categorized utility folders (for example `utils/date`, `utils/format`, `utils/web3`) or domain-local helpers.
+
+## Reorganization threshold
+
+- When a directory reaches around 15-20 files, evaluate whether it should be split into focused subdirectories.
+- If growth trend indicates fast expansion, proactively create categories earlier.
+
+## Refactor safety
+
+- Any folder reorganization must include all required path/import updates in the same change.
+- Do not leave broken references, stale aliases, or partial moves.
