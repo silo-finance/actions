@@ -1749,6 +1749,37 @@ function PositionsPageInner() {
     return { normal, warning, insolvent }
   }, [filteredPositionRows])
 
+  const hiddenSolventSummary = useMemo(() => {
+    if (!hasBorrowerAddressFilter && !hasDebtValueFilter) return null
+
+    let hiddenTotal = 0
+    let hiddenInsolvent = 0
+    let hiddenWarning = 0
+
+    for (const row of sortedPositionRows) {
+      const matchesBorrower = positionMatchesBorrowerFilter(row, normalizedBorrowerQuery)
+      const matchesDebt =
+        minDebtValueThreshold == null ||
+        (row.debtValueNum != null && row.debtValueNum >= minDebtValueThreshold)
+      const isVisible = matchesBorrower && matchesDebt
+      if (isVisible) continue
+
+      hiddenTotal += 1
+      if (row.isInsolvent) hiddenInsolvent += 1
+      else if (row.isWarning) hiddenWarning += 1
+    }
+
+    if (hiddenTotal === 0) return null
+    const hiddenNormal = Math.max(0, hiddenTotal - hiddenInsolvent - hiddenWarning)
+    return { normal: hiddenNormal, warning: hiddenWarning, insolvent: hiddenInsolvent }
+  }, [
+    hasBorrowerAddressFilter,
+    hasDebtValueFilter,
+    sortedPositionRows,
+    normalizedBorrowerQuery,
+    minDebtValueThreshold,
+  ])
+
   const filteredRealtimeBorrowersToMonitor = useMemo(() => {
     const rows = positionsQuery.data?.items ?? []
     const addresses: string[] = []
@@ -2371,6 +2402,34 @@ function PositionsPageInner() {
                               {solventSummary.insolvent}
                             </span>
                           </span>
+                          {hiddenSolventSummary ? (
+                            <span className="mt-1 inline-flex items-center justify-between w-full gap-3 text-[11px] font-normal tabular-nums">
+                              <span className="inline-flex items-center gap-2">
+                                <span className={hiddenSolventSummary.normal === 0 ? 'silo-text-soft opacity-30' : 'silo-text-soft'}>
+                                  {hiddenSolventSummary.normal}
+                                </span>
+                                <span
+                                  className={
+                                    hiddenSolventSummary.warning === 0
+                                      ? 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)] opacity-30'
+                                      : 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)]'
+                                  }
+                                >
+                                  {hiddenSolventSummary.warning}
+                                </span>
+                                <span
+                                  className={
+                                    hiddenSolventSummary.insolvent === 0
+                                      ? 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] opacity-30'
+                                      : 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)]'
+                                  }
+                                >
+                                  {hiddenSolventSummary.insolvent}
+                                </span>
+                              </span>
+                              <span className="silo-text-soft">hidden</span>
+                            </span>
+                          ) : null}
                         </div>
                       </th>
                       <th
