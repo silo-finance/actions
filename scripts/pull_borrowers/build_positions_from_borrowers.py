@@ -235,7 +235,7 @@ def run_multicall(
 
 
 def build_market_index(chain: str) -> dict[str, dict[str, Any]]:
-  silos_path = Path(__file__).resolve().parents[2] / "src" / "data" / "liquidation" / "silos" / f"{chain}.json"
+  silos_path = Path(__file__).resolve().parents[2] / "src" / "data" / "silos" / f"{chain}.json"
   payload = json.loads(silos_path.read_text(encoding="utf-8"))
   entries = payload.get("silos") or []
   market_index: dict[str, dict[str, Any]] = {}
