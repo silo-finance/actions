@@ -1,4 +1,4 @@
-name: Liquidation Snapshot Full Refresh
+name: FULL REFRESH SILOS
 
 on:
   workflow_dispatch:
@@ -61,11 +61,11 @@ jobs:
         if: steps.detect.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
-          branch: chore/liquidation-full-refresh
-          commit-message: 'chore: refresh liquidation silo snapshots'
-          title: 'chore: refresh liquidation silo snapshots'
+          branch: chore/full-refresh-silos
+          commit-message: 'chore: refresh silo snapshots'
+          title: 'chore: refresh silo snapshots'
           body: |
-            Automated full refresh for liquidation snapshot data.
+            Automated full refresh for static silo snapshot data.
 
             - source: union(existing snapshot, earn API)
             - scope: static silo metadata only

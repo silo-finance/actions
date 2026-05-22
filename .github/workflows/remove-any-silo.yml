@@ -1,4 +1,4 @@
-name: Liquidation Snapshot Remove Silo
+name: REMOVE ANY SILO
 
 on:
   workflow_dispatch:
@@ -50,7 +50,7 @@ jobs:
 
           chain_upper="$(printf '%s' "$CHAIN_KEY" | tr '[:lower:]' '[:upper:]')"
           address="$(printf '%s' "$SILO_ADDRESS" | tr '[:upper:]' '[:lower:]')"
-          token_symbol="$(
+          market_meta="$(
             node -e '
               const fs = require("fs");
               const chainKey = process.env.CHAIN_KEY;
@@ -59,28 +59,35 @@ jobs:
               const payload = JSON.parse(fs.readFileSync(file, "utf8"));
               const silos = Array.isArray(payload?.silos) ? payload.silos : [];
               let symbol = "";
+              let siloId = "";
               for (const row of silos) {
                 if ((row?.siloAddress || "").toLowerCase() === address) {
                   symbol = row?.tokenSymbol || "";
+                  siloId = row?.siloId == null ? "" : String(row.siloId);
                   break;
                 }
                 if ((row?.otherSilo?.siloAddress || "").toLowerCase() === address) {
                   symbol = row?.otherSilo?.tokenSymbol || "";
+                  siloId = row?.otherSilo?.siloId == null ? "" : String(row.otherSilo.siloId);
                   break;
                 }
               }
-              process.stdout.write(symbol);
+              process.stdout.write(`${symbol}\t${siloId}`);
             '
           )"
+          IFS=$'\t' read -r token_symbol silo_id <<< "$market_meta"
+          silo_ref="#${silo_id:-unknown}"
 
           if [ -n "$token_symbol" ]; then
-            title="Remove \`${address}\` (${token_symbol}) from ${chain_upper}"
+            title="Remove ${silo_ref} (${token_symbol}) from ${chain_upper}"
           else
-            title="Remove \`${address}\` from ${chain_upper}"
+            title="Remove ${silo_ref} from ${chain_upper}"
           fi
 
           echo "title=${title}" >> "$GITHUB_OUTPUT"
           echo "commit_message=${title}" >> "$GITHUB_OUTPUT"
+          echo "silo_id=${silo_id}" >> "$GITHUB_OUTPUT"
+          echo "address=${address}" >> "$GITHUB_OUTPUT"
 
       - name: Remove from observed markets and legacy whitelist
         run: |
@@ -113,13 +120,14 @@ jobs:
         if: steps.detect.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
-          branch: chore/liquidation-remove-silo-${{ inputs.chainKey }}
+          branch: chore/remove-any-silo-${{ inputs.chainKey }}
           commit-message: ${{ steps.market_meta.outputs.commit_message }}
           title: ${{ steps.market_meta.outputs.title }}
           body: |
-            Removes a market from the liquidation snapshot and legacy positions whitelist.
+            Removes a market from the silo snapshot and legacy positions whitelist.
 
             Positions for this market are dropped on the next `Pull Legacy Positions` run.
 
             - chain: `${{ inputs.chainKey }}`
-            - silo: `${{ inputs.siloAddress }}`
+            - siloId: `#${{ steps.market_meta.outputs.silo_id }}`
+            - silo address: `${{ steps.market_meta.outputs.address }}`
