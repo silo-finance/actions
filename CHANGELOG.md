@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.28.0] - 2026-05-22
+
+### Added
+- display external liquidity sources
+- fix path
+
 ## [0.27.0] - 2026-05-22
 
 ### Added
