@@ -1,7 +1,7 @@
 {
   "chainId": 43114,
   "chainKey": "avalanche",
-  "generatedAt": "2026-05-15T10:40:52.174Z",
+  "generatedAt": "2026-05-22T10:25:50.364Z",
   "silos": [
     {
       "chainId": 43114,
@@ -60,7 +60,8 @@
           "hookReceiver": "0x2108fcb5ae037143baef90f2f63c4c66ba9fb3b6",
           "callBeforeQuote": false
         }
-      }
+      },
+      "marketVersion": "v3"
     },
     {
       "chainId": 43114,
@@ -119,7 +120,8 @@
           "hookReceiver": "0x9b8b655efa702aa8bbff3482c4a47aed4438bba4",
           "callBeforeQuote": false
         }
-      }
+      },
+      "marketVersion": "v3"
     },
     {
       "chainId": 43114,
@@ -178,7 +180,8 @@
           "hookReceiver": "0x809c5abc4db4258c077c7c65dac5beb994471703",
           "callBeforeQuote": false
         }
-      }
+      },
+      "marketVersion": "v3"
     },
     {
       "chainId": 43114,
@@ -237,7 +240,8 @@
           "hookReceiver": "0x7ad4607ff83205ceec6e92cc99aaccd10d6c8e5a",
           "callBeforeQuote": false
         }
-      }
+      },
+      "marketVersion": "v3"
     },
     {
       "chainId": 43114,
@@ -296,7 +300,8 @@
           "hookReceiver": "0x9434ab1b8eb7d44bb615387dabd11ed79ff19d33",
           "callBeforeQuote": false
         }
-      }
+      },
+      "marketVersion": "v3"
     }
   ]
 }
