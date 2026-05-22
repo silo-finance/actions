@@ -66,6 +66,7 @@ type MarketRow = {
   otherLiquidity: bigint | null
   otherTotalDebt: bigint | null
   positionsCount: number | null
+  normalPositionsCount: number | null
   warningPositionsCount: number | null
   insolventPositionsCount: number | null
   needsSanityAlert: boolean
@@ -1221,6 +1222,12 @@ function PositionsPageInner() {
       const otherD = otherKey != null ? dynamic.get(otherKey) : null
       const prefetch = prefetched.get(key)
       const positionsCount = counts.get(key) ?? prefetch?.totalCount ?? null
+      const warningPositionsCount = prefetch?.warningCount ?? null
+      const insolventPositionsCount = prefetch?.insolventCount ?? null
+      const normalPositionsCount =
+        positionsCount == null || warningPositionsCount == null || insolventPositionsCount == null
+          ? null
+          : Math.max(0, positionsCount - warningPositionsCount - insolventPositionsCount)
       const totalDebt = d?.totalDebt ?? null
       return {
         ...row,
@@ -1231,8 +1238,9 @@ function PositionsPageInner() {
         otherLiquidity: otherD?.liquidity ?? null,
         otherTotalDebt: otherD?.totalDebt ?? null,
         positionsCount,
-        warningPositionsCount: prefetch?.warningCount ?? null,
-        insolventPositionsCount: prefetch?.insolventCount ?? null,
+        normalPositionsCount,
+        warningPositionsCount,
+        insolventPositionsCount,
         needsSanityAlert:
           row.marketVersion === 'v3' &&
           totalDebt != null &&
@@ -1740,6 +1748,37 @@ function PositionsPageInner() {
     const normal = Math.max(0, filteredPositionRows.length - insolvent - warning)
     return { normal, warning, insolvent }
   }, [filteredPositionRows])
+
+  const hiddenSolventSummary = useMemo(() => {
+    if (!hasBorrowerAddressFilter && !hasDebtValueFilter) return null
+
+    let hiddenTotal = 0
+    let hiddenInsolvent = 0
+    let hiddenWarning = 0
+
+    for (const row of sortedPositionRows) {
+      const matchesBorrower = positionMatchesBorrowerFilter(row, normalizedBorrowerQuery)
+      const matchesDebt =
+        minDebtValueThreshold == null ||
+        (row.debtValueNum != null && row.debtValueNum >= minDebtValueThreshold)
+      const isVisible = matchesBorrower && matchesDebt
+      if (isVisible) continue
+
+      hiddenTotal += 1
+      if (row.isInsolvent) hiddenInsolvent += 1
+      else if (row.isWarning) hiddenWarning += 1
+    }
+
+    if (hiddenTotal === 0) return null
+    const hiddenNormal = Math.max(0, hiddenTotal - hiddenInsolvent - hiddenWarning)
+    return { normal: hiddenNormal, warning: hiddenWarning, insolvent: hiddenInsolvent }
+  }, [
+    hasBorrowerAddressFilter,
+    hasDebtValueFilter,
+    sortedPositionRows,
+    normalizedBorrowerQuery,
+    minDebtValueThreshold,
+  ])
 
   const filteredRealtimeBorrowersToMonitor = useMemo(() => {
     const rows = positionsQuery.data?.items ?? []
@@ -2303,7 +2342,7 @@ function PositionsPageInner() {
                       </th>
                       <th
                         className="text-left px-4 py-3 font-semibold"
-                        title={isRealtimeEnabled ? 'Updated during LIVE refresh (with Health Factor and Solvent)' : undefined}
+                        title={isRealtimeEnabled ? 'Updated during LIVE refresh (with Health Factor)' : undefined}
                       >
                         <span className="inline-flex items-center gap-2">
                           <button type="button" onClick={() => togglePositionsSort('ltv')}>
@@ -2336,24 +2375,10 @@ function PositionsPageInner() {
                         className="text-left px-4 py-3 font-semibold"
                         title={isRealtimeEnabled ? 'Updated during LIVE refresh (derived from LTV)' : undefined}
                       >
-                        <button type="button" onClick={() => togglePositionsSort('healthFactor')}>
-                          Health Factor{positionsSortIndicator('healthFactor')}
-                        </button>
-                      </th>
-                      <th
-                        className="text-right px-4 py-3 font-semibold"
-                        title="Debt value × health factor; insolvent and warning rows stay on top"
-                      >
-                        <button type="button" onClick={() => togglePositionsSort('priority')}>
-                          Priority{positionsSortIndicator('priority')}
-                        </button>
-                      </th>
-                      <th
-                        className="text-left px-4 py-3 font-semibold"
-                        title={isRealtimeEnabled ? 'Updated during LIVE refresh (derived from LTV)' : undefined}
-                      >
                         <div className="inline-flex flex-col items-start leading-tight">
-                          <span>Solvent</span>
+                          <button type="button" onClick={() => togglePositionsSort('healthFactor')}>
+                            Health Factor{positionsSortIndicator('healthFactor')}
+                          </button>
                           <span className="mt-1 inline-flex items-center gap-2 text-[11px] font-normal tabular-nums">
                             <span className={solventSummary.normal === 0 ? 'silo-text-soft opacity-30' : 'silo-text-soft'}>
                               {solventSummary.normal}
@@ -2377,7 +2402,43 @@ function PositionsPageInner() {
                               {solventSummary.insolvent}
                             </span>
                           </span>
+                          {hiddenSolventSummary ? (
+                            <span className="mt-1 inline-flex items-center justify-between w-full gap-3 text-[11px] font-normal tabular-nums">
+                              <span className="inline-flex items-center gap-2">
+                                <span className={hiddenSolventSummary.normal === 0 ? 'silo-text-soft opacity-30' : 'silo-text-soft'}>
+                                  {hiddenSolventSummary.normal}
+                                </span>
+                                <span
+                                  className={
+                                    hiddenSolventSummary.warning === 0
+                                      ? 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)] opacity-30'
+                                      : 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)]'
+                                  }
+                                >
+                                  {hiddenSolventSummary.warning}
+                                </span>
+                                <span
+                                  className={
+                                    hiddenSolventSummary.insolvent === 0
+                                      ? 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)] opacity-30'
+                                      : 'text-[color-mix(in_srgb,var(--silo-danger)_82%,#4f0f1c)]'
+                                  }
+                                >
+                                  {hiddenSolventSummary.insolvent}
+                                </span>
+                              </span>
+                              <span className="silo-text-soft">hidden</span>
+                            </span>
+                          ) : null}
                         </div>
+                      </th>
+                      <th
+                        className="text-right px-4 py-3 font-semibold"
+                        title="Debt value × health factor; insolvent and warning rows stay on top"
+                      >
+                        <button type="button" onClick={() => togglePositionsSort('priority')}>
+                          Priority{positionsSortIndicator('priority')}
+                        </button>
                       </th>
                       <th
                         className={`text-left px-4 py-3 font-semibold ${isRealtimeEnabled ? POSITIONS_LIVE_STALE_COLUMN_CLASS : ''}`}
@@ -2533,20 +2594,11 @@ function PositionsPageInner() {
                                 isWarning={isWarning}
                               />
                             </td>
-                            <td className={`px-4 py-3 ${liveMetricClass}`}>
-                              {isSolvent == null ? (
-                                <span className="silo-text-soft">—</span>
-                              ) : isSolvent ? (
-                                <span className="text-[color-mix(in_srgb,var(--silo-success)_80%,#1e6a3a)]">yes</span>
-                              ) : (
-                                <span className="text-[color-mix(in_srgb,var(--silo-danger)_85%,#4f0f1c)] font-semibold">no</span>
-                              )}
-                            </td>
                             <td className={`px-4 py-3 ${staleColumnClass}`}>{formatPositionAge(row.lastUpdatedTimestamp, nowMs)}</td>
                           </tr>
                           {hasLtMismatch ? (
                             <tr className="border-t border-[var(--silo-border)]">
-                              <td colSpan={8} className="px-4 py-2 text-xs text-[color-mix(in_srgb,var(--silo-warning)_88%,#5a3b12)]">
+                              <td colSpan={7} className="px-4 py-2 text-xs text-[color-mix(in_srgb,var(--silo-warning)_88%,#5a3b12)]">
                                 Warning: `isSolvent` and Health Factor threshold are divergent for this borrower (possible rounding or pricing mismatch).
                               </td>
                             </tr>
@@ -2556,13 +2608,13 @@ function PositionsPageInner() {
                     })}
                     {(positionsQuery.data?.items ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-4 text-sm silo-text-soft">
+                        <td colSpan={7} className="px-4 py-4 text-sm silo-text-soft">
                           No open positions returned for this market.
                         </td>
                       </tr>
                     ) : filteredPositionRows.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-4 text-sm silo-text-soft">
+                        <td colSpan={7} className="px-4 py-4 text-sm silo-text-soft">
                           No positions match the current filters.
                         </td>
                       </tr>
@@ -2767,16 +2819,12 @@ function PositionsPageInner() {
                         isDynamicLoading={
                           !isClientMounted || dynamicStateQuery.isLoading || dynamicStateQuery.isFetching
                         }
-                        isCountsLoading={
-                          !isClientMounted || positionsCountQuery.isLoading || positionsCountQuery.isFetching
-                        }
                         isPrefetchLoading={
                           !isClientMounted ||
                           prefetchedMarketPositionsQuery.isLoading ||
                           prefetchedMarketPositionsQuery.isFetching
                         }
                         hasDynamicError={dynamicStateQuery.isError}
-                        hasCountsError={positionsCountQuery.isError}
                         hasPrefetchError={prefetchedMarketPositionsQuery.isError}
                         onOpenPositions={() => openPositionsView(row)}
                       />
@@ -2803,21 +2851,18 @@ function FragmentRow({
   row,
   onOpenPositions,
   isDynamicLoading,
-  isCountsLoading,
   isPrefetchLoading,
   hasDynamicError,
-  hasCountsError,
   hasPrefetchError,
 }: {
   row: MarketRow
   onOpenPositions: () => void
   isDynamicLoading: boolean
-  isCountsLoading: boolean
   isPrefetchLoading: boolean
   hasDynamicError: boolean
-  hasCountsError: boolean
   hasPrefetchError: boolean
 }) {
+  const normalCount = row.normalPositionsCount ?? 0
   const warningCount = row.warningPositionsCount ?? 0
   const insolventCount = row.insolventPositionsCount ?? 0
   const showLiquidityStressAlert =
@@ -2946,11 +2991,11 @@ function FragmentRow({
             title="Open positions"
           >
             <span className="text-[var(--silo-text)]">
-              {row.positionsCount == null
-                ? isCountsLoading || !hasCountsError
+              {row.normalPositionsCount == null
+                ? isPrefetchLoading || !hasPrefetchError
                   ? <InlineLoadingHint />
                   : '—'
-                : row.positionsCount}
+                : normalCount}
             </span>
             <span className={warningCount === 0 ? 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)] opacity-30' : 'text-[color-mix(in_srgb,var(--silo-warning)_75%,#5a3b12)]'}>
               {row.warningPositionsCount == null

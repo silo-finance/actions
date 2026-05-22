@@ -62,7 +62,7 @@ function resolvePositionsSourceUrl(chainId: number): string | null {
   const fileName = CHAIN_FILE_NAMES[chainId]
   if (base && fileName) return `${base.replace(/\/$/, '')}/${fileName}`
   const chainKey = CHAIN_KEY_BY_ID[chainId]
-  if (chainKey) return `/liquidation/positions/${chainKey}_positions.json`
+  if (chainKey) return `/legacy-positions/${chainKey}_positions.json`
   return null
 }
 

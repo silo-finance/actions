@@ -353,7 +353,7 @@ def get_default_positions_output(chain: str) -> str:
 
 
 def get_default_public_positions_output(chain: str) -> Path:
-  return Path(__file__).resolve().parents[2] / "public" / "liquidation" / "positions" / f"{chain}_positions.json"
+  return Path(__file__).resolve().parents[2] / "public" / "legacy-positions" / f"{chain}_positions.json"
 
 
 def main() -> None:

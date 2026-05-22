@@ -55,7 +55,7 @@ jobs:
               const fs = require("fs");
               const chainKey = process.env.CHAIN_KEY;
               const address = (process.env.SILO_ADDRESS || "").toLowerCase();
-              const file = `src/data/liquidation/silos/${chainKey}.json`;
+              const file = `src/data/silos/${chainKey}.json`;
               const payload = JSON.parse(fs.readFileSync(file, "utf8"));
               const silos = Array.isArray(payload?.silos) ? payload.silos : [];
               let symbol = "";
@@ -95,7 +95,7 @@ jobs:
           snapshot_changed=false
           legacy_whitelist_changed=false
 
-          if ! git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/liquidation/silos; then
+          if ! git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/silos; then
             snapshot_changed=true
           fi
           if ! git diff --quiet -- src/data/positions; then
@@ -119,7 +119,7 @@ jobs:
           body: |
             Removes a market from the liquidation snapshot and legacy positions whitelist.
 
-            Positions for this market are dropped on the next `Pull Positions` run.
+            Positions for this market are dropped on the next `Pull Legacy Positions` run.
 
             - chain: `${{ inputs.chainKey }}`
             - silo: `${{ inputs.siloAddress }}`

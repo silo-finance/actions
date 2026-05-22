@@ -1,9 +1,9 @@
-import arbitrumSnapshot from '@/data/liquidation/silos/arbitrum.json'
-import avalancheSnapshot from '@/data/liquidation/silos/avalanche.json'
-import ethereumSnapshot from '@/data/liquidation/silos/ethereum.json'
-import injectiveSnapshot from '@/data/liquidation/silos/injective.json'
-import sonicSnapshot from '@/data/liquidation/silos/sonic.json'
-import xdcSnapshot from '@/data/liquidation/silos/xdc.json'
+import arbitrumSnapshot from '@/data/silos/arbitrum.json'
+import avalancheSnapshot from '@/data/silos/avalanche.json'
+import ethereumSnapshot from '@/data/silos/ethereum.json'
+import injectiveSnapshot from '@/data/silos/injective.json'
+import sonicSnapshot from '@/data/silos/sonic.json'
+import xdcSnapshot from '@/data/silos/xdc.json'
 
 export type StaticSiloConfigData = {
   daoFee: string

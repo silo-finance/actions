@@ -77,6 +77,25 @@ Use the contract knowledge to:
 - Reuse existing components, tokens, spacing, and typography.
 - Avoid one-off visual styles unless explicitly requested.
 
+### Reuse and composition limits
+
+- Before adding new code, search for existing functions/hooks/components that can be reused or extended.
+- Prefer reusable, parameterized building blocks over copy-pasted variants.
+- Keep API surfaces small and explicit: if behavior diverges too much, split into two or more focused functions/components.
+- Function arguments:
+  - Preferred: up to 3 arguments.
+  - Hard limit: 5 arguments. If you exceed this, redesign (options object, split responsibilities, or both).
+- Component complexity:
+  - If a component effectively needs around 15 independent props/controls, treat this as a split signal and break it into smaller components.
+
+### Directory structure and file organization
+
+- Avoid flat directories growing without structure (for example, one folder with 50 mixed files).
+- Group files by domain or responsibility, not only by generic type names.
+- Avoid a single catch-all `utils` bucket; prefer categorized utilities (for example: `utils/date`, `utils/format`, `utils/web3`).
+- When a directory reaches around 15-20 files, review whether it should be split into focused subdirectories.
+- If reorganization is introduced, update all import paths/references in the same change and verify no broken paths remain.
+
 ### Language policy
 
 - Use English only across the repository.

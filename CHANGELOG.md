@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.26.0] - 2026-05-22
+
+### Added
+- display hidden counter
+- schedule pulling legacy positions for every hour
+- use `legacy-positions` dir name for local positions data
+- rename pull workflow to explicitly say about positions type
+- move static data to other directory
+- additional ai skills
+- display positions on landing page
+
 ## [0.25.3] - 2026-05-21
 
 ### Fixed

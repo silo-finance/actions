@@ -26,4 +26,4 @@ next-env.d.ts
 /playwright-report/
 
 __pycache__/
-public/liquidation/positions/
+public/legacy-positions/
