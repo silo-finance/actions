@@ -51,8 +51,10 @@ type MarketRow = {
   siloId: number | null
   siloIndex: 0 | 1 | null
   otherSiloAddress: string | null
+  tokenAddress: string | null
   tokenSymbol: string | null
   quoteTokenSymbol: string | null
+  otherTokenAddress: string | null
   otherTokenSymbol: string | null
   otherTokenDecimals: number | null
   ltRaw: string | null
@@ -854,8 +856,10 @@ function PositionsPageInner() {
         siloId: row.siloId,
         siloIndex: row.siloIndex ?? null,
         otherSiloAddress: row.otherSilo?.siloAddress ?? null,
+        tokenAddress: row.tokenAddress ?? null,
         tokenSymbol: row.tokenSymbol,
         quoteTokenSymbol: row.quoteTokenSymbol ?? row.tokenSymbol ?? null,
+        otherTokenAddress: row.otherSilo?.tokenAddress ?? null,
         otherTokenSymbol: row.otherSilo?.tokenSymbol ?? null,
         otherTokenDecimals: row.otherSilo?.tokenDecimals ?? null,
         ltRaw: row.siloConfig?.lt ?? null,
@@ -2947,10 +2951,68 @@ function FragmentRow({
           </div>
         </td>
         <td className="px-4 py-3">
-          {row.tokenSymbol ?? 'Unknown'}
+          <div className="flex flex-col items-start">
+            <div className="inline-flex items-center gap-1.5">
+              {row.tokenAddress ? (
+                <a
+                  href={getExplorerAddressUrl(row.chainId, row.tokenAddress)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:underline"
+                  title={row.tokenAddress}
+                >
+                  {row.tokenSymbol ?? 'Unknown'}
+                </a>
+              ) : (
+                <span>{row.tokenSymbol ?? 'Unknown'}</span>
+              )}
+              {row.tokenAddress ? (
+                <button
+                  type="button"
+                  className="text-xs silo-text-soft hover:silo-text-main"
+                  aria-label="Copy token address"
+                  title="Copy token address"
+                  onClick={() => {
+                    if (!row.tokenAddress) return
+                    void copyToClipboard(row.tokenAddress)
+                  }}
+                >
+                  ⧉
+                </button>
+              ) : null}
+            </div>
           {row.otherTokenSymbol ? (
-            <div className="text-xs mt-1 silo-text-faint">{row.otherTokenSymbol}</div>
+              <div className="text-xs mt-1 silo-text-faint inline-flex items-center gap-1.5">
+                {row.otherTokenAddress ? (
+                  <a
+                    href={getExplorerAddressUrl(row.chainId, row.otherTokenAddress)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hover:underline"
+                    title={row.otherTokenAddress}
+                  >
+                    {row.otherTokenSymbol}
+                  </a>
+                ) : (
+                  <span>{row.otherTokenSymbol}</span>
+                )}
+                {row.otherTokenAddress ? (
+                  <button
+                    type="button"
+                    className="text-xs silo-text-faint hover:silo-text-main"
+                    aria-label="Copy other token address"
+                    title="Copy other token address"
+                    onClick={() => {
+                      if (!row.otherTokenAddress) return
+                      void copyToClipboard(row.otherTokenAddress)
+                    }}
+                  >
+                    ⧉
+                  </button>
+                ) : null}
+              </div>
           ) : null}
+          </div>
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
           {row.totalAssets == null
