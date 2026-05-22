@@ -10,7 +10,7 @@ import Erc20Abi from '../src/abis/ERC20.json' with { type: 'json' }
 import SiloOracleAbi from '../src/abis/ISiloOracle.json' with { type: 'json' }
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const snapshotDir = join(root, 'src', 'data', 'liquidation', 'silos')
+const snapshotDir = join(root, 'src', 'data', 'silos')
 const legacyWhitelistDir = join(root, 'src', 'data', 'positions')
 
 const CHAIN_ID_BY_KEY = {
