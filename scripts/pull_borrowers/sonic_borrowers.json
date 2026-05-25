@@ -105,11 +105,6 @@
     "last_updated_timestamp": 1771873042
   },
   {
-    "account_id": "0x40b7e39b745b137efcabf6f445c9400f3dffb5dc",
-    "debt_market_id": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
-    "last_updated_timestamp": 1742478715
-  },
-  {
     "account_id": "0x4118499a3409a0ed72aa39089e100d7a671037c1",
     "debt_market_id": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "last_updated_timestamp": 1747941897
