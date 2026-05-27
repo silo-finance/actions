@@ -7,11 +7,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "17984406873416989872",
-    "debt_value": "16256982402160871594",
-    "ltv": "903948766094174104",
+    "debt_value": "16257051191604828443",
+    "ltv": "903952591043444938",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1762692221
   },
   {
@@ -22,11 +22,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "7715513035913448052044",
-    "debt_value": "4593059754965762877216",
-    "ltv": "595301924005107393",
+    "debt_value": "4593079189939535296484",
+    "ltv": "595304442952801727",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1754050496
   },
   {
@@ -37,11 +37,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "38715998076121837908672",
-    "debt_value": "27875592078776447461700",
-    "ltv": "720001897509359819",
+    "debt_value": "27875710030954264429135",
+    "ltv": "720004944109826765",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1747174520
   },
   {
@@ -52,11 +52,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "588601498863889578594",
-    "debt_value": "430644080103437116142",
-    "ltv": "731639455445934688",
+    "debt_value": "430645902321489691926",
+    "ltv": "731642551289312751",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1760182459
   },
   {
@@ -67,11 +67,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "269612717058434487922992",
-    "debt_value": "235400997829877188238506",
-    "ltv": "873107917156806718",
+    "debt_value": "235401993900571430510694",
+    "ltv": "873111611606775955",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1763750701
   },
   {
@@ -82,11 +82,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "126397282818147600051",
-    "debt_value": "107682803335200224978",
-    "ltv": "851939226337067846",
+    "debt_value": "107683258981886793244",
+    "ltv": "851942831214296290",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742353600
   },
   {
@@ -97,11 +97,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "290317991032521875251",
-    "debt_value": "117529851049174071436",
-    "ltv": "404831442347671088",
+    "debt_value": "117530348362445501772",
+    "ltv": "404833155342686181",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1744976564
   },
   {
@@ -112,11 +112,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "3630479515059957918243",
-    "debt_value": "3102023789765772414012",
-    "ltv": "854439138658668901",
+    "debt_value": "3102036915602189050790",
+    "ltv": "854442754113972309",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1743603961
   },
   {
@@ -127,11 +127,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "3170579475813979636042",
-    "debt_value": "2722506243853939161656",
-    "ltv": "858677810987530256",
+    "debt_value": "2722517763808014948203",
+    "ltv": "858681444378260141",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1748807475
   },
   {
@@ -142,11 +142,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "2139397386329883128804",
-    "debt_value": "1195323699361754276498",
-    "ltv": "558719809138554327",
+    "debt_value": "1195328757228619938479",
+    "ltv": "558722173293478503",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1759757616
   },
   {
@@ -157,11 +157,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "3214736338945724843943",
-    "debt_value": "2699751573499272024965",
-    "ltv": "839804975852127751",
+    "debt_value": "2699762997169727493949",
+    "ltv": "839808529384750963",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1760192460
   },
   {
@@ -172,11 +172,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "406022248307034297384722",
-    "debt_value": "365556693876469943906460",
-    "ltv": "900336608155609557",
+    "debt_value": "365558240685163242618097",
+    "ltv": "900340417820473363",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1779610661
   },
   {
@@ -187,11 +187,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "4923091571956060095362",
-    "debt_value": "1967221521205193281349",
-    "ltv": "399590682491321179",
+    "debt_value": "1967229845263818433431",
+    "ltv": "399592373310698290",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1777537663
   },
   {
@@ -202,11 +202,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "1207171908792047044684",
-    "debt_value": "1029285051949275908701",
-    "ltv": "852641653150483690",
+    "debt_value": "1029289407243797681474",
+    "ltv": "852645260999945770",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741597323
   },
   {
@@ -217,11 +217,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "3230338688728724664738",
-    "debt_value": "2915930775085984282980",
-    "ltv": "902670294375085098",
+    "debt_value": "2915943113492440832275",
+    "ltv": "902674113914658333",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1743594218
   },
   {
@@ -232,11 +232,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "591356506527267783458",
-    "debt_value": "533195328931281900038",
-    "ltv": "901647860547715072",
+    "debt_value": "533197585082472215474",
+    "ltv": "901651675760983908",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742694809
   },
   {
@@ -247,11 +247,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "1416853641565966047155",
-    "debt_value": "1210342097133632458530",
-    "ltv": "854246382001680589",
+    "debt_value": "1210347218549021843644",
+    "ltv": "854249996641357645",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742577450
   },
   {
@@ -262,11 +262,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "2406921205372297224",
-    "debt_value": "2166998390466933330",
-    "ltv": "900319622275190697",
+    "debt_value": "2167007559857085083",
+    "ltv": "900323431868180816",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742965523
   },
   {
@@ -277,11 +277,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "5437384678358297710",
-    "debt_value": "3294180236079919799",
-    "ltv": "605839099299210745",
+    "debt_value": "3294194175002970085",
+    "ltv": "605841662833680867",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742404677
   },
   {
@@ -292,11 +292,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "1963837738124016384119",
-    "debt_value": "1620856953138292332211",
-    "ltv": "825351769992279877",
+    "debt_value": "1620863811597370516125",
+    "ltv": "825355262367920206",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1752240693
   },
   {
@@ -307,11 +307,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "20114710588259481011358",
-    "debt_value": "18509928252225003793648",
-    "ltv": "920218472495887972",
+    "debt_value": "18510006574735335261542",
+    "ltv": "920222366288442819",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1771873042
   },
   {
@@ -322,11 +322,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "286928300504074569304",
-    "debt_value": "201319824395216263922",
-    "ltv": "701638088824066314",
+    "debt_value": "201320676255569867845",
+    "ltv": "701641057720310105",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1747941897
   },
   {
@@ -337,11 +337,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "224381516425302759551",
-    "debt_value": "182173126031677334117",
-    "ltv": "811890074253612963",
+    "debt_value": "182173896875105320756",
+    "ltv": "811893509667724906",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1743537398
   },
   {
@@ -352,11 +352,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "840653835983014138381",
-    "debt_value": "770933614394205713558",
-    "ltv": "917064291383050135",
+    "debt_value": "770936876506038643426",
+    "ltv": "917068171829071196",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1748607119
   },
   {
@@ -367,11 +367,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "481151889093091528241",
-    "debt_value": "322211910862695966858",
-    "ltv": "669667766388745429",
+    "debt_value": "322213274263211278523",
+    "ltv": "669670600006457876",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1754309656
   },
   {
@@ -382,11 +382,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "1120027922159214750753",
-    "debt_value": "955035207735070248006",
-    "ltv": "852688748950054856",
+    "debt_value": "955039248850406054568",
+    "ltv": "852692356998797084",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1744105127
   },
   {
@@ -397,11 +397,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "76130608472784066553",
-    "debt_value": "3931821939074922523",
-    "ltv": "51645744306385121",
+    "debt_value": "3931838576101292826",
+    "ltv": "51645962839071304",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1759529331
   },
   {
@@ -412,11 +412,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "5901992451771918105047",
-    "debt_value": "5268383952996081602073",
-    "ltv": "892644983206372587",
+    "debt_value": "5268406245522069058254",
+    "ltv": "892648760325060829",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1777021497
   },
   {
@@ -427,11 +427,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "695258469689144751787308",
-    "debt_value": "435912116888472505491442",
-    "ltv": "626978506401183527",
+    "debt_value": "435913961397582069726967",
+    "ltv": "626981159384483952",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1757496335
   },
   {
@@ -442,11 +442,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "1126253628216255816522",
-    "debt_value": "1048876807894421502207",
-    "ltv": "931297162217019801",
+    "debt_value": "1048881246089075923566",
+    "ltv": "931301102887702879",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1751338658
   },
   {
@@ -457,11 +457,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "136689705524360037584857",
-    "debt_value": "109996287651353302790815",
-    "ltv": "804715228768639125",
+    "debt_value": "109996753087267402600291",
+    "ltv": "804718633823264961",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1762981993
   },
   {
@@ -472,11 +472,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "622459193786843281280",
-    "debt_value": "524472953510793481243",
-    "ltv": "842582066014749089",
+    "debt_value": "524475172754312968510",
+    "ltv": "842585631298291591",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1756036259
   },
   {
@@ -487,11 +487,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "15247829434191860008405",
-    "debt_value": "14147908699433415795483",
-    "ltv": "927863782874435048",
+    "debt_value": "14147968564588492603412",
+    "ltv": "927867709017190984",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1774176204
   },
   {
@@ -502,11 +502,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "2413423408626764281596",
-    "debt_value": "683898809264495273169",
-    "ltv": "283372907886740468",
+    "debt_value": "683901703099134954078",
+    "ltv": "283374106944738056",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741645200
   },
   {
@@ -517,11 +517,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "2308718146563697077996",
-    "debt_value": "2111964460953615519311",
-    "ltv": "914777953340501817",
+    "debt_value": "2111973397474387437959",
+    "ltv": "914781824112161502",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741397710
   },
   {
@@ -532,11 +532,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "2094343188888359989561",
-    "debt_value": "1797990061383890558689",
-    "ltv": "858498297186065105",
+    "debt_value": "1797997669360174404553",
+    "ltv": "858501929817204171",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1748809763
   },
   {
@@ -547,11 +547,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "89837058348818563660032",
-    "debt_value": "74283051329709530206198",
-    "ltv": "826864243943562047",
+    "debt_value": "74283365649407367218184",
+    "ltv": "826867742719051963",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1762550203
   },
   {
@@ -562,11 +562,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "3360161859189840801610",
-    "debt_value": "2748151356830602178505",
-    "ltv": "817862791137448731",
+    "debt_value": "2748162985298854719082",
+    "ltv": "817866251824385801",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1745563293
   },
   {
@@ -577,11 +577,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "6550059137220878606116",
-    "debt_value": "4654785197050321000573",
-    "ltv": "710647812414300971",
+    "debt_value": "4654804893207794918039",
+    "ltv": "710650819434094425",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1754477818
   },
   {
@@ -592,11 +592,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "1196793247186225463459",
-    "debt_value": "1042565825682717493810",
-    "ltv": "871132777640489468",
+    "debt_value": "1042570237173218190613",
+    "ltv": "871136463732896046",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1762793891
   },
   {
@@ -607,11 +607,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "15457655716224070571940",
-    "debt_value": "11935056378090552310543",
-    "ltv": "772112964423430462",
+    "debt_value": "11935106879830145346648",
+    "ltv": "772116231525539615",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1756883608
   },
   {
@@ -622,11 +622,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "164966325492417894999375",
-    "debt_value": "148481757937078540975144",
-    "ltv": "900073136101361427",
+    "debt_value": "148482386219579779920685",
+    "ltv": "900076944651375277",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741415406
   },
   {
@@ -637,11 +637,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "836792363374410752776",
-    "debt_value": "669115881763680994719",
-    "ltv": "799619966732768427",
+    "debt_value": "669118713046160768002",
+    "ltv": "799623350227412613",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1760014079
   },
   {
@@ -652,11 +652,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "99342875138553676382806",
-    "debt_value": "77657565474929875526602",
-    "ltv": "781712481812316559",
+    "debt_value": "77657894073473929618579",
+    "ltv": "781715789533616106",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1778608409
   },
   {
@@ -667,11 +667,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "129507474309528502079",
-    "debt_value": "110587213765384689583",
-    "ltv": "853906034033807454",
+    "debt_value": "110587681701730775983",
+    "ltv": "853909647233343475",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742195798
   },
   {
@@ -682,11 +682,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "366168689723873955815",
-    "debt_value": "310460753435401038133",
-    "ltv": "847862644043973274",
+    "debt_value": "310462067112322802353",
+    "ltv": "847866231671639514",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1758634377
   },
   {
@@ -697,11 +697,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "41900558604045162915101",
-    "debt_value": "36188745440745258226858",
-    "ltv": "863681694144562671",
+    "debt_value": "36188898569020529900110",
+    "ltv": "863685348708615593",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1753278612
   },
   {
@@ -712,11 +712,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "1513593460140235960160",
-    "debt_value": "1265094439558414820508",
-    "ltv": "835821819315473619",
+    "debt_value": "1265099792651682520553",
+    "ltv": "835825355993854354",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741667267
   },
   {
@@ -727,11 +727,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "3066117089743193376801",
-    "debt_value": "2862942496226439693474",
-    "ltv": "933735539912544294",
+    "debt_value": "2862954610419438369181",
+    "ltv": "933739490900926049",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1744365954
   },
   {
@@ -742,11 +742,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "100400958964204798190",
-    "debt_value": "15617232898028532980",
-    "ltv": "155548642753466410",
+    "debt_value": "15617298980450265638",
+    "ltv": "155549300938631316",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742776290
   },
   {
@@ -757,11 +757,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "4118246924550490960914150",
-    "debt_value": "3510276289027098827487833",
-    "ltv": "852371495283820924",
+    "debt_value": "3510291142334316838074262",
+    "ltv": "852375101990142845",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741283696
   },
   {
@@ -772,11 +772,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "3841519658094252209237",
-    "debt_value": "3584798708502768042933",
-    "ltv": "933172032830663317",
+    "debt_value": "3584813877142541089624",
+    "ltv": "933175981434633386",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1749179585
   },
   {
@@ -787,11 +787,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "10618375152153127416837",
-    "debt_value": "8508699366625393227537",
-    "ltv": "801318398031929831",
+    "debt_value": "8508735370151985491000",
+    "ltv": "801321788713279506",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741320271
   },
   {
@@ -802,11 +802,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "15655589115745203552373",
-    "debt_value": "11275888728499429576384",
-    "ltv": "720246848913465437",
+    "debt_value": "11275936441051277432323",
+    "ltv": "720249896550414459",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741444487
   },
   {
@@ -817,11 +817,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "7582806615744710103768",
-    "debt_value": "5875012888760144920378",
-    "ltv": "774780788496101960",
+    "debt_value": "5875037748162699444663",
+    "ltv": "774784066886784231",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742104795
   },
   {
@@ -832,11 +832,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "21132766342530709057410",
-    "debt_value": "19052035583728747546731",
-    "ltv": "901540066971052875",
+    "debt_value": "19052116200100324390474",
+    "ltv": "901543881728206300",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1743649872
   },
   {
@@ -847,11 +847,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "343724459301563566864",
-    "debt_value": "315585062351576916656",
-    "ltv": "918133853473317117",
+    "debt_value": "315586397711388671580",
+    "ltv": "918137738445060089",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1755289756
   },
   {
@@ -862,11 +862,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "21091015941361835508",
-    "debt_value": "17929513046870244271",
-    "ltv": "850101915276090077",
+    "debt_value": "17929588913424220939",
+    "ltv": "850105512378960208",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1746946880
   },
   {
@@ -877,11 +877,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "30656261612427875952704",
-    "debt_value": "24834482880011680812434",
-    "ltv": "810094955281302832",
+    "debt_value": "24834587964105764892145",
+    "ltv": "810098383099587156",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741337060
   },
   {
@@ -892,11 +892,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "273937735188818962402",
-    "debt_value": "246057221890996609030",
-    "ltv": "898223173676291956",
+    "debt_value": "246058263052207019085",
+    "ltv": "898226974398414785",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741374502
   },
   {
@@ -907,11 +907,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "97512707950049999312",
-    "debt_value": "72871165775204729012",
-    "ltv": "747299170612022416",
+    "debt_value": "72871474033308293831",
+    "ltv": "747302331821571870",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1754446699
   },
   {
@@ -922,11 +922,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "9162365511401836676917",
-    "debt_value": "7442329246525985415180",
-    "ltv": "812271594847924082",
+    "debt_value": "7442360728913775342709",
+    "ltv": "812275030902483437",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1744107329
   },
   {
@@ -937,11 +937,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "3481306631836553222705",
-    "debt_value": "2971580458098175619934",
-    "ltv": "853581937001202036",
+    "debt_value": "2971593028416584266894",
+    "ltv": "853585547805919348",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742452208
   },
   {
@@ -952,11 +952,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "71696727885332908919644",
-    "debt_value": "41704763451329945020350",
-    "ltv": "581682939813234374",
+    "debt_value": "41704939869960748655734",
+    "ltv": "581685400436417705",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1760277310
   },
   {
@@ -967,11 +967,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "607519498129205606096",
-    "debt_value": "551306118970513451478",
-    "ltv": "907470658420354363",
+    "debt_value": "551308451094295329504",
+    "ltv": "907474497184030359",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741623901
   },
   {
@@ -982,11 +982,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "403212271176111418950",
-    "debt_value": "364442785138801985076",
-    "ltv": "903848447061830499",
+    "debt_value": "364444326797160399782",
+    "ltv": "903852270502902661",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741464967
   },
   {
@@ -997,11 +997,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "52966169762945574011115",
-    "debt_value": "48014624679633732824525",
-    "ltv": "906514948966993719",
+    "debt_value": "48014827790109456222918",
+    "ltv": "906518783687847284",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1749157995
   },
   {
@@ -1012,11 +1012,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "2511639670230233732",
-    "debt_value": "1803739153423560133",
-    "ltv": "718152040200184173",
+    "debt_value": "1803746783563751318",
+    "ltv": "718155078112143290",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742844173
   },
   {
@@ -1027,11 +1027,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "40415678203306641516145",
-    "debt_value": "34558084028983751916106",
-    "ltv": "855066290243679599",
+    "debt_value": "34558230215878558434242",
+    "ltv": "855069907327477405",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1749045724
   },
   {
@@ -1042,11 +1042,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "2845301374678697612741",
-    "debt_value": "2165129036279454773054",
-    "ltv": "760948929891108453",
+    "debt_value": "2165138195163680057761",
+    "ltv": "760952148841588284",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1760150033
   },
   {
@@ -1057,11 +1057,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "9683229815000939283528",
-    "debt_value": "6475544294626551200101",
-    "ltv": "668738057274531708",
+    "debt_value": "6475571687340563341998",
+    "ltv": "668740886156478690",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742577380
   },
   {
@@ -1072,11 +1072,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "20261886798289781724745",
-    "debt_value": "13744555314006730787880",
-    "ltv": "678345281998458766",
+    "debt_value": "13744613455941340527830",
+    "ltv": "678348151520689768",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741516995
   },
   {
@@ -1087,11 +1087,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "19389325710371410072901",
-    "debt_value": "13017526868180248105230",
-    "ltv": "671375944817778417",
+    "debt_value": "13017581934654110592988",
+    "ltv": "671378784858462918",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741263897
   },
   {
@@ -1102,11 +1102,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "17138321924861809217236",
-    "debt_value": "14034608840944859925547",
-    "ltv": "818902159877477308",
+    "debt_value": "14034668209857921225526",
+    "ltv": "818905623980516193",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1744369748
   },
   {
@@ -1117,11 +1117,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "6545305494654181709880",
-    "debt_value": "5141411249714372234120",
-    "ltv": "785511272760847109",
+    "debt_value": "5141432998806274686629",
+    "ltv": "785514595614443510",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1747886600
   },
   {
@@ -1132,11 +1132,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "15417304786939523269856",
-    "debt_value": "13880327056861161839740",
-    "ltv": "900308273636752457",
+    "debt_value": "13880385773134599904542",
+    "ltv": "900312082102255960",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741513305
   },
   {
@@ -1147,11 +1147,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "242890096355439211763",
-    "debt_value": "206493320284467160926",
-    "ltv": "850151255168057857",
+    "debt_value": "206494193788254736552",
+    "ltv": "850154851460375586",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741233460
   },
   {
@@ -1162,11 +1162,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "2230115255620522356539",
-    "debt_value": "1905017110487359764447",
-    "ltv": "854223612742066515",
+    "debt_value": "1905025169051477551341",
+    "ltv": "854227226261187322",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1745394155
   },
   {
@@ -1177,11 +1177,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "2483819827377934944635",
-    "debt_value": "2237433306032997324431",
-    "ltv": "900803384114604802",
+    "debt_value": "2237442770777254307025",
+    "ltv": "900807194674514445",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741378140
   },
   {
@@ -1192,11 +1192,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "10192779693506490100771",
-    "debt_value": "7142297646901389618066",
-    "ltv": "700721281305778658",
+    "debt_value": "7142327860101690558464",
+    "ltv": "700724245482500754",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1743552012
   },
   {
@@ -1207,11 +1207,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "6008610784520989814715",
-    "debt_value": "3479163367203910063231",
-    "ltv": "579029578046012699",
+    "debt_value": "3479178084689079367220",
+    "ltv": "579032027444999769",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1764826152
   },
   {
@@ -1222,11 +1222,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "714386842963372758498",
-    "debt_value": "596706055564235077499",
-    "ltv": "835270220107943284",
+    "debt_value": "596708579737893027436",
+    "ltv": "835273753450813205",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1757854130
   },
   {
@@ -1237,11 +1237,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "3689260589030091368791",
-    "debt_value": "2990421339811356622891",
-    "ltv": "810574712099027961",
+    "debt_value": "2990433989830074776502",
+    "ltv": "810578140975468885",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1759326614
   },
   {
@@ -1252,11 +1252,11 @@
     "silo_address": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "silo_config_address": "0x6bdf0d12d4b534d5f46c53a90dddfbe6c0e85dc7",
     "collateral_value": "126322715027734479850363",
-    "debt_value": "98167896583055547455978",
-    "ltv": "777119907227314827",
+    "debt_value": "98168311850868402134877",
+    "ltv": "777123194583929696",
     "lt": "0",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1767894920
   },
   {
@@ -1266,13 +1266,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "58760450567320322510",
-    "debt_value": "45767369788160000000",
-    "ltv": "778880511403252649",
+    "collateral_value": "49935370977431849150",
+    "debt_value": "38969874818180000000",
+    "ltv": "780406234206056577",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779856301
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919146
   },
   {
     "chain": "sonic",
@@ -1281,12 +1281,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "1381054361254467357128",
-    "debt_value": "986563301431560000000",
-    "ltv": "714355154373086935",
+    "collateral_value": "1343724120240530524943",
+    "debt_value": "986587636180840000000",
+    "ltv": "734218893089630589",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1770326997
   },
   {
@@ -1297,11 +1297,11 @@
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
     "collateral_value": "241507800",
-    "debt_value": "189103275",
-    "ltv": "783011045605980428",
+    "debt_value": "189107939",
+    "ltv": "783030357611638217",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1779736012
   },
   {
@@ -1311,13 +1311,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "982729141048965",
-    "debt_value": "768707780000000",
-    "ltv": "782217345442184998",
+    "collateral_value": "814646431800490",
+    "debt_value": "636757940000000",
+    "ltv": "781637180430128532",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523524
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919005
   },
   {
     "chain": "sonic",
@@ -1326,13 +1326,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "11709403629402535695",
-    "debt_value": "9163400584080000000",
-    "ltv": "782567658789259470",
+    "collateral_value": "9679383078186160823",
+    "debt_value": "7553856443360000000",
+    "ltv": "780406807163533861",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523429
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918919
   },
   {
     "chain": "sonic",
@@ -1341,13 +1341,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "5436819950861838",
-    "debt_value": "4248385000000000",
-    "ltv": "781409912117202124",
+    "collateral_value": "4534382416854707",
+    "debt_value": "3538654800000000",
+    "ltv": "780405019842724789",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779522693
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919164
   },
   {
     "chain": "sonic",
@@ -1356,13 +1356,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "29136800733294145518",
-    "debt_value": "22801519128940000000",
-    "ltv": "782567699784728841",
+    "collateral_value": "24085439804215524970",
+    "debt_value": "18796439637700000000",
+    "ltv": "780406743264458717",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523463
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918923
   },
   {
     "chain": "sonic",
@@ -1371,12 +1371,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "311866810",
-    "debt_value": "146122162",
-    "ltv": "468540278460538972",
+    "collateral_value": "311872724",
+    "debt_value": "146125766",
+    "ltv": "468542949591192849",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742245127
   },
   {
@@ -1386,13 +1386,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "70400770182735056",
-    "debt_value": "54991095440000000",
-    "ltv": "781114969300235102",
+    "collateral_value": "58837265970762853",
+    "debt_value": "45916545080000000",
+    "ltv": "780399026406438414",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779522698
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919204
   },
   {
     "chain": "sonic",
@@ -1401,13 +1401,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "87866214079999",
-    "debt_value": "69973400000000",
-    "ltv": "796362979020488559",
+    "collateral_value": "48630659369892",
+    "debt_value": "37985560000000",
+    "ltv": "781103124904727344",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779249108
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918910
   },
   {
     "chain": "sonic",
@@ -1416,13 +1416,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "138568285145775043",
-    "debt_value": "108440776840000000",
-    "ltv": "782580059541902812",
+    "collateral_value": "114536543921190505",
+    "debt_value": "89385020780000000",
+    "ltv": "780406128209206425",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523410
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918928
   },
   {
     "chain": "sonic",
@@ -1431,13 +1431,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "5010248937962243",
-    "debt_value": "3922508880000000",
-    "ltv": "782897003436191307",
+    "collateral_value": "4132110367017765",
+    "debt_value": "3224774120000000",
+    "ltv": "780418196411193746",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523362
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918932
   },
   {
     "chain": "sonic",
@@ -1446,13 +1446,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "1655904826097756643",
-    "debt_value": "1295857387000000000",
-    "ltv": "782567552540908425",
+    "collateral_value": "1368823837761906063",
+    "debt_value": "1068239914520000000",
+    "ltv": "780407153243783743",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523516
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919009
   },
   {
     "chain": "sonic",
@@ -1461,13 +1461,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "173637688558777053",
-    "debt_value": "135883344700000000",
-    "ltv": "782568265149434673",
+    "collateral_value": "143531396315296598",
+    "debt_value": "112012419100000000",
+    "ltv": "780403604894509619",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523468
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918937
   },
   {
     "chain": "sonic",
@@ -1476,12 +1476,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "712624459",
-    "debt_value": "566246434",
-    "ltv": "794593038238672075",
+    "collateral_value": "712637972",
+    "debt_value": "566260401",
+    "ltv": "794597570223215667",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1778308702
   },
   {
@@ -1491,13 +1491,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "923668087282015",
-    "debt_value": "723724880000000",
-    "ltv": "783533489967843615",
+    "collateral_value": "783356268766238",
+    "debt_value": "615765920000000",
+    "ltv": "786061137890442062",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523357
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918591
   },
   {
     "chain": "sonic",
@@ -1506,13 +1506,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "619885040073595111",
-    "debt_value": "485103590560000000",
-    "ltv": "782570249642428306",
+    "collateral_value": "512410205234607798",
+    "debt_value": "399888984420000000",
+    "ltv": "780407923836938836",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523472
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919141
   },
   {
     "chain": "sonic",
@@ -1521,13 +1521,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "2629511118047774261",
-    "debt_value": "2057770749860000000",
-    "ltv": "782567807276566686",
+    "collateral_value": "2173638489805486621",
+    "debt_value": "1696323152160000000",
+    "ltv": "780407211280013561",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523476
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918941
   },
   {
     "chain": "sonic",
@@ -1536,13 +1536,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "20763782422236548",
-    "debt_value": "16248823100000000",
-    "ltv": "782556028067345540",
+    "collateral_value": "17166783692061856",
+    "debt_value": "13397906860000000",
+    "ltv": "780455273412419494",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523371
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918945
   },
   {
     "chain": "sonic",
@@ -1551,13 +1551,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "983728443791299347",
-    "debt_value": "769834351740000000",
-    "ltv": "782567950127629371",
+    "collateral_value": "813178847751532168",
+    "debt_value": "634610756240000000",
+    "ltv": "780407358104211442",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523480
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919196
   },
   {
     "chain": "sonic",
@@ -1566,13 +1566,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "1447805870860224",
-    "debt_value": "1134568700000000",
-    "ltv": "783646981156312110",
+    "collateral_value": "1226659276420147",
+    "debt_value": "962634060000000",
+    "ltv": "784760755088673151",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523438
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918595
   },
   {
     "chain": "sonic",
@@ -1581,13 +1581,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "137476013921706418333",
-    "debt_value": "107587581177600000000",
-    "ltv": "782591654416689035",
+    "collateral_value": "113621393390972831781",
+    "debt_value": "88670922240600000000",
+    "ltv": "780406925089204765",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523537
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918950
   },
   {
     "chain": "sonic",
@@ -1596,13 +1596,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "225598706193047864",
-    "debt_value": "176545887060000000",
-    "ltv": "782566044101898780",
+    "collateral_value": "186489479153977037",
+    "debt_value": "145538674280000000",
+    "ltv": "780412251351908351",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523541
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919014
   },
   {
     "chain": "sonic",
@@ -1611,13 +1611,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "17488943062366503",
-    "debt_value": "13686797040000000",
-    "ltv": "782597152451817834",
+    "collateral_value": "14448648225639303",
+    "debt_value": "11275713600000000",
+    "ltv": "780399205788061772",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523376
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919082
   },
   {
     "chain": "sonic",
@@ -1626,13 +1626,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "2904045092740162550",
-    "debt_value": "2272612079120000000",
-    "ltv": "782567765494177336",
+    "collateral_value": "2400574098175558417",
+    "debt_value": "1873423828320000000",
+    "ltv": "780406582635298041",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523546
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919019
   },
   {
     "chain": "sonic",
@@ -1641,13 +1641,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "9773875177746422",
-    "debt_value": "7649092240000000",
-    "ltv": "782605885679385504",
+    "collateral_value": "8072144146253141",
+    "debt_value": "6300604860000000",
+    "ltv": "780536713151308257",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523380
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918955
   },
   {
     "chain": "sonic",
@@ -1656,13 +1656,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "139751232247901969919",
-    "debt_value": "109364795579400000000",
-    "ltv": "782567665560185789",
+    "collateral_value": "115522743752001065308",
+    "debt_value": "90154694192920000000",
+    "ltv": "780406448676980595",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523485
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919023
   },
   {
     "chain": "sonic",
@@ -1671,13 +1671,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "2990844041839472",
-    "debt_value": "2341110040000000",
-    "ltv": "782758982832196349",
+    "collateral_value": "2469482070331409",
+    "debt_value": "1927267360000000",
+    "ltv": "780433833942093455",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523442
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918959
   },
   {
     "chain": "sonic",
@@ -1686,13 +1686,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "136368003839943",
-    "debt_value": "106959340000000",
-    "ltv": "784343372258639550",
+    "collateral_value": "115750590039305",
+    "debt_value": "90965420000000",
+    "ltv": "785874352511820533",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779522689
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918575
   },
   {
     "chain": "sonic",
@@ -1701,13 +1701,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "27623037959138045",
-    "debt_value": "21576797700000000",
-    "ltv": "781116028291961515",
+    "collateral_value": "23081960818234284",
+    "debt_value": "18014152020000000",
+    "ltv": "780442881861630354",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779522703
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919209
   },
   {
     "chain": "sonic",
@@ -1716,12 +1716,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "94705524",
-    "debt_value": "75511609",
-    "ltv": "797330565427207816",
+    "collateral_value": "94707319",
+    "debt_value": "75513472",
+    "ltv": "797335124648602924",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1778067343
   },
   {
@@ -1731,13 +1731,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "14640779496149946",
-    "debt_value": "11458644060000000",
-    "ltv": "782652594625392368",
+    "collateral_value": "12095644763001001",
+    "debt_value": "9440411280000000",
+    "ltv": "780480202996452596",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523446
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918963
   },
   {
     "chain": "sonic",
@@ -1746,12 +1746,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "318027296246092123",
-    "debt_value": "142692756140000000",
-    "ltv": "448680845400085338",
+    "collateral_value": "309430939758652006",
+    "debt_value": "142695755000000000",
+    "ltv": "461155420047196753",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1760361932
   },
   {
@@ -1761,13 +1761,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "986104088408332721",
-    "debt_value": "771694644560000000",
-    "ltv": "782569156371301249",
+    "collateral_value": "815141265218118051",
+    "debt_value": "636142174080000000",
+    "ltv": "780407275676049950",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523414
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918968
   },
   {
     "chain": "sonic",
@@ -1776,13 +1776,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "35255723849861131454",
-    "debt_value": "27589979822160000000",
-    "ltv": "782567390749195297",
+    "collateral_value": "29143607322174491161",
+    "debt_value": "22743869044300000000",
+    "ltv": "780406790170922889",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523550
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918973
   },
   {
     "chain": "sonic",
@@ -1791,13 +1791,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "686962608932285",
-    "debt_value": "542793660000000",
-    "ltv": "790135668145955870",
+    "collateral_value": "571530924640496",
+    "debt_value": "451828240000000",
+    "ltv": "790557816769422753",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779522652
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918474
   },
   {
     "chain": "sonic",
@@ -1806,13 +1806,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "23328105370675606",
-    "debt_value": "18256060060000000",
-    "ltv": "782577914919255428",
+    "collateral_value": "19284052903317152",
+    "debt_value": "15050278720000000",
+    "ltv": "780452055149212016",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523384
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919028
   },
   {
     "chain": "sonic",
@@ -1821,13 +1821,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "101773685468166549714",
-    "debt_value": "79269539124260000000",
-    "ltv": "778880500982294227",
+    "collateral_value": "86488563183968548605",
+    "debt_value": "67496211689400000000",
+    "ltv": "780406208689463398",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779856306
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919150
   },
   {
     "chain": "sonic",
@@ -1836,13 +1836,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "15370506937478183",
-    "debt_value": "12028427460000000",
-    "ltv": "782565435800355380",
+    "collateral_value": "12701370139340614",
+    "debt_value": "9913231540000000",
+    "ltv": "780485209961343669",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523489
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919087
   },
   {
     "chain": "sonic",
@@ -1851,12 +1851,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "236685992299035113175",
-    "debt_value": "75344329271020000000",
-    "ltv": "318330326772477751",
+    "collateral_value": "230288311398838615533",
+    "debt_value": "75346188564220000000",
+    "ltv": "327181992462167075",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1740010515
   },
   {
@@ -1866,13 +1866,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "1355746667282014179",
-    "debt_value": "1060963680540000000",
-    "ltv": "782567795403110356",
+    "collateral_value": "1120703212711770874",
+    "debt_value": "874604523940000000",
+    "ltv": "780406903468863349",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523554
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918977
   },
   {
     "chain": "sonic",
@@ -1881,13 +1881,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "288974471407021402",
-    "debt_value": "226142033360000000",
-    "ltv": "782567512828765673",
+    "collateral_value": "238873623621596608",
+    "debt_value": "186419133800000000",
+    "ltv": "780409033754641013",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523493
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919091
   },
   {
     "chain": "sonic",
@@ -1896,13 +1896,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "699998404964378",
-    "debt_value": "547791760000000",
-    "ltv": "782561440304819557",
+    "collateral_value": "578928007409185",
+    "debt_value": "451828240000000",
+    "ltv": "780456696199617144",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779522685
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918981
   },
   {
     "chain": "sonic",
@@ -1911,13 +1911,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "6564706771407158989",
-    "debt_value": "5137324074740000000",
-    "ltv": "782567181388180048",
+    "collateral_value": "5426614299253419838",
+    "debt_value": "4234966101120000000",
+    "ltv": "780406689619093835",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523612
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918996
   },
   {
     "chain": "sonic",
@@ -1926,13 +1926,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "53109998444773395632",
-    "debt_value": "41562153377860000000",
-    "ltv": "782567399640927126",
+    "collateral_value": "43902475933526746226",
+    "debt_value": "34261777575240000000",
+    "ltv": "780406499786393809",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523558
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919032
   },
   {
     "chain": "sonic",
@@ -1941,12 +1941,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "6837129066",
-    "debt_value": "2975862528",
-    "ltv": "435250307442419137",
+    "collateral_value": "6837258787",
+    "debt_value": "2975935974",
+    "ltv": "435252791609743702",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1746932201
   },
   {
@@ -1956,13 +1956,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "1332218758670875",
-    "debt_value": "1043603280000000",
-    "ltv": "783357292642523486",
+    "collateral_value": "1131127865517551",
+    "debt_value": "888662180000000",
+    "ltv": "785642549433073964",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523528
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918599
   },
   {
     "chain": "sonic",
@@ -1971,13 +1971,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "3996607115779845",
-    "debt_value": "3128810600000000",
-    "ltv": "782866694013150533",
+    "collateral_value": "3296963330120123",
+    "debt_value": "2574021500000000",
+    "ltv": "780724940579250234",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523451
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919000
   },
   {
     "chain": "sonic",
@@ -1986,12 +1986,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "668737186363947524982803",
-    "debt_value": "457109504453603140000000",
-    "ltv": "683541328005094614",
+    "collateral_value": "650661054849386347334587",
+    "debt_value": "457120786183915920000000",
+    "ltv": "702548251162395571",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1779490891
   },
   {
@@ -2001,13 +2001,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "13450669393026388716",
-    "debt_value": "10526052579480000000",
-    "ltv": "782567192153077482",
+    "collateral_value": "11118762167382644235",
+    "debt_value": "8677150429380000000",
+    "ltv": "780406154817735485",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523618
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919096
   },
   {
     "chain": "sonic",
@@ -2016,13 +2016,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "647491956563981",
-    "debt_value": "508806580000000",
-    "ltv": "785811429535067899",
+    "collateral_value": "540042276488977",
+    "debt_value": "423838880000000",
+    "ltv": "784825370997878034",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523455
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918580
   },
   {
     "chain": "sonic",
@@ -2031,13 +2031,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "4917661541497325395",
-    "debt_value": "3848402051300000000",
-    "ltv": "782567490427216718",
+    "collateral_value": "4065082653214381561",
+    "debt_value": "3172416023640000000",
+    "ltv": "780406278118718312",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523563
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919200
   },
   {
     "chain": "sonic",
@@ -2046,12 +2046,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "16297160",
-    "debt_value": "12759992",
-    "ltv": "782958012316256330",
+    "collateral_value": "16297469",
+    "debt_value": "12760307",
+    "ltv": "782962495587505030",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1779356202
   },
   {
@@ -2061,12 +2061,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "318551826878562527499",
-    "debt_value": "178138991450200000000",
-    "ltv": "559215099143379480",
+    "collateral_value": "309941292225675978218",
+    "debt_value": "178143388778580000000",
+    "ltv": "574764941771196332",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1769881752
   },
   {
@@ -2076,13 +2076,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "1709237854807847203",
-    "debt_value": "1337593521240000000",
-    "ltv": "782567222857565650",
+    "collateral_value": "1412911483853732735",
+    "debt_value": "1102644835680000000",
+    "ltv": "780406167180779937",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523567
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919037
   },
   {
     "chain": "sonic",
@@ -2091,13 +2091,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "255728074515036635",
-    "debt_value": "200124923620000000",
-    "ltv": "782569234916883528",
+    "collateral_value": "211386487495554061",
+    "debt_value": "164967288600000000",
+    "ltv": "780406025732697970",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523571
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919041
   },
   {
     "chain": "sonic",
@@ -2106,12 +2106,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "4436008490917945361921",
-    "debt_value": "7984082895160000000",
-    "ltv": "1799834899213156",
+    "collateral_value": "4316102084460232385425",
+    "debt_value": "7984279820300000000",
+    "ltv": "1849882061188205",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1741454805
   },
   {
@@ -2121,13 +2121,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "1074448461683324313",
-    "debt_value": "840829363380000000",
-    "ltv": "782568353313739837",
+    "collateral_value": "888166210532960642",
+    "debt_value": "693130510280000000",
+    "ltv": "780406304653353290",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523575
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919046
   },
   {
     "chain": "sonic",
@@ -2136,13 +2136,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "2399125418340483409",
-    "debt_value": "1877478287040000000",
-    "ltv": "782567794366783976",
+    "collateral_value": "1983194754785065891",
+    "debt_value": "1547699650560000000",
+    "ltv": "780407293245254749",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523497
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919050
   },
   {
     "chain": "sonic",
@@ -2151,13 +2151,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "1160880063001171173",
-    "debt_value": "908468650680000000",
-    "ltv": "782568914424610527",
+    "collateral_value": "959607806015947580",
+    "debt_value": "748884315780000000",
+    "ltv": "780406652681558536",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523592
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919191
   },
   {
     "chain": "sonic",
@@ -2166,12 +2166,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "1163811537117983274697",
-    "debt_value": "711422746587800000000",
-    "ltv": "611286899895784733",
+    "collateral_value": "1132353423479213438695",
+    "debt_value": "711440304913100000000",
+    "ltv": "628284676993480983",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1769379103
   },
   {
@@ -2181,13 +2181,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "48696265068274888",
-    "debt_value": "38109512880000000",
-    "ltv": "782596218140515107",
+    "collateral_value": "40248697285875589",
+    "debt_value": "31411059260000000",
+    "ltv": "780424246700353028",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523390
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919055
   },
   {
     "chain": "sonic",
@@ -2196,13 +2196,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "144776812286415477",
-    "debt_value": "113301928900000000",
-    "ltv": "782597206767144781",
+    "collateral_value": "119652550359794658",
+    "debt_value": "93378502680000000",
+    "ltv": "780413809811920266",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523580
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919101
   },
   {
     "chain": "sonic",
@@ -2211,12 +2211,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "156258122",
-    "debt_value": "123428804",
-    "ltv": "789903285795281733",
+    "collateral_value": "156261087",
+    "debt_value": "123431850",
+    "ltv": "789907790670878925",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1740599478
   },
   {
@@ -2226,12 +2226,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "29166582092623719696",
-    "debt_value": "13118474084820000000",
-    "ltv": "449777558548338969",
+    "collateral_value": "28378202166268641249",
+    "debt_value": "13118797961700000000",
+    "ltv": "462284322482326888",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1770305474
   },
   {
@@ -2241,12 +2241,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "83028360",
-    "debt_value": "66013253",
-    "ltv": "795068733141302563",
+    "collateral_value": "83029935",
+    "debt_value": "66014883",
+    "ltv": "795073282906941937",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1778266285
   },
   {
@@ -2256,13 +2256,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "75341586361582487",
-    "debt_value": "58959586840000000",
-    "ltv": "782563650266649406",
+    "collateral_value": "62280412319505176",
+    "debt_value": "48604523260000000",
+    "ltv": "780414281951981909",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523623
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919168
   },
   {
     "chain": "sonic",
@@ -2271,13 +2271,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "56687278921280077",
-    "debt_value": "44362135980000000",
-    "ltv": "782576564340023569",
+    "collateral_value": "46859636074144913",
+    "debt_value": "36571097700000000",
+    "ltv": "780439217285733977",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523394
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919105
   },
   {
     "chain": "sonic",
@@ -2286,12 +2286,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "343134915522",
+    "collateral_value": "333859893904",
     "debt_value": "1999240000000",
-    "ltv": "5826396293593792794",
+    "ltv": "5988260454473375600",
     "lt": "800000000000000000",
     "solvent": false,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1779523710
   },
   {
@@ -2301,13 +2301,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "29376504657583911",
-    "debt_value": "22990260380000000",
-    "ltv": "782607074870793984",
+    "collateral_value": "24278348569968016",
+    "debt_value": "18947797100000000",
+    "ltv": "780440112942367299",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523459
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919110
   },
   {
     "chain": "sonic",
@@ -2316,13 +2316,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "16121886186728754",
-    "debt_value": "12617203640000000",
-    "ltv": "782613367559079690",
+    "collateral_value": "13323905820073919",
+    "debt_value": "10399046860000000",
+    "ltv": "780480363673293187",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523520
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919059
   },
   {
     "chain": "sonic",
@@ -2331,12 +2331,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "403336378488725008750",
-    "debt_value": "35002592958380000000",
-    "ltv": "86782633120107894",
+    "collateral_value": "392434096440062085112",
+    "debt_value": "35003456630060000000",
+    "ltv": "89195757829381698",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1767659858
   },
   {
@@ -2346,13 +2346,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "4517905869724123395",
-    "debt_value": "3535565974200000000",
-    "ltv": "782567427509482850",
+    "collateral_value": "3734641652976726464",
+    "debt_value": "2914538054520000000",
+    "ltv": "780406348276264678",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523631
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919077
   },
   {
     "chain": "sonic",
@@ -2361,12 +2361,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "231113985038618382669",
-    "debt_value": "36351235279480000000",
-    "ltv": "157287042899657625",
+    "collateral_value": "224866916872532004366",
+    "debt_value": "36352132938240000000",
+    "ltv": "161660654416525663",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1769887396
   },
   {
@@ -2376,12 +2376,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "218005432701607",
+    "collateral_value": "212112691946709",
     "debt_value": "7996960000000",
-    "ltv": "36682388603341680",
+    "ltv": "37701468623146554",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1760536444
   },
   {
@@ -2391,13 +2391,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "149270771188119998677",
-    "debt_value": "117741223326840000000",
-    "ltv": "788776144115015209",
+    "collateral_value": "125358692785400620457",
+    "debt_value": "98871632497160000000",
+    "ltv": "788709823788739078",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779522646
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918439
   },
   {
     "chain": "sonic",
@@ -2406,12 +2406,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "401272521",
-    "debt_value": "302390039",
-    "ltv": "753577738755751980",
+    "collateral_value": "401280134",
+    "debt_value": "302397502",
+    "ltv": "753582040021946365",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1739077162
   },
   {
@@ -2421,13 +2421,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "1958483283252120620",
-    "debt_value": "1532645373360000000",
-    "ltv": "782567503366684901",
+    "collateral_value": "1618943947894642903",
+    "debt_value": "1263434712300000000",
+    "ltv": "780406705212391569",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523636
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919114
   },
   {
     "chain": "sonic",
@@ -2436,13 +2436,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "670360810480265434",
-    "debt_value": "524603574860000000",
-    "ltv": "782568978762584839",
+    "collateral_value": "554137062709599954",
+    "debt_value": "432453605160000000",
+    "ltv": "780409097787835278",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523584
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919173
   },
   {
     "chain": "sonic",
@@ -2451,12 +2451,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "172005864",
-    "debt_value": "134907224",
-    "ltv": "784317585823701918",
+    "collateral_value": "172009127",
+    "debt_value": "134910554",
+    "ltv": "784322066816838156",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1779262860
   },
   {
@@ -2466,12 +2466,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "901008415367001994030",
-    "debt_value": "319505861618400000000",
-    "ltv": "354609186961098162",
+    "collateral_value": "876653935095829307087",
+    "debt_value": "319513747620580000000",
+    "ltv": "364469643982894033",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1777228174
   },
   {
@@ -2481,13 +2481,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "445119295162642871",
-    "debt_value": "348336581780000000",
-    "ltv": "782569045120186767",
+    "collateral_value": "367946171846023269",
+    "debt_value": "287148841960000000",
+    "ltv": "780409918438192009",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523502
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919064
   },
   {
     "chain": "sonic",
@@ -2496,13 +2496,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "29557487407454661425928",
-    "debt_value": "21992639747951360000000",
-    "ltv": "744063236660793451",
+    "collateral_value": "28758541213775577045814",
+    "debt_value": "17757738199292100000000",
+    "ltv": "617477015516558879",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779914718
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918688
   },
   {
     "chain": "sonic",
@@ -2511,13 +2511,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "383625570319690342",
-    "debt_value": "300213875360000000",
-    "ltv": "782570033352625370",
+    "collateral_value": "317108029850780525",
+    "debt_value": "247472924540000000",
+    "ltv": "780405733202188964",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523640
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919177
   },
   {
     "chain": "sonic",
@@ -2526,12 +2526,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "2206230206743383659480",
-    "debt_value": "1575113496338540000000",
-    "ltv": "713938867994906563",
+    "collateral_value": "2146595258692525742912",
+    "debt_value": "1575152370560720000000",
+    "ltv": "733791041502687795",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1772892076
   },
   {
@@ -2541,13 +2541,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "48424360506707649219",
-    "debt_value": "37896486860660000000",
-    "ltv": "782591374756733269",
+    "collateral_value": "40021755291299544893",
+    "debt_value": "31233233859340000000",
+    "ltv": "780406397270883590",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523608
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919119
   },
   {
     "chain": "sonic",
@@ -2556,13 +2556,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "158995697075377260",
-    "debt_value": "124426699880000000",
-    "ltv": "782579039362375551",
+    "collateral_value": "131422868240472447",
+    "debt_value": "102564010860000000",
+    "ltv": "780412208568849423",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523644
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919182
   },
   {
     "chain": "sonic",
@@ -2571,12 +2571,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "44144251",
-    "debt_value": "34432614",
-    "ltv": "780002224978287660",
+    "collateral_value": "44145088",
+    "debt_value": "34433464",
+    "ltv": "780006690665108653",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1779917077
   },
   {
@@ -2586,13 +2586,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "17602093920381622",
-    "debt_value": "13774763600000000",
-    "ltv": "782563918946602030",
+    "collateral_value": "14552356269383099",
+    "debt_value": "11357682440000000",
+    "ltv": "780470339631224060",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523399
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919123
   },
   {
     "chain": "sonic",
@@ -2601,12 +2601,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "99626663",
-    "debt_value": "79539588",
-    "ltv": "798376514929542507",
+    "collateral_value": "99628553",
+    "debt_value": "79541551",
+    "ltv": "798381072542527041",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1777972524
   },
   {
@@ -2616,13 +2616,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "607938280378296660",
-    "debt_value": "475753145080000000",
-    "ltv": "782568165939406015",
+    "collateral_value": "502535675533874777",
+    "debt_value": "392183913460000000",
+    "ltv": "780410093359757465",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523648
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919128
   },
   {
     "chain": "sonic",
@@ -2631,13 +2631,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "131277511613111226999",
-    "debt_value": "102733503428340000000",
-    "ltv": "782567418943059711",
+    "collateral_value": "108518086631813644055",
+    "debt_value": "84688190254080000000",
+    "ltv": "780406224276833446",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523588
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919132
   },
   {
     "chain": "sonic",
@@ -2646,12 +2646,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "5494791295007153477",
-    "debt_value": "1529241667260000000",
-    "ltv": "278307507083944512",
+    "collateral_value": "5346265727536228181",
+    "debt_value": "1529279652820000000",
+    "ltv": "286046322939647983",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1742468760
   },
   {
@@ -2661,13 +2661,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "25848704559506972",
-    "debt_value": "20229309940000000",
-    "ltv": "782604400674300016",
+    "collateral_value": "21356652138688479",
+    "debt_value": "16667663880000000",
+    "ltv": "780443665597091486",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523403
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919187
   },
   {
     "chain": "sonic",
@@ -2676,13 +2676,13 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "6553348358284597",
-    "debt_value": "5129050220000000",
-    "ltv": "782661006188686579",
+    "collateral_value": "5414304141881455",
+    "debt_value": "4225393740000000",
+    "ltv": "780413074196398565",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523366
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779919137
   },
   {
     "chain": "sonic",
@@ -2691,12 +2691,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "255818170312442965397",
-    "debt_value": "110380617420360000000",
-    "ltv": "431480755591156302",
+    "collateral_value": "248903341909487227461",
+    "debt_value": "110383342384480000000",
+    "ltv": "443478747764746731",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1779086266
   },
   {
@@ -2706,12 +2706,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "208882618782038840231",
-    "debt_value": "161373513753580000000",
-    "ltv": "772555968009799776",
+    "collateral_value": "203236469925403493802",
+    "debt_value": "161377494240420000000",
+    "ltv": "794038069543583717",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
+    "age_timestamp": 1779921487,
     "last_updated_timestamp": 1766619024
   },
   {
@@ -2721,12 +2721,12 @@
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_address": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
     "silo_config_address": "0x062a36bbe0306c2fd7aecdf25843291fbab96ad2",
-    "collateral_value": "615210090202063",
-    "debt_value": "482816460000000",
-    "ltv": "784799319272252338",
+    "collateral_value": "500687760613406",
+    "debt_value": "391851040000000",
+    "ltv": "782625561926923847",
     "lt": "800000000000000000",
     "solvent": true,
-    "age_timestamp": 1779917958,
-    "last_updated_timestamp": 1779523433
+    "age_timestamp": 1779921487,
+    "last_updated_timestamp": 1779918914
   }
 ]
