@@ -367,11 +367,11 @@ function formatPositionAge(rawTimestamp: string | null, nowMs: number): string {
   if (ageDays < 30) {
     return formatEnglishCount(ageDays, 'day')
   }
-  const ageMonths = Math.floor(ageDays / 30)
-  if (ageMonths < 12) {
-    return formatEnglishCount(ageMonths, 'month')
-  }
   const ageYears = Math.floor(ageDays / 365)
+  if (ageYears < 1) {
+    // Below a full year, render months so we never show a misleading "0 years".
+    return formatEnglishCount(Math.floor(ageDays / 30), 'month')
+  }
   return formatEnglishCount(ageYears, 'year')
 }
 
