@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.29.0] - 2026-06-02
+
+### Added
+- fix fetching LT for positions
+
 ## [0.28.0] - 2026-05-22
 
 ### Added
