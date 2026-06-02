@@ -9,48 +9,71 @@ on:
         default: "master"
         type: string
       chain:
-        description: "Chain to pull legacy positions for (legacy whitelist only)"
-        required: true
+        description: "Chain to pull legacy positions for. Use 'all' (default) to run every chain."
+        required: false
+        default: "all"
         type: choice
         options:
+          - all
           - sonic
           - ethereum
           - avalanche
           - arbitrum
   schedule:
-    # Every hour at minute 0 (UTC)
+    # Every hour at minute 0 (UTC); runs every chain.
     - cron: "0 * * * *"
 
 permissions:
   contents: write
 
 concurrency:
-  group: pull-legacy-positions-${{ inputs.source_ref || github.ref_name || 'master' }}-${{ inputs.chain || 'sonic' }}
-  cancel-in-progress: true
+  group: pull-legacy-positions-${{ github.workflow }}-${{ inputs.source_ref || github.ref_name || 'master' }}
+  cancel-in-progress: false
 
 env:
   TARGET_BRANCH: legacy-positions
 
 jobs:
-  pull-legacy-positions:
+  setup:
     runs-on: ubuntu-latest
+    outputs:
+      chains: ${{ steps.matrix.outputs.chains }}
+      source_ref: ${{ steps.matrix.outputs.source_ref }}
     steps:
-      - name: Resolve inputs
+      - name: Compute chain matrix
+        id: matrix
         run: |
           set -euo pipefail
-          CHAIN="${{ inputs.chain }}"
+          CHAIN_INPUT="${{ inputs.chain }}"
           SOURCE_REF="${{ inputs.source_ref }}"
-          if [ -z "$CHAIN" ]; then
-            # Scheduled runs default to sonic to keep one stable output file per chain.
-            CHAIN="sonic"
-          fi
           if [ -z "$SOURCE_REF" ]; then
-            # Scheduled runs use master unless explicitly overridden via workflow_dispatch.
+            # Scheduled runs have no inputs; default the source ref to master.
             SOURCE_REF="master"
           fi
-          echo "CHAIN=$CHAIN" >> "$GITHUB_ENV"
-          echo "SOURCE_REF=$SOURCE_REF" >> "$GITHUB_ENV"
+          if [ -z "$CHAIN_INPUT" ] || [ "$CHAIN_INPUT" = "all" ]; then
+            # Schedule runs and explicit "all" fan out to every supported chain.
+            CHAINS='["sonic","ethereum","avalanche","arbitrum"]'
+          else
+            # Manual dispatch with a specific chain runs only that chain.
+            CHAINS="[\"$CHAIN_INPUT\"]"
+          fi
+          echo "chains=$CHAINS" >> "$GITHUB_OUTPUT"
+          echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
+          echo "::notice::Resolved chains: $CHAINS (source ref: $SOURCE_REF)"
 
+  pull-legacy-positions:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Serialize so matrix jobs do not race pushing to the shared target branch.
+      max-parallel: 1
+      matrix:
+        chain: ${{ fromJSON(needs.setup.outputs.chains) }}
+    env:
+      CHAIN: ${{ matrix.chain }}
+      SOURCE_REF: ${{ needs.setup.outputs.source_ref }}
+    steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -117,28 +140,40 @@ jobs:
           git reset --hard HEAD
           git clean -fd
 
-          git fetch origin "${TARGET_BRANCH}" || true
-          if git show-ref --verify --quiet "refs/remotes/origin/${TARGET_BRANCH}"; then
-            git checkout -B "${TARGET_BRANCH}" "origin/${TARGET_BRANCH}"
-          else
-            git checkout -B "${TARGET_BRANCH}"
-          fi
+          # Retry to absorb races with concurrent pushes to the shared target branch.
+          for attempt in 1 2 3; do
+            git fetch origin "${TARGET_BRANCH}" || true
+            if git show-ref --verify --quiet "refs/remotes/origin/${TARGET_BRANCH}"; then
+              git checkout -B "${TARGET_BRANCH}" "origin/${TARGET_BRANCH}"
+            else
+              git checkout -B "${TARGET_BRANCH}"
+            fi
 
-          mkdir -p scripts/pull_borrowers
-          cp "${EXPORT_DIR}/${CHAIN}_borrowers.json" "scripts/pull_borrowers/${CHAIN}_borrowers.json"
-          cp "${EXPORT_DIR}/${CHAIN}_positions.json" "scripts/pull_borrowers/${CHAIN}_positions.json"
+            mkdir -p scripts/pull_borrowers
+            cp "${EXPORT_DIR}/${CHAIN}_borrowers.json" "scripts/pull_borrowers/${CHAIN}_borrowers.json"
+            cp "${EXPORT_DIR}/${CHAIN}_positions.json" "scripts/pull_borrowers/${CHAIN}_positions.json"
 
-          git add \
-            "scripts/pull_borrowers/${CHAIN}_borrowers.json" \
-            "scripts/pull_borrowers/${CHAIN}_positions.json"
+            git add \
+              "scripts/pull_borrowers/${CHAIN}_borrowers.json" \
+              "scripts/pull_borrowers/${CHAIN}_positions.json"
 
-          if git diff --staged --quiet; then
-            echo "::notice::No data changes to commit for ${CHAIN}."
-            exit 0
-          fi
+            if git diff --staged --quiet; then
+              echo "::notice::No data changes to commit for ${CHAIN}."
+              exit 0
+            fi
 
-          git commit -m "chore: sync ${CHAIN} legacy positions"
-          git push origin "HEAD:${TARGET_BRANCH}"
+            git commit -m "chore: sync ${CHAIN} legacy positions"
+            if git push origin "HEAD:${TARGET_BRANCH}"; then
+              echo "::notice::Pushed ${CHAIN} legacy positions on attempt ${attempt}."
+              exit 0
+            fi
+
+            echo "::warning::Push for ${CHAIN} failed on attempt ${attempt}; retrying after rebase."
+            git reset --hard HEAD~1 || true
+          done
+
+          echo "::error::Failed to push ${CHAIN} legacy positions after 3 attempts."
+          exit 1
 
       - name: Log published URLs
         run: |
