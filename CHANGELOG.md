@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.29.2] - 2026-06-02
+
+### Fixed
+- fix age formatting
+- fix refresh on legacy positions
+
 ## [0.29.1] - 2026-06-02
 
 ### Fixed
