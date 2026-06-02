@@ -422,12 +422,12 @@
   {
     "account_id": "0x0625ad46632162abafb0114503e1f144f078f07b",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410483
+    "last_updated_timestamp": 1780414458
   },
   {
     "account_id": "0x0837ba9dd7cda62cf72597ce1a1b8c94f672d1f1",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780411336
+    "last_updated_timestamp": 1780414703
   },
   {
     "account_id": "0x08dba7dfe06b7118d17837d2569196090cc712b8",
@@ -437,22 +437,22 @@
   {
     "account_id": "0x092c9e796839ede09806f0bf968c7f0fa19fd04b",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780414085
+    "last_updated_timestamp": 1780415668
   },
   {
     "account_id": "0x0a11b1f8f518a2adc481e23cbab02376b6a8fc6c",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410488
+    "last_updated_timestamp": 1780414499
   },
   {
     "account_id": "0x0ab66ab72ee7355ea16813f39237d397e4fbf91c",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410479
+    "last_updated_timestamp": 1780414503
   },
   {
     "account_id": "0x0abeaaa9003b19b459534176b27dd898715619e9",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410492
+    "last_updated_timestamp": 1780414565
   },
   {
     "account_id": "0x0cc582e874667f955af396562f75bb5635f7c701",
@@ -462,7 +462,7 @@
   {
     "account_id": "0x0d086c1f47f035dcd95998f740e9ed2500f175cf",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410497
+    "last_updated_timestamp": 1780414569
   },
   {
     "account_id": "0x0eb77ed36c3b8a7297fc5da96c026a067f6f4d02",
@@ -477,12 +477,12 @@
   {
     "account_id": "0x15d97bc1ee906dd4ead16f746fb7f80d1c556a76",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410506
+    "last_updated_timestamp": 1780414508
   },
   {
     "account_id": "0x185542374ce5fc8bf8f215f5fc681370704fd124",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410510
+    "last_updated_timestamp": 1780414512
   },
   {
     "account_id": "0x1b8b76c7528a9990e3ad435b41758de618a339de",
@@ -492,27 +492,27 @@
   {
     "account_id": "0x1f864a883ee9135741417ab01f106c47d0965c69",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780412508
+    "last_updated_timestamp": 1780414768
   },
   {
     "account_id": "0x1fad4cd10d056e2a60408e6038941c9fc03f123a",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410515
+    "last_updated_timestamp": 1780414517
   },
   {
     "account_id": "0x238f04fb98b630a302fb0e304141e1336f256b8c",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410618
+    "last_updated_timestamp": 1780414574
   },
   {
     "account_id": "0x29f931698e80da35883ab5d7646e3d209d543ff5",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410654
+    "last_updated_timestamp": 1780414521
   },
   {
     "account_id": "0x2c6199c711da6a194336c2a01c46268d18b4f69a",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410520
+    "last_updated_timestamp": 1780414526
   },
   {
     "account_id": "0x2cba364e4c0c7ae1f5eaabfa7f5d88ddea60d337",
@@ -522,12 +522,12 @@
   {
     "account_id": "0x2f401fe8a2134337bf3db523b108891ebd0c774f",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410659
+    "last_updated_timestamp": 1780414530
   },
   {
     "account_id": "0x3345e0a59d7b4f4d767a117f004e01699a64b5e7",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410663
+    "last_updated_timestamp": 1780414534
   },
   {
     "account_id": "0x33f128fc10a4a6ab8f0eda0cfeaf4cf800cfae76",
@@ -537,17 +537,17 @@
   {
     "account_id": "0x3b8ad926c26978862bb5330b2634a2ef1aeb69ec",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410672
+    "last_updated_timestamp": 1780414579
   },
   {
     "account_id": "0x3d733a995892e1b44c79f79e0e6375f70a5c3bd9",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410599
+    "last_updated_timestamp": 1780414583
   },
   {
     "account_id": "0x44a5aa2d447392161a03f670181852675b9709f7",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410677
+    "last_updated_timestamp": 1780414539
   },
   {
     "account_id": "0x4a489818cb725dff144017aee1a196b501cd4f84",
@@ -562,7 +562,7 @@
   {
     "account_id": "0x5659dc05579fc909cd8517b3d26734d45b174d2d",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410681
+    "last_updated_timestamp": 1780414544
   },
   {
     "account_id": "0x5a04c84e05ff337cd1f0e5f26fd999a603aa1837",
@@ -572,7 +572,7 @@
   {
     "account_id": "0x5aa0bd3e3d9a57a6aa567dce6450e0637957433e",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410622
+    "last_updated_timestamp": 1780414481
   },
   {
     "account_id": "0x5b4be8aa5b8d7afee00d3c46937353d28144bf77",
@@ -582,7 +582,7 @@
   {
     "account_id": "0x5daf884b73f6ab637d72bf09475a8455121614e6",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410685
+    "last_updated_timestamp": 1780414463
   },
   {
     "account_id": "0x5ef24c043d558df8de81eef19fc6c9cfbe2ceff5",
@@ -592,7 +592,7 @@
   {
     "account_id": "0x629aff1e728978ac9e6e39cdae88a5ec59d546db",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780414081
+    "last_updated_timestamp": 1780414759
   },
   {
     "account_id": "0x645c22593c232ae78a7ecbac93b38cbac535ef12",
@@ -602,12 +602,12 @@
   {
     "account_id": "0x672eb607312b3bcbe2ff35d7b3bb29ce003e26a1",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410690
+    "last_updated_timestamp": 1780414548
   },
   {
     "account_id": "0x67362e618fb792330d2d07b6f9a32b8b43e50826",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410627
+    "last_updated_timestamp": 1780414476
   },
   {
     "account_id": "0x68ae58a6a595e344661244a4c93e08523d473fb8",
@@ -627,12 +627,12 @@
   {
     "account_id": "0x70ddf043d521aaea0ed98f39eac0183fdc9e3640",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410699
+    "last_updated_timestamp": 1780414588
   },
   {
     "account_id": "0x73ce41f6c09b306202816dea3b7873d902ac240a",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780412522
+    "last_updated_timestamp": 1780414601
   },
   {
     "account_id": "0x73f64f67b7622064f6b320bb9ad198e75f6ec20c",
@@ -642,7 +642,7 @@
   {
     "account_id": "0x76fc3cdfcf1efbb989379118705b92ce5596dc88",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410743
+    "last_updated_timestamp": 1780414485
   },
   {
     "account_id": "0x7d6f06f2129dfde6b87e65528f35e6c475f02604",
@@ -652,7 +652,7 @@
   {
     "account_id": "0x7e0b4a9738ad31467de716991d42c8217d153145",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780412530
+    "last_updated_timestamp": 1780414773
   },
   {
     "account_id": "0x8bb9d5908cdce82915a847fbb34fd93e1e50ccc2",
@@ -667,7 +667,7 @@
   {
     "account_id": "0x92694d62feaddb49b5ab9a533547691e4bc6b62f",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410725
+    "last_updated_timestamp": 1780414592
   },
   {
     "account_id": "0x929ed7b5d64250d9784a46dc960f5a3a32d8e0bf",
@@ -677,7 +677,7 @@
   {
     "account_id": "0x946da0df56627b0288eab6384f1afdad8e8693e9",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410703
+    "last_updated_timestamp": 1780414596
   },
   {
     "account_id": "0x97105cf9fe2a44295c000f2f6e1ca9ce1a3036af",
@@ -717,7 +717,7 @@
   {
     "account_id": "0xa1c8980f71dd6445cd1890082ce1dc44b2504b66",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410756
+    "last_updated_timestamp": 1780414490
   },
   {
     "account_id": "0xa749e799fbf53706d74b6e1f43d1b9eaa2455cf9",
@@ -797,7 +797,7 @@
   {
     "account_id": "0xbefb548a6f0cef90128a75db9be9368793804f62",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410595
+    "last_updated_timestamp": 1780414560
   },
   {
     "account_id": "0xbf990cc5ff55597b5681c15910f7ad2b750c144d",
@@ -812,7 +812,7 @@
   {
     "account_id": "0xcc9799c6933425d68687bb15c817af0a667fad87",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410788
+    "last_updated_timestamp": 1780414440
   },
   {
     "account_id": "0xcfe8ce9eece778b1f71555b56f7fcd68b17226a4",
@@ -837,12 +837,12 @@
   {
     "account_id": "0xd6339759848e5cef0a90fb6bc3406a62315739c6",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780411338
+    "last_updated_timestamp": 1780414704
   },
   {
     "account_id": "0xd6fd705ee0b31a9300d3e2154bcce777270cbb6f",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410792
+    "last_updated_timestamp": 1780414494
   },
   {
     "account_id": "0xd7aa63951a20b71cf6f81c336ade08e669ff31ad",
@@ -867,12 +867,12 @@
   {
     "account_id": "0xe95bfbfc7c6f9c5dd7d48758c519a8a65c6487df",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410797
+    "last_updated_timestamp": 1780414445
   },
   {
     "account_id": "0xeb066e53731d70ed4bfe89d7862e092d4fbef0ba",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410802
+    "last_updated_timestamp": 1780414450
   },
   {
     "account_id": "0xed0f0c4de6150b7e3262e537d9691fc750b2ba23",
@@ -887,7 +887,7 @@
   {
     "account_id": "0xf419ae7568d63dbe8070e19aa2765fad54bb51eb",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780410650
+    "last_updated_timestamp": 1780414454
   },
   {
     "account_id": "0xf5d95ed1dd309de59552306cd7de3da5b4e2b119",
@@ -897,12 +897,12 @@
   {
     "account_id": "0xf60fd90fc72e1eb4d2054a24f5dcf7658f166eda",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780412526
+    "last_updated_timestamp": 1780414706
   },
   {
     "account_id": "0xfb780ff2c8b43b9e4d04fb6bc872d40256df775f",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1780412517
+    "last_updated_timestamp": 1780414764
   },
   {
     "account_id": "0x01c3a7577db1d0a2a5c435b7809b08707776a6b2",
@@ -933,6 +933,11 @@
     "account_id": "0x123124880fb83ab36d33dc41ec5ef49d79efc652",
     "debt_market_id": "0xf55902de87bd80c6a35614b48d7f8b612a083c12",
     "last_updated_timestamp": 1740104724
+  },
+  {
+    "account_id": "0x12839f0c0a79518182aea486b5cbb4554252eb54",
+    "debt_market_id": "0xf55902de87bd80c6a35614b48d7f8b612a083c12",
+    "last_updated_timestamp": 1780418109
   },
   {
     "account_id": "0x1412118a8ad554c66cdba95b35e7b3f69a69df16",
@@ -1032,7 +1037,7 @@
   {
     "account_id": "0x3246eaf37dcfc9f70e3abc27bef57bfb5fd2d70c",
     "debt_market_id": "0xf55902de87bd80c6a35614b48d7f8b612a083c12",
-    "last_updated_timestamp": 1779774046
+    "last_updated_timestamp": 1780420312
   },
   {
     "account_id": "0x325dd88858372f41909f48b76d7b1df0dbf18767",
@@ -1087,7 +1092,7 @@
   {
     "account_id": "0x4317fc32e0ad4abf548adce63526ca3b5bd75c94",
     "debt_market_id": "0xf55902de87bd80c6a35614b48d7f8b612a083c12",
-    "last_updated_timestamp": 1778555714
+    "last_updated_timestamp": 1780414807
   },
   {
     "account_id": "0x482467199e42492972e654ec935c88e05fbcd6ba",
@@ -1292,7 +1297,7 @@
   {
     "account_id": "0x9ba9de31881f1f349fd59888773ebec8cfd73f69",
     "debt_market_id": "0xf55902de87bd80c6a35614b48d7f8b612a083c12",
-    "last_updated_timestamp": 1780405939
+    "last_updated_timestamp": 1780421313
   },
   {
     "account_id": "0x9d5dd3298d49979349c909d615b79600e80c1c2c",
