@@ -21,6 +21,9 @@ const UPSTREAM = (process.env.EARN_SILOS_UPSTREAM || 'https://app.silo.finance/a
   /\/$/,
   ''
 )
+// Cloudflare-fronted upstream bans non-browser user agents (403 / code 1010).
+const BROWSER_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 const ALLOWED_ORIGINS = new Set([
   'http://localhost:3000',
   'http://127.0.0.1:3000',
@@ -71,6 +74,7 @@ const server = http.createServer(async (req, res) => {
       method: 'POST',
       headers: {
         'Content-Type': req.headers['content-type'] || 'application/json',
+        'User-Agent': BROWSER_USER_AGENT,
       },
       body,
     })

@@ -31,6 +31,11 @@ CHAIN_CONFIG: dict[str, dict[str, str | int]] = {
 }
 DEFAULT_CHAIN = "sonic"
 
+BROWSER_USER_AGENT = (
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
 POSITIONS_QUERY_API_V3 = """
 query BorrowersByChain($first: Int!, $skip: Int!, $chainId: Int!) {
   positions(
@@ -248,8 +253,9 @@ def build_headers(api_key: str | None) -> dict[str, str]:
   headers = {
     "Content-Type": "application/json",
     "Accept": "*/*",
-    # The Graph gateway may reject urllib default user agent (403 / code 1010).
-    "User-Agent": "python-requests/2.31.0",
+    # Gateways behind Cloudflare reject the default urllib user agent (403 / code 1010);
+    # present a browser-like signature instead.
+    "User-Agent": BROWSER_USER_AGENT,
   }
   if api_key:
     headers["Authorization"] = f"Bearer {api_key}"
