@@ -15,10 +15,12 @@ on:
         type: choice
         options:
           - all
-          - sonic
           - ethereum
-          - avalanche
+          - xdc
+          - sonic
+          - injective
           - arbitrum
+          - avalanche
   schedule:
     # Every hour at minute 0 (UTC); runs every chain.
     - cron: "0 * * * *"
@@ -52,7 +54,7 @@ jobs:
           fi
           if [ -z "$CHAIN_INPUT" ] || [ "$CHAIN_INPUT" = "all" ]; then
             # Schedule runs and explicit "all" fan out to every supported chain.
-            CHAINS='["sonic","ethereum","avalanche","arbitrum"]'
+            CHAINS='["ethereum","xdc","sonic","injective","arbitrum","avalanche"]'
           else
             # Manual dispatch with a specific chain runs only that chain.
             CHAINS="[\"$CHAIN_INPUT\"]"
