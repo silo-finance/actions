@@ -53,6 +53,13 @@ function normalizeRawValue(value: unknown): string | null {
   return null
 }
 
+/** Append a unique value so the browser/CDN never serves a stale legacy positions file. */
+function appendCacheBust(url: string): string {
+  const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}_cb=${token}`
+}
+
 function resolvePositionsSourceUrl(chainId: number): string | null {
   const envKey = CHAIN_URL_ENV_KEYS[chainId]
   const direct = envKey ? process.env[envKey]?.trim() : ''
@@ -102,9 +109,10 @@ export async function fetchExternalPositionsData(chainIds: number[]): Promise<Ex
         )
         return
       }
-      console.info(`[positions-external] loading ${chainKey} positions from ${sourceUrl}`)
+      const requestUrl = appendCacheBust(sourceUrl)
+      console.info(`[positions-external] loading ${chainKey} positions from ${requestUrl}`)
       try {
-        const res = await fetch(sourceUrl, { cache: 'no-store' })
+        const res = await fetch(requestUrl, { cache: 'no-store' })
         if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`)
         const payload = (await res.json()) as unknown
         if (!Array.isArray(payload)) throw new Error('Payload is not a JSON array')
