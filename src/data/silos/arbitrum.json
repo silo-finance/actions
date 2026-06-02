@@ -1,7 +1,7 @@
 {
   "chainId": 42161,
   "chainKey": "arbitrum",
-  "generatedAt": "2026-05-15T10:40:52.172Z",
+  "generatedAt": "2026-06-02T12:59:54.046Z",
   "silos": [
     {
       "chainId": 42161,
@@ -60,7 +60,8 @@
           "hookReceiver": "0xac623a1d1ee7023e60288fd2c9ec3fb729f4ee8f",
           "callBeforeQuote": false
         }
-      }
+      },
+      "marketVersion": "v3"
     },
     {
       "chainId": 42161,
@@ -119,7 +120,8 @@
           "hookReceiver": "0x9d9fddc7cdce47d58b0b55f563d2d0a2971ee85f",
           "callBeforeQuote": false
         }
-      }
+      },
+      "marketVersion": "v3"
     },
     {
       "chainId": 42161,
@@ -178,7 +180,8 @@
           "hookReceiver": "0x2f9407fc70478af8eb1968695b771ceefa5d9f4e",
           "callBeforeQuote": false
         }
-      }
+      },
+      "marketVersion": "v3"
     },
     {
       "chainId": 42161,
@@ -237,7 +240,8 @@
           "hookReceiver": "0x2f9407fc70478af8eb1968695b771ceefa5d9f4e",
           "callBeforeQuote": false
         }
-      }
+      },
+      "marketVersion": "v3"
     }
   ]
 }
