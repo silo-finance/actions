@@ -2156,6 +2156,11 @@ function PositionsPageInner() {
   const syncMarketCachesFromPositionsRefresh = async () => {
     if (!selectedRow || selectedChainId == null || !selectedSiloAddress) return
     const marketKey = `${selectedRow.chainId}:${selectedRow.siloAddress.toLowerCase()}`
+    // Re-download the legacy positions file (cache-busted) so a manual refresh reflects the latest data.
+    const externalData =
+      selectedRow.marketVersion === 'legacy'
+        ? (await externalPositionsQuery.refetch()).data ?? externalPositionsQuery.data
+        : externalPositionsQuery.data
     const allItems =
       selectedRow.marketVersion === 'legacy'
         ? mergeMarketPositionItems(
@@ -2163,21 +2168,21 @@ function PositionsPageInner() {
             selectedRow.siloAddress,
             'legacy',
             [],
-            externalPositionsQuery.data
+            externalData
           )
         : mergeMarketPositionItems(
             selectedRow.chainId,
             selectedRow.siloAddress,
             'v3',
             await fetchAllOpenPositionsByMarket(selectedRow.chainId, selectedRow.siloAddress, graphPageLimit),
-            externalPositionsQuery.data
+            externalData
           )
     const allBorrowerAddresses = Array.from(
       new Set(allItems.map((item) => extractBorrowerAddress(item.accountId)).filter(Boolean))
     ) as string[]
     const solvencyByBorrower =
       selectedRow.marketVersion === 'legacy'
-        ? solvencyMapFromExternalMarket(externalPositionsQuery.data, marketKey)
+        ? solvencyMapFromExternalMarket(externalData, marketKey)
         : allBorrowerAddresses.length > 0
           ? await fetchBorrowersSolvency(selectedRow.chainId, selectedRow.siloAddress, allBorrowerAddresses, {
               preferredProvider: walletProvider,
@@ -2195,7 +2200,7 @@ function PositionsPageInner() {
         ? buildLiquidationPositionKey(selectedRow.chainId, selectedRow.siloAddress, borrowerAddress)
         : null
       const externalSolvent = externalSolventKey
-        ? externalPositionsQuery.data?.byPositionKey.get(externalSolventKey)?.solvent
+        ? externalData?.byPositionKey.get(externalSolventKey)?.solvent
         : null
       const isSolvent = externalSolvent ?? (borrowerAddress ? solvencyByBorrower.get(borrowerAddress) : undefined)
       const isInsolvent = isSolvent === false || (healthFactor != null && healthFactor >= 1)
