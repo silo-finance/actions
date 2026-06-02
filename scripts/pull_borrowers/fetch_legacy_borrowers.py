@@ -28,6 +28,15 @@ CHAIN_CONFIG: dict[str, dict[str, str | int]] = {
     "chain_id": 146,
     "subgraph_url": "https://gateway.thegraph.com/api/subgraphs/id/8wcbzcdNirQvk1ETh25wpVzb5GWs8DvugpbwrYnTCcxj",
   },
+  "xdc": {
+    "chain_id": 50,
+    # No dedicated legacy (v2) subgraph; fall back to the v3 API (only used if a legacy whitelist exists).
+    "subgraph_url": "https://api-v3.silo.finance/graphql",
+  },
+  "injective": {
+    "chain_id": 1776,
+    "subgraph_url": "https://api-v3.silo.finance/graphql",
+  },
 }
 DEFAULT_CHAIN = "sonic"
 
