@@ -37,11 +37,25 @@ CHAIN_CONFIG: dict[str, dict[str, str | int]] = {
     "rpc_default": "https://rpc.soniclabs.com",
     "rpc_env": "NEXT_PUBLIC_RPC_SONIC",
   },
+  "xdc": {
+    "chain_id": 50,
+    "silo_lens": "0xee6845d30c2529BA0a9A1adFfa06C377FE2DDEdd",
+    "rpc_default": "https://rpc.xdcrpc.com",
+    "rpc_env": "NEXT_PUBLIC_RPC_XDC",
+  },
+  "injective": {
+    "chain_id": 1776,
+    "silo_lens": "0xa678Aeee7edC5FB8FB51440554789b762D76ec9F",
+    "rpc_default": "https://sentry.evm-rpc.injective.network",
+    "rpc_env": "NEXT_PUBLIC_RPC_INJECTIVE",
+  },
 }
 
 MULTICALL3_BY_CHAIN_ID: dict[int, str] = {
   1: "0xca11bde05977b3631167028862be2a173976ca11",
+  50: "0x0b1795cca8e4ec4df02346a082df54d437f8d9af",
   146: "0xca11bde05977b3631167028862be2a173976ca11",
+  1776: "0xca11bde05977b3631167028862be2a173976ca11",
   42161: "0xca11bde05977b3631167028862be2a173976ca11",
   43114: "0xca11bde05977b3631167028862be2a173976ca11",
 }

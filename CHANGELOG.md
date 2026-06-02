@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.30.0] - 2026-06-02
+
+### Added
+- add XDC and injective
+- chore: refresh silo snapshots
+
 ## [0.29.2] - 2026-06-02
 ### Added
 - add browser agent
