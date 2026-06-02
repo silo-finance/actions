@@ -74,7 +74,7 @@ jobs:
       - name: Fetch legacy borrowers
         run: |
           set -euo pipefail
-          python3 scripts/pull_borrowers/fetch_sonic_borrowers.py \
+          python3 scripts/pull_borrowers/fetch_legacy_borrowers.py \
             --chain "$CHAIN"
         env:
           THE_GRAPH_API_KEY: ${{ secrets.THE_GRAPH_API_KEY }}
@@ -82,7 +82,7 @@ jobs:
       - name: Build legacy positions
         run: |
           set -euo pipefail
-          python3 scripts/pull_borrowers/build_positions_from_borrowers.py \
+          python3 scripts/pull_borrowers/build_legacy_positions_from_borrowers.py \
             --chain "$CHAIN"
 
       - name: Prepare output bundle

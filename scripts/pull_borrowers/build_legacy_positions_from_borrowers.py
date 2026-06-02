@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Example:
-# python3 scripts/pull_borrowers/build_positions_from_borrowers.py --chain sonic
+# python3 scripts/pull_borrowers/build_legacy_positions_from_borrowers.py --chain sonic
 
 from __future__ import annotations
 
@@ -50,7 +50,12 @@ SELECTOR_AGGREGATE3 = bytes.fromhex("82ad56cb")
 SELECTOR_CALC_BORROW_VALUE = bytes.fromhex("8ec109da")
 SELECTOR_CALC_COLLATERAL_VALUE = bytes.fromhex("dd718ab4")
 SELECTOR_GET_USER_LTV = bytes.fromhex("43afdad2")
-SELECTOR_GET_LT = bytes.fromhex("37febff4")
+SELECTOR_GET_CONFIGS_FOR_SOLVENCY = bytes.fromhex("94c0527d")
+
+# SiloConfig.getConfigsForSolvency returns two static ConfigData tuples (collateralConfig, debtConfig).
+# ConfigData has 17 single-word fields; `lt` is the 12th field (index 11).
+CONFIG_DATA_WORD_COUNT = 17
+COLLATERAL_CONFIG_LT_BYTE_OFFSET = 11 * 32
 
 
 class RpcError(RuntimeError):
@@ -179,6 +184,13 @@ def encode_two_address_call(selector: bytes, address_a: str, address_b: str) -> 
 
 def encode_one_address_call(selector: bytes, address_a: str) -> bytes:
   return selector + encode_address(address_a)
+
+
+def decode_collateral_lt(payload: bytes) -> int | None:
+  # getConfigsForSolvency packs collateralConfig first; read its `lt` field directly.
+  if len(payload) < CONFIG_DATA_WORD_COUNT * 32:
+    return None
+  return decode_uint256(payload[COLLATERAL_CONFIG_LT_BYTE_OFFSET : COLLATERAL_CONFIG_LT_BYTE_OFFSET + 32])
 
 
 def rpc_request(rpc_url: str, method: str, params: list[Any]) -> Any:
@@ -400,23 +412,32 @@ def main() -> None:
       }
     )
 
-  # Fetch LT from SiloLens once per unique market silo.
-  unique_silos = sorted({pos["silo_address"] for pos in positions if pos.get("silo_address")})
-  lt_calls = [
-    {
-      "target": lens_address,
-      "allowFailure": True,
-      "callData": encode_one_address_call(SELECTOR_GET_LT, silo_address),
-      "silo_address": silo_address,
-    }
-    for silo_address in unique_silos
-  ]
-  lt_results = run_multicall(rpc_url, multicall_address, lt_calls, args.chunk_size, "market LT")
-  lt_by_silo: dict[str, str] = {}
-  for i, (success, payload) in enumerate(lt_results):
+  # Fetch the authoritative LT per borrower from SiloConfig.getConfigsForSolvency.
+  # It returns (collateralConfig, debtConfig); the LT that governs solvency lives on the
+  # collateral config, which may differ from the debt-market silo (e.g. one-way legacy
+  # markets where the debt silo's own config LT is 0). The static silo LT is only a fallback.
+  config_calls: list[dict[str, Any]] = []
+  config_refs: list[int] = []
+  for index, pos in enumerate(positions):
+    config_address = normalize_address(pos.get("silo_config_address"))
+    account_address = normalize_address(pos.get("account_id"))
+    if not config_address or not account_address:
+      continue
+    config_calls.append(
+      {
+        "target": config_address,
+        "allowFailure": True,
+        "callData": encode_one_address_call(SELECTOR_GET_CONFIGS_FOR_SOLVENCY, account_address),
+      }
+    )
+    config_refs.append(index)
+  config_results = run_multicall(rpc_url, multicall_address, config_calls, args.chunk_size, "collateral LT")
+  for i, (success, payload) in enumerate(config_results):
     if not success:
       continue
-    lt_by_silo[lt_calls[i]["silo_address"]] = str(decode_uint256(payload))
+    collateral_lt = decode_collateral_lt(payload)
+    if collateral_lt is not None:
+      positions[config_refs[i]]["lt"] = str(collateral_lt)
 
   # Build multicall payloads for borrower-level metrics.
   metric_calls: list[dict[str, Any]] = []
@@ -463,9 +484,6 @@ def main() -> None:
     positions[row_idx][field] = str(decode_uint256(payload))
 
   for row in positions:
-    silo_address = normalize_address(row.get("silo_address"))
-    if silo_address and silo_address in lt_by_silo:
-      row["lt"] = lt_by_silo[silo_address]
     ltv_raw = row.get("ltv")
     lt_raw = row.get("lt")
     if isinstance(ltv_raw, str) and ltv_raw.isdigit() and isinstance(lt_raw, str) and lt_raw.isdigit():

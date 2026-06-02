@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Example:
-# THE_GRAPH_API_KEY=your_api_key python3 scripts/pull_borrowers/fetch_sonic_borrowers.py --chain sonic
+# THE_GRAPH_API_KEY=your_api_key python3 scripts/pull_borrowers/fetch_legacy_borrowers.py --chain sonic
 
 from __future__ import annotations
 
