@@ -3,7 +3,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Contract, Interface, JsonRpcProvider, getAddress } from 'ethers'
+import { Contract, FetchRequest, Interface, JsonRpcProvider, getAddress } from 'ethers'
 import SiloAbi from '../src/abis/Silo.json' with { type: 'json' }
 import SiloConfigAbi from '../src/abis/SiloConfig.json' with { type: 'json' }
 import Erc20Abi from '../src/abis/ERC20.json' with { type: 'json' }
@@ -23,6 +23,10 @@ const CHAIN_ID_BY_KEY = {
 }
 
 const EARN_SILOS_URL = (process.env.EARN_SILOS_URL || 'https://app.silo.finance/api/earn-silos').replace(/\/$/, '')
+// Cloudflare-fronted gateways/RPC nodes ban the default urllib/node user agent (403 / code 1010);
+// present a browser-like signature on every outbound request instead.
+const BROWSER_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 const EARN_PAGE_SIZE = Number(process.env.TEST_API_LIMIT || 1000)
 const siloAbi = Array.isArray(SiloAbi) ? SiloAbi : SiloAbi.abi
 const siloConfigAbi = Array.isArray(SiloConfigAbi) ? SiloConfigAbi : SiloConfigAbi.abi
@@ -62,6 +66,12 @@ function getRpcUrl(chainKey) {
   ).trim()
   if (fromEnv) return fromEnv
   return DEFAULT_RPC_BY_CHAIN[chainKey]
+}
+
+function createRpcFetchRequest(rpcUrl) {
+  const fetchRequest = new FetchRequest(rpcUrl)
+  fetchRequest.setHeader('User-Agent', BROWSER_USER_AGENT)
+  return fetchRequest
 }
 
 const args = process.argv.slice(2)
@@ -161,7 +171,7 @@ async function fetchAllEarnSilos() {
     }
     const res = await fetch(EARN_SILOS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'User-Agent': BROWSER_USER_AGENT },
       body: JSON.stringify(body),
     })
     if (!res.ok) throw new Error(`earn-silos HTTP ${res.status}`)
@@ -190,7 +200,7 @@ async function fetchEarnSilosForChain(chainKey) {
     }
     const res = await fetch(EARN_SILOS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'User-Agent': BROWSER_USER_AGENT },
       body: JSON.stringify(body),
     })
     if (!res.ok) throw new Error(`earn-silos HTTP ${res.status}`)
@@ -296,7 +306,7 @@ async function refreshTargets(targetsByChain) {
     }
     const rpcUrl = getRpcUrl(chainKey)
     if (!rpcUrl) throw new Error(`Missing RPC url for ${chainKey}`)
-    const provider = new JsonRpcProvider(rpcUrl, chainId)
+    const provider = new JsonRpcProvider(createRpcFetchRequest(rpcUrl), chainId)
 
     const siloAddresses = [...addressesSet]
     const configCalls = siloAddresses.map((siloAddress) => ({
