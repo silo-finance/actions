@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.29.1] - 2026-06-02
+
+### Fixed
+- fix cron job: include all chains
+
 ## [0.29.0] - 2026-06-02
 
 ### Added
