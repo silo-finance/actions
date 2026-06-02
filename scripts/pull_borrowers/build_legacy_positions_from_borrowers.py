@@ -46,6 +46,11 @@ MULTICALL3_BY_CHAIN_ID: dict[int, str] = {
   43114: "0xca11bde05977b3631167028862be2a173976ca11",
 }
 
+BROWSER_USER_AGENT = (
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
 SELECTOR_AGGREGATE3 = bytes.fromhex("82ad56cb")
 SELECTOR_CALC_BORROW_VALUE = bytes.fromhex("8ec109da")
 SELECTOR_CALC_COLLATERAL_VALUE = bytes.fromhex("dd718ab4")
@@ -199,7 +204,13 @@ def rpc_request(rpc_url: str, method: str, params: list[Any]) -> Any:
     url=rpc_url,
     data=payload,
     method="POST",
-    headers={"Content-Type": "application/json", "Accept": "application/json"},
+    headers={
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      # Some RPC gateways (e.g. Cloudflare-fronted nodes) ban the default urllib user agent
+      # with HTTP 403 error 1010; present a browser-like signature instead.
+      "User-Agent": BROWSER_USER_AGENT,
+    },
   )
   try:
     with request.urlopen(req, timeout=45) as response:
