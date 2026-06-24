@@ -115,6 +115,9 @@
 
 ## Unreleased
 
+### Added
+- add user lookup page with multicall position, market totals, and borrower health metrics
+
 ## [0.23.0] - 2026-05-18
 
 ### Added
