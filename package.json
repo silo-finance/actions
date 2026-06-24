@@ -3,7 +3,7 @@
   "version": "0.32.0",
   "private": true,
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=24"
   },
   "scripts": {
     "dev": "rm -rf .next && NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next dev",
