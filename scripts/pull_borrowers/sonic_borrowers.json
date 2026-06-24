@@ -502,12 +502,12 @@
   {
     "account_id": "0x15d97bc1ee906dd4ead16f746fb7f80d1c556a76",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1782160219
+    "last_updated_timestamp": 1782318971
   },
   {
     "account_id": "0x185542374ce5fc8bf8f215f5fc681370704fd124",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1782160450
+    "last_updated_timestamp": 1782318958
   },
   {
     "account_id": "0x1b8b76c7528a9990e3ad435b41758de618a339de",
@@ -532,7 +532,7 @@
   {
     "account_id": "0x2f401fe8a2134337bf3db523b108891ebd0c774f",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1782160273
+    "last_updated_timestamp": 1782318976
   },
   {
     "account_id": "0x3345e0a59d7b4f4d767a117f004e01699a64b5e7",
@@ -557,7 +557,7 @@
   {
     "account_id": "0x44a5aa2d447392161a03f670181852675b9709f7",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1782160397
+    "last_updated_timestamp": 1782318981
   },
   {
     "account_id": "0x4be474fc5ba51385902ee081e4fcfa3bc4a118c5",
@@ -597,7 +597,7 @@
   {
     "account_id": "0x645c22593c232ae78a7ecbac93b38cbac535ef12",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1782158792
+    "last_updated_timestamp": 1782317527
   },
   {
     "account_id": "0x672eb607312b3bcbe2ff35d7b3bb29ce003e26a1",
@@ -652,7 +652,7 @@
   {
     "account_id": "0x8d4d19405ba352e4767681c28936fc0a9a8c8dfe",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1782308335
+    "last_updated_timestamp": 1782319473
   },
   {
     "account_id": "0x92694d62feaddb49b5ab9a533547691e4bc6b62f",
@@ -707,7 +707,7 @@
   {
     "account_id": "0xa1c8980f71dd6445cd1890082ce1dc44b2504b66",
     "debt_market_id": "0x322e1d5384aa4ed66aeca770b95686271de61dc3",
-    "last_updated_timestamp": 1782160389
+    "last_updated_timestamp": 1782318995
   },
   {
     "account_id": "0xa749e799fbf53706d74b6e1f43d1b9eaa2455cf9",
