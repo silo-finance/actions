@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { BrowserProvider, type Provider } from 'ethers'
 import ShareLinkCopyButton from '@/components/ShareLinkCopyButton'
 import UserLookupForm from '@/components/user/UserLookupForm'
 import UserPositionSummary from '@/components/user/UserPositionSummary'
@@ -35,7 +36,7 @@ function UserPageInner() {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { chainId } = useWeb3()
+  const { chainId, isConnected, switchNetwork, eip1193Provider } = useWeb3()
 
   const [userInput, setUserInput] = useState('')
   const [addressInput, setAddressInput] = useState('')
@@ -45,29 +46,30 @@ function UserPageInner() {
   const [resolvedChainId, setResolvedChainId] = useState<number | null>(null)
 
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || ''
-  const initialQueryParams = useMemo(
-    () => (typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search)),
-    []
-  )
-  const userFromUrl = useMemo(() => {
-    const raw = initialQueryParams.get('user')
-    if (!raw?.trim()) return null
-    return normalizeAddress(extractHexAddressLike(raw.trim()))
-  }, [initialQueryParams])
-  const addressFromUrl = useMemo(() => {
-    const raw = initialQueryParams.get('address')
-    if (!raw?.trim()) return null
-    return normalizeAddress(extractHexAddressLike(raw.trim()))
-  }, [initialQueryParams])
-  const chainFromUrl = useMemo(
-    () => parseChainFromSearchParam(initialQueryParams.get('chain')),
-    [initialQueryParams]
-  )
 
+  /** Drive everything off the reactive `useSearchParams()` hook so deep links resolve on the client. */
+  const userParam = searchParams.get('user')
+  const addressParam = searchParams.get('address')
+  const chainParam = searchParams.get('chain')
+  const userFromUrl = useMemo(
+    () => (userParam?.trim() ? normalizeAddress(extractHexAddressLike(userParam.trim())) : null),
+    [userParam]
+  )
+  const addressFromUrl = useMemo(
+    () => (addressParam?.trim() ? normalizeAddress(extractHexAddressLike(addressParam.trim())) : null),
+    [addressParam]
+  )
+  const chainFromUrl = useMemo(() => parseChainFromSearchParam(chainParam), [chainParam])
+
+  /** Seed the form inputs from the URL once, so the deep-link tab shows the resolved addresses. */
+  const formSeededRef = useRef(false)
   useEffect(() => {
-    if (userFromUrl) setUserInput(userFromUrl)
-    if (addressFromUrl) setAddressInput(addressFromUrl)
-  }, [userFromUrl, addressFromUrl])
+    if (formSeededRef.current) return
+    if (!userParam?.trim() && !addressParam?.trim()) return
+    formSeededRef.current = true
+    if (userParam?.trim()) setUserInput(userFromUrl ?? userParam.trim())
+    if (addressParam?.trim()) setAddressInput(addressFromUrl ?? addressParam.trim())
+  }, [userParam, addressParam, userFromUrl, addressFromUrl])
 
   const displayChainId = resolvedChainId ?? chainFromUrl ?? chainId
   const networkName = displayChainId != null ? getNetworkDisplayName(displayChainId) : null
@@ -123,7 +125,22 @@ function UserPageInner() {
 
       setLoading(true)
       try {
-        const provider = getReadonlyProvider(targetChainId)
+        /**
+         * When a wallet is connected, switch it to the target chain (if needed) and read through
+         * the wallet's own RPC — usually healthier than the bundled public endpoint (Ethereum's
+         * public RPCs often rate-limit or require an API key). If the user rejects the switch, or
+         * no wallet is connected (e.g. a deep link in a fresh tab), fall back to the read-only
+         * public provider so the lookup still works.
+         */
+        let provider: Provider = getReadonlyProvider(targetChainId)
+        if (isConnected && eip1193Provider) {
+          try {
+            if (chainId !== targetChainId) await switchNetwork(targetChainId)
+            provider = new BrowserProvider(eip1193Provider, targetChainId)
+          } catch {
+            provider = getReadonlyProvider(targetChainId)
+          }
+        }
         const resolved = await resolveSiloInput(provider, siloTarget)
         const result = await readUserSiloPosition(
           provider,
@@ -155,7 +172,7 @@ function UserPageInner() {
         setLoading(false)
       }
     },
-    [chainId, chainFromUrl, pathname, router]
+    [chainId, chainFromUrl, isConnected, switchNetwork, eip1193Provider, pathname, router]
   )
 
   const handleSubmit = useCallback(() => {
