@@ -15,10 +15,15 @@ import {
   classifyManageableOracleAction,
   type ManageableOracleAuthority,
 } from '@/utils/manageableOracleAction'
-import { type DynamicKinkIrmConfig, dynamicKinkIrmConfigToTuple } from '@/utils/dynamicKinkIrmConfig'
+import {
+  type DynamicKinkIrmConfig,
+  dynamicKinkIrmConfigToTuple,
+  formatDynamicKinkIrmConfigJson,
+} from '@/utils/dynamicKinkIrmConfig'
 import {
   type DkinkIrmNamedPreset,
   fetchDkinkIrmPresets,
+  findDkinkIrmPresetName,
 } from '@/utils/dkinkIrmPresetsClient'
 import { flatRateCalculationPreview, flatRateToConfig, parseHumanPercentInput, SECONDS_IN_YEAR } from '@/utils/flatIrmRate'
 import { getExplorerAddressUrl } from '@/utils/networks'
@@ -67,6 +72,12 @@ function AddressLine({ chainId, address }: { chainId: number; address: string })
 }
 
 type Busy = 'idle' | 'updating' | 'cancelling'
+
+type PendingPresetMatch =
+  | { kind: 'unavailable' }
+  | { kind: 'resolving' }
+  | { kind: 'matched'; name: string }
+  | { kind: 'no-match'; presetsFailed: boolean }
 
 function formatActivateAtUnix(seconds: bigint): { iso: string; unix: string } {
   const n = Number(seconds)
@@ -304,6 +315,15 @@ export default function SiloIrmUpdateSection({
     irmState.owner &&
     (authority?.mode === 'direct' || authority?.mode === 'safe_as_wallet' || authority?.mode === 'safe_propose')
 
+  const pendingConfig = irmState?.pendingConfig ?? null
+  const pendingPresetMatch: PendingPresetMatch = useMemo(() => {
+    if (!pendingConfig) return { kind: 'unavailable' }
+    if (presetsLoading || (presets == null && !presetsError)) return { kind: 'resolving' }
+    const name = presets ? findDkinkIrmPresetName(presets, pendingConfig) : null
+    if (name) return { kind: 'matched', name }
+    return { kind: 'no-match', presetsFailed: presets == null }
+  }, [pendingConfig, presets, presetsLoading, presetsError])
+
   if (loading || !irmState) {
     return (
       <section className="silo-panel p-5">
@@ -359,6 +379,7 @@ export default function SiloIrmUpdateSection({
 
         <div className="space-y-1 rounded-md border border-[var(--silo-border)] bg-[var(--silo-surface)] p-3">
           <p className="text-xs font-semibold uppercase tracking-wide silo-text-soft m-0">Pending config</p>
+          <PendingConfigName match={pendingPresetMatch} config={pendingConfig} />
           <p className="text-sm silo-text-main m-0">
             A new config is in the timelock window. It becomes active at:
           </p>
@@ -602,6 +623,64 @@ export default function SiloIrmUpdateSection({
         </button>
       </div>
     </section>
+  )
+}
+
+function PendingConfigName({
+  match,
+  config,
+}: {
+  match: PendingPresetMatch
+  config: DynamicKinkIrmConfig | null
+}) {
+  if (match.kind === 'unavailable') {
+    return (
+      <p className="text-sm silo-text-soft m-0">Pending config values are unavailable (read failed).</p>
+    )
+  }
+  if (match.kind === 'resolving') {
+    return <p className="text-sm silo-text-soft m-0">Resolving preset name…</p>
+  }
+  if (match.kind === 'matched') {
+    return (
+      <p className="text-sm silo-text-main m-0 inline-flex items-center gap-1.5">
+        <span>
+          Pending config name: <span className="font-medium">{match.name}</span>
+        </span>
+        <span className="text-[var(--silo-success)] font-semibold leading-none" aria-hidden>
+          ✓
+        </span>
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm silo-text-main m-0 inline-flex items-center gap-1.5">
+        <span>
+          Pending config name: <span className="font-medium">No matching preset found</span>
+        </span>
+        <span
+          className="inline-flex items-center"
+          style={{ color: 'var(--silo-warning)' }}
+          role="img"
+          aria-label="No matching preset found"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden>
+            <path d="M12 3.2 1.5 21.2h21L12 3.2Zm0 5.1 7.8 13.4H4.2L12 8.3Zm-1 5.1v4.2h2v-4.2h-2Zm0 5.2v1.8h2v-1.8h-2Z" />
+          </svg>
+        </span>
+      </p>
+      {match.presetsFailed ? (
+        <p className="text-xs silo-alert silo-alert-warning m-0">
+          Could not load preset list — showing raw pending config.
+        </p>
+      ) : null}
+      {config ? (
+        <pre className="text-xs font-mono silo-text-main whitespace-pre-wrap break-all m-0">
+          {formatDynamicKinkIrmConfigJson(config)}
+        </pre>
+      ) : null}
+    </div>
   )
 }
 

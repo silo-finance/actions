@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.32.0] - 2026-06-24
+
+### Updated
+- Show pending IRM preset name (or raw config) on Update IRM timelock view
+
 ## [0.31.0] - 2026-06-24
 
 ### Added
