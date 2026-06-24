@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.31.0] - 2026-06-24
+
+### Added
+- user lookups (#111)
+
 ## [0.30.0] - 2026-06-02
 
 ### Added
@@ -114,6 +119,9 @@
 - chore: add or refresh liquidation silo snapshot
 
 ## Unreleased
+
+### Added
+- add user lookup page with multicall position, market totals, and borrower health metrics
 
 ## [0.23.0] - 2026-05-18
 

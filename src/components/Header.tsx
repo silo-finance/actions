@@ -85,6 +85,13 @@ export default function Header() {
               Vaults
             </Link>
             <Link
+              href="/user"
+              className={navLinkClass(isNavActive('/user'))}
+              aria-current={isNavActive('/user') ? 'page' : undefined}
+            >
+              User
+            </Link>
+            <Link
               href="/pause"
               className={navLinkClass(isNavActive('/pause'))}
               aria-current={isNavActive('/pause') ? 'page' : undefined}

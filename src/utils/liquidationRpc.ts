@@ -95,7 +95,7 @@ export function getSiloLensAddressForChain(chainId: number): Promise<string | nu
   return promise
 }
 
-function getReadonlyProvider(chainId: number): Provider {
+export function getReadonlyProvider(chainId: number): Provider {
   const cached = providerCache.get(chainId)
   if (cached) return cached
   const cfg = NETWORK_CONFIGS.find((row) => row.chainId === chainId)
