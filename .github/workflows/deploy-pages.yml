@@ -149,7 +149,7 @@ jobs:
     needs: deploy
     if: success()
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     outputs:
       smoke_ok: ${{ steps.record_smoke.outputs.ok }}
     steps:
@@ -165,8 +165,34 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Install Playwright browser
-        run: npx playwright install chromium --with-deps
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browser (retry + per-attempt timeout)
+        shell: bash
+        run: |
+          set -uo pipefail
+          # A stalled CDN download must never silently consume the whole job budget:
+          # that surfaced only as "The operation was canceled." and triggered false rollbacks.
+          # Cap each attempt and retry instead of letting the job time out.
+          max=3
+          attempt=0
+          until [ "$attempt" -ge "$max" ]; do
+            attempt=$((attempt + 1))
+            echo "::group::playwright install attempt ${attempt}/${max}"
+            if timeout -k 30s 360s npx playwright install chromium --with-deps; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "::warning::playwright browser install attempt ${attempt} failed or stalled; retrying in 10s"
+            sleep 10
+          done
+          echo "::error::playwright browser install failed after ${max} attempts"
+          exit 1
 
       - name: Log smoke URLs
         env:
@@ -211,6 +237,7 @@ jobs:
       - name: Post-deploy smoke (Playwright)
         id: playwright_smoke
         continue-on-error: true
+        timeout-minutes: 8
         env:
           SMOKE_BASE_URL: ${{ needs.deploy.outputs.page_url }}
         run: npm run test:smoke

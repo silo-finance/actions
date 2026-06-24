@@ -1,6 +1,7 @@
 import {
   parseDynamicKinkIrmConfigFromJsonObj,
   preprocessDkinkJsonConfigNumbers,
+  sameDynamicKinkIrmConfig,
   type DynamicKinkIrmConfig,
 } from '@/utils/dynamicKinkIrmConfig'
 
@@ -42,4 +43,12 @@ export async function fetchDkinkIrmPresets(): Promise<DkinkIrmNamedPreset[]> {
     out.push({ name, config: parseDynamicKinkIrmConfigFromJsonObj(cfg) })
   }
   return out
+}
+
+/** Name of the first preset whose config exactly matches `config`, or `null` if none match. */
+export function findDkinkIrmPresetName(
+  presets: DkinkIrmNamedPreset[],
+  config: DynamicKinkIrmConfig
+): string | null {
+  return presets.find((p) => sameDynamicKinkIrmConfig(p.config, config))?.name ?? null
 }

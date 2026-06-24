@@ -127,3 +127,9 @@ export function dynamicKinkIrmConfigToTuple(
 export function sameDynamicKinkIrmConfig(a: DynamicKinkIrmConfig, b: DynamicKinkIrmConfig): boolean {
   return CONFIG_KEYS.every((k) => a[k] === b[k])
 }
+
+/** Pretty-printed JSON of all config fields with bigint values rendered as decimal strings. */
+export function formatDynamicKinkIrmConfigJson(config: DynamicKinkIrmConfig): string {
+  const obj = Object.fromEntries(CONFIG_KEYS.map((k) => [k, String(config[k])]))
+  return JSON.stringify(obj, null, 2)
+}
