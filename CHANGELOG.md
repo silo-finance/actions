@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.32.0] - 2026-06-24
+
+### Updated
+- Show pending IRM preset name (or raw config) on Update IRM timelock view
+
+### Fixed
+- make post-deploy smoke browser install resilient so stalled downloads no longer trigger false rollbacks
+
 ## [0.31.0] - 2026-06-24
 
 ### Added
