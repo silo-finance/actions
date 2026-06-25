@@ -175,19 +175,18 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          # A stalled CDN download must never silently consume the whole job budget:
-          # that surfaced only as "The operation was canceled." and triggered false rollbacks.
-          # Cap each attempt and retry instead of letting the job time out.
+          # Cap each attempt and retry so a transient network stall can't silently consume the
+          # whole job budget (which previously surfaced only as "The operation was canceled."
+          # and triggered false rollbacks). Output is intentionally not collapsed so a real
+          # install failure stays visible in the log.
           max=3
           attempt=0
           until [ "$attempt" -ge "$max" ]; do
             attempt=$((attempt + 1))
-            echo "::group::playwright install attempt ${attempt}/${max}"
+            echo "::notice::playwright install attempt ${attempt}/${max}"
             if timeout -k 30s 360s npx playwright install chromium --with-deps; then
-              echo "::endgroup::"
               exit 0
             fi
-            echo "::endgroup::"
             echo "::warning::playwright browser install attempt ${attempt} failed or stalled; retrying in 10s"
             sleep 10
           done

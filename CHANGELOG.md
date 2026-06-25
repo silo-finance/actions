@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.32.1] - 2026-06-25
+### Fixed
+- upgrade Playwright to fix post-deploy smoke browser install (dead CDN) that caused false rollbacks
+
 ## [0.32.0] - 2026-06-24
 
 ### Updated
