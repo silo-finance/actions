@@ -17,37 +17,37 @@ CHAIN_CONFIG: dict[str, dict[str, str | int]] = {
     "chain_id": 1,
     "silo_lens": "0xC0e1bcFB1Ed68688B0d589A6807d05cF2D68b22b",
     "rpc_default": "https://eth.llamarpc.com",
-    "rpc_env": "NEXT_PUBLIC_RPC_ETHEREUM",
+    "rpc_env": "RPC_URL_ETHEREUM",
   },
   "avalanche": {
     "chain_id": 43114,
     "silo_lens": "0xA0380d22A4Ee658e9706b390ddf9646f184dd521",
     "rpc_default": "https://avalanche-c-chain-rpc.publicnode.com",
-    "rpc_env": "NEXT_PUBLIC_RPC_AVALANCHE",
+    "rpc_env": "RPC_URL_AVALANCHE",
   },
   "arbitrum": {
     "chain_id": 42161,
     "silo_lens": "0xF0B0218153633e6154c201d5A5d81128B0539336",
     "rpc_default": "https://arbitrum.drpc.org",
-    "rpc_env": "NEXT_PUBLIC_RPC_ARBITRUM",
+    "rpc_env": "RPC_URL_ARBITRUM",
   },
   "sonic": {
     "chain_id": 146,
     "silo_lens": "0xB95AD415b0fcE49f84FbD5B26b14ec7cf4822c69",
     "rpc_default": "https://rpc.soniclabs.com",
-    "rpc_env": "NEXT_PUBLIC_RPC_SONIC",
+    "rpc_env": "RPC_URL_SONIC",
   },
   "xdc": {
     "chain_id": 50,
     "silo_lens": "0xee6845d30c2529BA0a9A1adFfa06C377FE2DDEdd",
     "rpc_default": "https://rpc.xdcrpc.com",
-    "rpc_env": "NEXT_PUBLIC_RPC_XDC",
+    "rpc_env": "RPC_URL_XDC",
   },
   "injective": {
     "chain_id": 1776,
     "silo_lens": "0xa678Aeee7edC5FB8FB51440554789b762D76ec9F",
     "rpc_default": "https://sentry.evm-rpc.injective.network",
-    "rpc_env": "NEXT_PUBLIC_RPC_INJECTIVE",
+    "rpc_env": "RPC_URL_INJECTIVE",
   },
 }
 
@@ -314,8 +314,16 @@ def get_chain_runtime(chain: str, args: argparse.Namespace) -> tuple[int, str, s
   chain_cfg = CHAIN_CONFIG[chain]
   chain_id = int(chain_cfg["chain_id"])
   default_rpc = str(chain_cfg["rpc_default"])
-  rpc_env_key = str(chain_cfg["rpc_env"])
-  rpc_url = args.rpc_url or os.getenv(rpc_env_key, "").strip() or default_rpc
+  # Private CI secret first; the public NEXT_PUBLIC_* name is kept only as a local/.env fallback
+  # (it must never be a CI secret, since the static frontend build inlines NEXT_PUBLIC_* publicly).
+  private_rpc_env_key = str(chain_cfg["rpc_env"])
+  public_rpc_env_key = f"NEXT_PUBLIC_RPC_{chain.upper()}"
+  rpc_url = (
+    args.rpc_url
+    or os.getenv(private_rpc_env_key, "").strip()
+    or os.getenv(public_rpc_env_key, "").strip()
+    or default_rpc
+  )
   lens_address = normalize_address(args.silo_lens or str(chain_cfg["silo_lens"]))
   if not lens_address:
     raise ValueError(f"Invalid SiloLens address for {chain}.")
