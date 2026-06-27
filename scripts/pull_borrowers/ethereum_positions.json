@@ -1,0 +1,17 @@
+[
+  {
+    "chain": "ethereum",
+    "chain_id": 1,
+    "account_id": "0xa521e425f37acc731651565b41ce3e5022274f4f",
+    "debt_market_id": "0xe073be79811469a5726fb74ce84317091626c35e",
+    "silo_address": "0xe073be79811469a5726fb74ce84317091626c35e",
+    "silo_config_address": "0x7a81c2fb4894ec17d0294e676ffe7750adcf200f",
+    "collateral_value": "12564889000000000000",
+    "debt_value": "4149483000000000000",
+    "ltv": "330244302197974053",
+    "lt": "930000000000000000",
+    "solvent": true,
+    "age_timestamp": 1782558179,
+    "last_updated_timestamp": 1766179379
+  }
+]
