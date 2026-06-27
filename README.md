@@ -66,6 +66,15 @@ NEXT_PUBLIC_RPC_SONIC=https://rpc.soniclabs.com
 NEXT_PUBLIC_RPC_XDC=https://rpc.xdcrpc.com
 ```
 
+> RPC endpoints are public by design on the deployed site: `NEXT_PUBLIC_RPC_*` is inlined into the static browser bundle at build time, so only ever point it at a public RPC (or rely on the hardcoded public defaults / the connected wallet's RPC). The deploy build does not pass any RPC var.
+
+For a **private** RPC used **only by CI scripts** (legacy positions pull and silo sync), add a **repository secret** named `RPC_URL_<CHAIN>` (e.g. `RPC_URL_ETHEREUM`):
+
+1. GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **Secrets** → **New repository secret**
+2. Name: `RPC_URL_ETHEREUM` (and/or `RPC_URL_ARBITRUM`, `RPC_URL_AVALANCHE`, `RPC_URL_SONIC`, `RPC_URL_XDC`, `RPC_URL_INJECTIVE`), value: your private RPC URL
+
+CI scripts prefer `RPC_URL_<CHAIN>`, then fall back to `NEXT_PUBLIC_RPC_<CHAIN>` (local `.env` only), then the hardcoded public default. These secrets are passed only to script steps, never to `npm run build`, so they stay out of the published bundle.
+
 Data contract details live in `docs/liquidation-dashboard-data.md`.
 
 For WalletConnect on the deployed site, add a **repository variable** (not required for local-only extension wallets):

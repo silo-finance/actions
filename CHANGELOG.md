@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.32.2] - 2026-06-27
+### Fixed
+- use private RPC_URL_* secrets in CI scripts so legacy positions and silo sync stop failing on flaky public RPC
+
 ## [0.32.1] - 2026-06-25
 ### Fixed
 - upgrade Playwright to fix post-deploy smoke browser install (dead CDN) that caused false rollbacks

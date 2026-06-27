@@ -39,6 +39,14 @@ jobs:
         env:
           TEST_API_LIMIT: ${{ inputs.testApiLimit }}
           TEST_GRAPH_LIMIT: ${{ inputs.testGraphLimit }}
+          # Private CI-only RPC endpoints. Unset secrets resolve to empty and the script
+          # falls back to its hardcoded public RPC default per chain.
+          RPC_URL_ETHEREUM: ${{ secrets.RPC_URL_ETHEREUM }}
+          RPC_URL_ARBITRUM: ${{ secrets.RPC_URL_ARBITRUM }}
+          RPC_URL_AVALANCHE: ${{ secrets.RPC_URL_AVALANCHE }}
+          RPC_URL_SONIC: ${{ secrets.RPC_URL_SONIC }}
+          RPC_URL_XDC: ${{ secrets.RPC_URL_XDC }}
+          RPC_URL_INJECTIVE: ${{ secrets.RPC_URL_INJECTIVE }}
         run: |
           set -euo pipefail
           EXTRA=""
