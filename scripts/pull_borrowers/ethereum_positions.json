@@ -7,11 +7,11 @@
     "silo_address": "0xe073be79811469a5726fb74ce84317091626c35e",
     "silo_config_address": "0x7a81c2fb4894ec17d0294e676ffe7750adcf200f",
     "collateral_value": "12564889000000000000",
-    "debt_value": "4156035000000000000",
-    "ltv": "330765755272489873",
+    "debt_value": "4156067000000000000",
+    "ltv": "330768302051852587",
     "lt": "930000000000000000",
     "solvent": true,
-    "age_timestamp": 1783553333,
+    "age_timestamp": 1783558290,
     "last_updated_timestamp": 1766179379
   }
 ]
