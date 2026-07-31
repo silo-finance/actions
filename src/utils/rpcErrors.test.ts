@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { extractErrorMessage, isUserRejectionError, toUserErrorMessage } from '@/utils/rpcErrors'
+import {
+  extractAsciiHintsFromRevertData,
+  extractErrorMessage,
+  formatViewCallFailure,
+  isUserRejectionError,
+  toUserErrorMessage,
+} from '@/utils/rpcErrors'
 
 describe('extractErrorMessage', () => {
   it('reads pino-style Safe / WalletConnect payloads', () => {
@@ -60,5 +66,26 @@ describe('toUserErrorMessage', () => {
 
   it('passes through extracted message', () => {
     expect(toUserErrorMessage({ shortMessage: 'Insufficient gas' })).toBe('Insufficient gas')
+  })
+})
+
+describe('extractAsciiHintsFromRevertData', () => {
+  it('extracts oracle feed ids from custom-error data', () => {
+    const data =
+      '0x4f319ffe4d53595f46554e44414d454e54414c2f555344000000000000000000000000000000000000000000000000000000000000000000000000000000019ee4dcdbe0000000000000000000000000000000000000000000000000000000006a367e370000000000000000000000000000000000000000000000000000000006577c69'
+    expect(extractAsciiHintsFromRevertData(data)).toContain('MSY_FUNDAMENTAL/USD')
+  })
+})
+
+describe('formatViewCallFailure', () => {
+  it('appends ascii hints when the base message omits them', () => {
+    const data =
+      '0x4f319ffe4d53595f46554e44414d454e54414c2f555344000000000000000000000000'
+    const msg = formatViewCallFailure(
+      { message: 'execution reverted (unknown custom error)', data },
+      'Call reverted.'
+    )
+    expect(msg).toContain('execution reverted')
+    expect(msg).toContain('MSY_FUNDAMENTAL/USD')
   })
 })

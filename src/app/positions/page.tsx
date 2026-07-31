@@ -1119,12 +1119,17 @@ function PositionsPageInner() {
         const borrowerAddresses = Array.from(
           new Set(items.map((item) => extractBorrowerAddress(item.accountId)).filter(Boolean))
         ) as string[]
-        const solvencyByBorrower =
-          row.marketVersion === 'legacy'
-            ? solvencyMapFromExternalMarket(externalData, key)
-            : borrowerAddresses.length > 0
-              ? await fetchBorrowersSolvency(row.chainId, row.siloAddress, borrowerAddresses)
-              : new Map<string, boolean>()
+        let solvencyByBorrower = new Map<string, boolean>()
+        try {
+          solvencyByBorrower =
+            row.marketVersion === 'legacy'
+              ? solvencyMapFromExternalMarket(externalData, key)
+              : borrowerAddresses.length > 0
+                ? await fetchBorrowersSolvency(row.chainId, row.siloAddress, borrowerAddresses)
+                : new Map<string, boolean>()
+        } catch (error) {
+          console.warn(`[positions] solvency prefetch failed for ${key}; continuing with health-factor counts`, error)
+        }
         const ltRatio = parseScaledNumber(resolveEffectiveLtRawForMarket(row), 18)
         let warningCount = 0
         let insolventCount = 0

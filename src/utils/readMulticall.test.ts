@@ -111,6 +111,39 @@ describe('executeReadMulticall', () => {
     expect(fallbackB).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps allowFailure fallbacks null when one direct call reverts', async () => {
+    const fallbackOk = vi.fn(async () => BigInt(42))
+    const fallbackFail = vi.fn(async () => {
+      throw new Error('execution reverted (unknown custom error)')
+    })
+    const provider = mockProvider({
+      callImpl: async () => {
+        throw new Error('rpc rate limited')
+      },
+    })
+    const results = await executeReadMulticall(provider, [
+      buildReadMulticallCall({
+        target: getAddress('0x8888888888888888888888888888888888888888'),
+        abi: uintAbi,
+        functionName: 'readValue',
+        allowFailure: true,
+        fallback: fallbackFail,
+        decodeResult: (v) => BigInt(String(v)),
+      }),
+      buildReadMulticallCall({
+        target: getAddress('0x9999999999999999999999999999999999999999'),
+        abi: uintAbi,
+        functionName: 'readValue',
+        allowFailure: true,
+        fallback: fallbackOk,
+        decodeResult: (v) => BigInt(String(v)),
+      }),
+    ])
+    expect(results).toEqual([null, BigInt(42)])
+    expect(fallbackFail).toHaveBeenCalledTimes(1)
+    expect(fallbackOk).toHaveBeenCalledTimes(1)
+  })
+
   it('splits calls into chunks when chunkSize is set', async () => {
     const rpcCalls: string[] = []
     const provider = mockProvider({

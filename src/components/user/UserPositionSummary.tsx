@@ -11,7 +11,6 @@ import {
 type Props = {
   chainId: number
   position: UserSiloPosition
-  lensAvailable: boolean
 }
 
 function shortAddress(addr: string): string {
@@ -81,8 +80,20 @@ function SiloRef({
   )
 }
 
-export default function UserPositionSummary({ chainId, position, lensAvailable }: Props) {
+function liveLtvWarning(position: UserSiloPosition): string | null {
+  if (position.role !== 'BORROWER' || position.ltv != null) return null
+  if (!position.lensAddress) {
+    return 'Silo Lens is not available on this chain, so live LTV could not be read.'
+  }
+  if (position.ltvReadError) {
+    return `Live LTV could not be read: ${position.ltvReadError}`
+  }
+  return 'Live LTV could not be read.'
+}
+
+export default function UserPositionSummary({ chainId, position }: Props) {
   const { role, siloId, isSolvent, ltv, lt, collateralConfig, debtConfig } = position
+  const ltvWarning = liveLtvWarning(position)
 
   const symbolForToken = (token: string): string | null =>
     position.silos.find((s) => s.token.toLowerCase() === token.toLowerCase())?.symbol ?? null
@@ -128,7 +139,7 @@ export default function UserPositionSummary({ chainId, position, lensAvailable }
         <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
           <Metric
             label="LTV"
-            value={lensAvailable ? formatWadPercent(ltv) : '—'}
+            value={ltv != null ? formatWadPercent(ltv) : '—'}
             hint="Current loan-to-value: borrowed value / collateral value."
           />
           <Metric
@@ -167,11 +178,7 @@ export default function UserPositionSummary({ chainId, position, lensAvailable }
         </p>
       )}
 
-      {role === 'BORROWER' && !lensAvailable ? (
-        <p className="mt-3 text-sm silo-alert silo-alert-warning">
-          Silo Lens is not available on this chain, so live LTV could not be read.
-        </p>
-      ) : null}
+      {ltvWarning ? <p className="mt-3 text-sm silo-alert silo-alert-warning">{ltvWarning}</p> : null}
     </div>
   )
 }

@@ -235,11 +235,7 @@ function UserPageInner() {
 
       {position && displayChainId != null ? (
         <>
-          <UserPositionSummary
-            chainId={displayChainId}
-            position={position}
-            lensAvailable={position.ltv != null}
-          />
+          <UserPositionSummary chainId={displayChainId} position={position} />
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {position.silos.map((silo, idx) => (
               <SiloUserCard key={silo.silo} chainId={displayChainId} label={siloLabel(idx)} data={silo} />

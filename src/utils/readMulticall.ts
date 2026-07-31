@@ -98,11 +98,30 @@ function chunkCalls<T>(calls: ReadMulticallCall<T>[], chunkSize: number): ReadMu
   return out
 }
 
-async function runFallback<T>(calls: ReadMulticallCall<T>[], reason: string, debugLabel?: string): Promise<T[]> {
+async function runFallback<T>(
+  calls: ReadMulticallCall<T>[],
+  reason: string,
+  debugLabel?: string
+): Promise<(T | null)[]> {
   if (debugLabel) {
     console.debug(`[readMulticall] fallback (${debugLabel}): ${reason}; calls=${calls.length}`)
   }
-  return Promise.all(calls.map((c) => c.fallback()))
+  return Promise.all(
+    calls.map(async (call) => {
+      try {
+        return await call.fallback()
+      } catch (error) {
+        if (call.allowFailure) {
+          if (debugLabel) {
+            const detail = error instanceof Error ? error.message : String(error)
+            console.debug(`[readMulticall] fallback call failed (${debugLabel}): ${detail}`)
+          }
+          return null
+        }
+        throw error
+      }
+    })
+  )
 }
 
 export async function executeReadMulticall<T>(
