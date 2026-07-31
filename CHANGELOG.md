@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+### Fixed
+- keep positions market metrics loading when a single borrower `isSolvent` call reverts (e.g. broken oracle feed)
+
 ## [0.32.2] - 2026-06-27
 ### Fixed
 - use private RPC_URL_* secrets in CI scripts so legacy positions and silo sync stop failing on flaky public RPC

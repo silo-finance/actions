@@ -429,6 +429,8 @@ export async function fetchBorrowersSolvency(
       abi: SiloAbi,
       functionName: 'isSolvent',
       args: [borrowerAddress],
+      // Oracle/pricing reverts must not fail the whole market solvency batch.
+      allowFailure: true,
       fallback: async () => (await silo.isSolvent(borrowerAddress)) as boolean,
       decodeResult: (decoded) => Boolean(decoded),
     })
@@ -440,7 +442,9 @@ export async function fetchBorrowersSolvency(
     debugLabel: `liq-solvency:${chainId}`,
   })
   for (let i = 0; i < normalizedBorrowers.length; i += 1) {
-    out.set(normalizedBorrowers[i]!, Boolean(results[i]))
+    const value = results[i]
+    if (value == null) continue
+    out.set(normalizedBorrowers[i]!, Boolean(value))
   }
   return out
 }
