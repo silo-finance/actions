@@ -110,6 +110,38 @@ export function toUserErrorMessage(err: unknown, fallback = 'Transaction failed.
   return msg || fallback
 }
 
+/** Pull printable ASCII runs (e.g. oracle feed ids) out of hex revert `data`. */
+export function extractAsciiHintsFromRevertData(data: string): string[] {
+  const hex = data.startsWith('0x') || data.startsWith('0X') ? data.slice(2) : data
+  if (hex.length < 8 || hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) return []
+  const hints: string[] = []
+  let run = ''
+  for (let i = 0; i < hex.length; i += 2) {
+    const byte = Number.parseInt(hex.slice(i, i + 2), 16)
+    if (byte >= 0x20 && byte <= 0x7e) {
+      run += String.fromCharCode(byte)
+      continue
+    }
+    if (run.length >= 4) hints.push(run)
+    run = ''
+  }
+  if (run.length >= 4) hints.push(run)
+  return hints
+}
+
+/**
+ * User-facing message for a failed eth_call / view read. Appends ASCII hints from revert data when
+ * ethers only surfaces "unknown custom error".
+ */
+export function formatViewCallFailure(err: unknown, fallback = 'Call reverted.'): string {
+  const base = toUserErrorMessage(err, fallback)
+  const data = (err as { data?: unknown } | null)?.data
+  if (typeof data !== 'string' || !data) return base
+  const hints = extractAsciiHintsFromRevertData(data).filter((hint) => !base.includes(hint))
+  if (hints.length === 0) return base
+  return `${base} [${hints.join(', ')}]`
+}
+
 /** User-facing copy when we could not finish on-chain reads via the wallet RPC. */
 export function formatWalletRpcFailureMessage(err: unknown): string {
   if (isLikelyRpcOrNetworkFailure(err)) {

@@ -1,4 +1,4 @@
-import { getAddress, ZeroAddress, formatUnits, type Provider } from 'ethers'
+import { Contract, getAddress, ZeroAddress, formatUnits, type Provider } from 'ethers'
 import siloArtifact from '@/abis/Silo.json'
 import siloConfigArtifact from '@/abis/SiloConfig.json'
 import siloLensArtifact from '@/abis/ISiloLens.json'
@@ -6,6 +6,7 @@ import erc20Artifact from '@/abis/ERC20.json'
 import { loadAbi } from '@/utils/loadAbi'
 import { buildReadMulticallCall, executeReadMulticall, type ReadMulticallCall } from '@/utils/readMulticall'
 import { getSiloLensAddressForChain } from '@/utils/liquidationRpc'
+import { formatViewCallFailure } from '@/utils/rpcErrors'
 
 const siloAbi = loadAbi(siloArtifact)
 const siloConfigAbi = loadAbi(siloConfigArtifact)
@@ -58,8 +59,12 @@ export type UserSiloPosition = {
   user: string
   role: UserRole
   isSolvent: boolean | null
-  /** WAD (1e18 = 100%). `null` when the Silo Lens is unavailable on this chain. */
+  /** Resolved Silo Lens used for live LTV/LT, or null when none is configured for the chain. */
+  lensAddress: string | null
+  /** WAD (1e18 = 100%). `null` when Lens is missing or the live LTV read failed. */
   ltv: bigint | null
+  /** Set when Lens exists but `getUserLTV` failed (e.g. oracle revert). */
+  ltvReadError: string | null
   /** WAD; Silo Lens returns `0` when the user has no debt. */
   lt: bigint | null
   collateralConfig: SolvencyConfigSummary | null
@@ -296,6 +301,17 @@ export async function readUserSiloPosition(
   const isSolvent = get<boolean>('isSolvent')
   const ltv = get<bigint>('ltv')
   const lt = get<bigint>('lt')
+  let ltvReadError: string | null = null
+  if (lensAddress && ltv == null) {
+    // Multicall allowFailure drops revert details — probe once so the UI can show the real cause.
+    try {
+      const lens = new Contract(lensAddress, siloLensAbi, provider)
+      await lens.getUserLTV.staticCall(silo0, user)
+    } catch (error) {
+      ltvReadError = formatViewCallFailure(error, 'Live LTV call reverted.')
+    }
+    if (!ltvReadError) ltvReadError = 'Live LTV could not be read.'
+  }
 
   const configs: (SiloConfigShape | null)[] = [get<SiloConfigShape>('config0'), get<SiloConfigShape>('config1')]
   const collateralShares: bigint[] = [
@@ -461,7 +477,9 @@ export async function readUserSiloPosition(
     user,
     role,
     isSolvent,
+    lensAddress,
     ltv,
+    ltvReadError,
     lt,
     collateralConfig,
     debtConfig,
