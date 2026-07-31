@@ -18,21 +18,27 @@ export type ExternalPositionsData = {
 
 const CHAIN_URL_ENV_KEYS: Record<number, string> = {
   1: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_ETHEREUM',
+  50: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_XDC',
   146: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_SONIC',
+  1776: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_INJECTIVE',
   42161: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_ARBITRUM',
   43114: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_AVALANCHE',
 }
 
 const CHAIN_KEY_BY_ID: Record<number, string> = {
   1: 'ethereum',
+  50: 'xdc',
   146: 'sonic',
+  1776: 'injective',
   42161: 'arbitrum',
   43114: 'avalanche',
 }
 
 const CHAIN_FILE_NAMES: Record<number, string> = {
   1: 'ethereum_positions.json',
+  50: 'xdc_positions.json',
   146: 'sonic_positions.json',
+  1776: 'injective_positions.json',
   42161: 'arbitrum_positions.json',
   43114: 'avalanche_positions.json',
 }

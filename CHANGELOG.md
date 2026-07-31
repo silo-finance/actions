@@ -3,6 +3,7 @@
 ## [Unreleased]
 ### Fixed
 - keep positions market metrics loading when a single borrower `isSolvent` call reverts (e.g. broken oracle feed)
+- load legacy positions for XDC and Injective from the shared positions base URL
 
 ## [0.32.2] - 2026-06-27
 ### Fixed
