@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import HotValueFlame from '@/components/HotValueFlame'
+import FormattedDecimal from '@/components/FormattedDecimal'
 import PositionPriorityTicks from '@/components/PositionPriorityTicks'
 import { useWeb3 } from '@/contexts/Web3Context'
 import {
@@ -260,6 +261,17 @@ function formatPositionLtv(raw: string | null): string {
   const n = parseScaledNumber(raw, 18)
   if (n == null) return '—'
   return `${capDisplayLtvPercent(n * 100).toFixed(2)}%`
+}
+
+function PositionLtvDisplay({ raw }: { raw: string | null }) {
+  const formatted = formatPositionLtv(raw)
+  if (formatted === '—' || !formatted.endsWith('%')) return formatted
+  return (
+    <span className="inline-flex items-baseline tabular-nums">
+      <span>{formatted.slice(0, -1)}</span>
+      <span className="text-[0.82em]">%</span>
+    </span>
+  )
 }
 
 function formatHealthFactor(value: number | null): string {
@@ -798,6 +810,7 @@ function OtherSiloMetricSubline({
   enabled,
   isLoading,
   hasError,
+  styledFraction = false,
 }: {
   value: bigint | null
   /** From snapshot `otherSilo.tokenDecimals` (paired token may differ from primary). */
@@ -806,6 +819,7 @@ function OtherSiloMetricSubline({
   enabled: boolean
   isLoading: boolean
   hasError: boolean
+  styledFraction?: boolean
 }) {
   if (!enabled) return <MetricSublineSpacer />
   return (
@@ -816,6 +830,8 @@ function OtherSiloMetricSubline({
         ) : (
           '—'
         )
+      ) : styledFraction ? (
+        <FormattedDecimal value={formatMetric(value, decimals, maximumFractionDigits)} />
       ) : (
         formatMetric(value, decimals, maximumFractionDigits)
       )}
@@ -2312,10 +2328,18 @@ function PositionsPageInner() {
                   {selectedRow.tokenSymbol ?? selectedRow.quoteTokenSymbol ?? 'Unknown'}
                 </h2>
                 <span className="ml-6 text-sm text-[var(--silo-text)]">
-                  total assets {formatMetricFixed(selectedRow.totalAssets, selectedRow.tokenDecimals, 4)}
+                  total assets{' '}
+                  <FormattedDecimal
+                    value={formatMetricFixed(selectedRow.totalAssets, selectedRow.tokenDecimals, 4)}
+                    fractionDigits={4}
+                  />
                 </span>
                 <span className="text-sm text-[var(--silo-text)]">
-                  total debt {formatMetricFixed(selectedRow.totalDebt, selectedRow.tokenDecimals, 4)}
+                  total debt{' '}
+                  <FormattedDecimal
+                    value={formatMetricFixed(selectedRow.totalDebt, selectedRow.tokenDecimals, 4)}
+                    fractionDigits={4}
+                  />
                 </span>
               </div>
               <button type="button" onClick={backToMarkets} className="silo-btn-secondary">
@@ -2687,7 +2711,10 @@ function PositionsPageInner() {
                             <td className={`px-4 py-3 text-right ${staleColumnClass}`}>
                               <span className="inline-flex flex-wrap items-baseline justify-end gap-x-1.5 w-full tabular-nums leading-none">
                                 <span className="inline-flex items-baseline gap-1">
-                                  <span>{formatScaledValue(row.collateralValue, 18, 2)}</span>
+                                  <FormattedDecimal
+                                    value={formatScaledValue(row.collateralValue, 18, 2)}
+                                    fractionDigits={2}
+                                  />
                                 </span>
                                 {row.collateralValue ? (
                                   <span className={symbolToneClass}>
@@ -2700,7 +2727,10 @@ function PositionsPageInner() {
                               <span className="inline-flex flex-wrap items-baseline justify-end gap-x-1.5 w-full tabular-nums leading-none">
                                 <span className="inline-flex items-baseline gap-1">
                                   {hotDebtPositionIds.has(row.id) ? <HotValueFlame /> : null}
-                                  <span>{formatScaledValue(row.debtValue, 18, 2)}</span>
+                                  <FormattedDecimal
+                                    value={formatScaledValue(row.debtValue, 18, 2)}
+                                    fractionDigits={2}
+                                  />
                                 </span>
                                 {row.debtValue ? (
                                   <span className={symbolToneClass}>
@@ -2730,7 +2760,7 @@ function PositionsPageInner() {
                                     title="Add position to realtime monitoring"
                                   />
                                 ) : null}
-                                <span>{formatPositionLtv(effectiveLtvRaw)}</span>
+                                <PositionLtvDisplay raw={effectiveLtvRaw} />
                               </span>
                             </td>
                             <td className={`px-4 py-3 ${liveMetricClass}`}>{formatHealthFactor(healthFactor)}</td>
@@ -3139,27 +3169,27 @@ function FragmentRow({
             ? isDynamicLoading || !hasDynamicError
               ? <InlineLoadingHint />
               : '—'
-            : formatMetric(row.totalAssets, row.tokenDecimals, 0)}
+            : <FormattedDecimal value={formatMetric(row.totalAssets, row.tokenDecimals)} />}
           <OtherSiloMetricSubline
             value={row.otherTotalAssets}
             decimals={row.otherTokenDecimals}
-            maximumFractionDigits={0}
             enabled={row.otherSiloAddress != null}
             isLoading={isDynamicLoading}
             hasError={hasDynamicError}
+            styledFraction
           />
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
           {row.totalDebt == null
             ? (isDynamicLoading || !hasDynamicError ? <InlineLoadingHint /> : '—')
-            : formatMetric(row.totalDebt, row.tokenDecimals, 0)}
+            : <FormattedDecimal value={formatMetric(row.totalDebt, row.tokenDecimals)} />}
           <OtherSiloMetricSubline
             value={row.otherTotalDebt}
             decimals={row.otherTokenDecimals}
-            maximumFractionDigits={0}
             enabled={row.otherSiloAddress != null}
             isLoading={isDynamicLoading}
             hasError={hasDynamicError}
+            styledFraction
           />
         </td>
         <td className="px-4 py-3 text-right tabular-nums overflow-visible">
@@ -3169,7 +3199,7 @@ function FragmentRow({
                 ? isDynamicLoading || !hasDynamicError
                   ? <InlineLoadingHint />
                   : '—'
-                : formatMetric(row.liquidity, row.tokenDecimals)}
+                : <FormattedDecimal value={formatMetric(row.liquidity, row.tokenDecimals)} />}
             </div>
             {showLiquidityStressAlert ? (
               <span
@@ -3194,6 +3224,7 @@ function FragmentRow({
             enabled={row.otherSiloAddress != null}
             isLoading={isDynamicLoading}
             hasError={hasDynamicError}
+            styledFraction
           />
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
@@ -3206,7 +3237,7 @@ function FragmentRow({
                 className="mt-1 tabular-nums inline-flex flex-col items-end w-full"
               >
                 <span className="text-sm text-[var(--silo-text)]">
-                  {formatWholeTokenMetric(source.amount, row.tokenDecimals)}
+                  <FormattedDecimal value={formatWholeTokenMetric(source.amount, row.tokenDecimals)} />
                 </span>
                 <a
                   href={getExplorerAddressUrl(row.chainId, source.sourceAddress)}
@@ -3222,7 +3253,7 @@ function FragmentRow({
           ) : row.externalLiquidity == null ? (
             isDynamicLoading || !hasDynamicError ? <InlineLoadingHint /> : '—'
           ) : (
-            formatWholeTokenMetric(row.externalLiquidity, row.tokenDecimals)
+            <FormattedDecimal value={formatWholeTokenMetric(row.externalLiquidity, row.tokenDecimals)} />
           )}
         </td>
         <td className="px-4 py-3 text-right tabular-nums">

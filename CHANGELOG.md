@@ -4,6 +4,7 @@
 
 ### Updated
 - shorten Positions markets localStorage keys with a snapshot hash and one-shot schema wipe for oversized legacy entries
+- show Positions asset/liquidity metric fractional digits in a smaller type style and inherit row colors; LTV percent sign matches that scale
 
 ### Fixed
 - sort Positions market columns descending first on header click, then ascending
