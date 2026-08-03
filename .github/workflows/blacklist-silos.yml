@@ -12,6 +12,9 @@ permissions:
   contents: write
   pull-requests: write
 
+env:
+  TARGET_BRANCH: legacy-positions
+
 jobs:
   blacklist-silos:
     runs-on: ubuntu-latest
@@ -29,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Record source SHA
+        run: echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
       - name: Apply blacklist batch
         env:
           BLACKLIST_CONFIG: ${{ inputs.config }}
@@ -43,16 +49,52 @@ jobs:
           printf '%s' "$BLACKLIST_CONFIG" > /tmp/blacklist-config.json
           node ./scripts/sync-liquidation-silos.mjs blacklist --configFile=/tmp/blacklist-config.json
 
-      - name: Detect changes
-        id: detect
+      - name: Export sync artifacts
+        id: export
         run: |
-          snapshot_changed=false
-          blacklist_changed=false
-          legacy_whitelist_changed=false
+          set -euo pipefail
+          SILOS_DIR="${RUNNER_TEMP}/silos-data-branch"
+          MASTER_DIR="${RUNNER_TEMP}/silos-master-side"
+          mkdir -p "${SILOS_DIR}" "${MASTER_DIR}/blacklist" "${MASTER_DIR}/positions"
+          cp src/data/silos/*.json "${SILOS_DIR}/"
+          if [ -d src/data/silos/blacklist ]; then
+            cp -R src/data/silos/blacklist/. "${MASTER_DIR}/blacklist/"
+          fi
+          if [ -d src/data/positions ]; then
+            cp -R src/data/positions/. "${MASTER_DIR}/positions/"
+          fi
 
+          snapshot_changed=false
           if ! git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/silos/*.json; then
             snapshot_changed=true
           fi
+          echo "snapshot_changed=${snapshot_changed}" >> "$GITHUB_OUTPUT"
+          echo "SILOS_DIR=${SILOS_DIR}" >> "$GITHUB_ENV"
+          echo "MASTER_DIR=${MASTER_DIR}" >> "$GITHUB_ENV"
+
+      - name: Push silo snapshots to data branch
+        if: steps.export.outputs.snapshot_changed == 'true'
+        env:
+          COMMIT_MESSAGE: 'chore: publish silo snapshots after blacklist'
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/ci/push-silos-to-data-branch.sh
+          ./scripts/ci/push-silos-to-data-branch.sh "${SILOS_DIR}"
+
+      - name: Restore source ref for master-side PR
+        run: |
+          set -euo pipefail
+          git checkout -f "${SOURCE_SHA}"
+          mkdir -p src/data/silos/blacklist src/data/positions
+          cp -R "${MASTER_DIR}/blacklist/." src/data/silos/blacklist/
+          cp -R "${MASTER_DIR}/positions/." src/data/positions/
+
+      - name: Detect master-side changes
+        id: detect
+        run: |
+          blacklist_changed=false
+          legacy_whitelist_changed=false
+
           if ! git diff --quiet -- src/data/silos/blacklist; then
             blacklist_changed=true
           fi
@@ -60,21 +102,24 @@ jobs:
             legacy_whitelist_changed=true
           fi
 
-          if [ "${snapshot_changed}" = true ] || [ "${blacklist_changed}" = true ] || [ "${legacy_whitelist_changed}" = true ]; then
+          if [ "${blacklist_changed}" = true ] || [ "${legacy_whitelist_changed}" = true ]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No snapshot, blacklist, or legacy whitelist changes detected."
+            echo "::notice::No blacklist or legacy whitelist changes for master PR (silos may still have been published to ${TARGET_BRANCH})."
           fi
 
-      - name: Create PR with blacklisted markets
+      - name: Create PR for blacklist / legacy whitelist
         if: steps.detect.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
           branch: chore/blacklist-silos
           commit-message: 'chore: blacklist silo markets'
           title: 'chore: blacklist silo markets'
+          add-paths: |
+            src/data/silos/blacklist
+            src/data/positions
           body: |
-            Batch-removes markets from the silo snapshot and appends v3 addresses to the durable blacklist so Refresh V3 Silos will not re-add them.
+            Batch-removes markets from the live silo list on `${{ env.TARGET_BRANCH }}` (published directly) and appends v3 addresses to the durable blacklist on master so Refresh V3 Silos will not re-add them.
 
             Paste source: Positions UI clipboard JSON.
