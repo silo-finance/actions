@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.35.0] - 2026-08-03
+
+### Added
+- Add Positions multi-select remove UI for silo blacklist workflow.
+- Wire silo sync workflows to GraphQL blacklist membership.
+- Sync Positions v3 markets from GraphQL minus a durable blacklist.
+- format floating point
+- sort positions by desc first
+- Hash Positions markets cache keys and wipe legacy localStorage once.
+
 ## [Unreleased]
 
 ### Updated
