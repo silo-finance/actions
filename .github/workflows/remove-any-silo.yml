@@ -89,7 +89,7 @@ jobs:
           echo "silo_id=${silo_id}" >> "$GITHUB_OUTPUT"
           echo "address=${address}" >> "$GITHUB_OUTPUT"
 
-      - name: Remove from observed markets and legacy whitelist
+      - name: Remove from snapshot and durable exclude list
         env:
           # Private CI-only RPC endpoints. Unset secrets resolve to empty and the script
           # falls back to its hardcoded public RPC default per chain.
@@ -109,20 +109,24 @@ jobs:
         id: detect
         run: |
           snapshot_changed=false
+          blacklist_changed=false
           legacy_whitelist_changed=false
 
-          if ! git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/silos; then
+          if ! git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/silos/*.json; then
             snapshot_changed=true
+          fi
+          if ! git diff --quiet -- src/data/silos/blacklist; then
+            blacklist_changed=true
           fi
           if ! git diff --quiet -- src/data/positions; then
             legacy_whitelist_changed=true
           fi
 
-          if [ "${snapshot_changed}" = true ] || [ "${legacy_whitelist_changed}" = true ]; then
+          if [ "${snapshot_changed}" = true ] || [ "${blacklist_changed}" = true ] || [ "${legacy_whitelist_changed}" = true ]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No snapshot or legacy whitelist changes detected (or only generatedAt changed)."
+            echo "::notice::No snapshot, blacklist, or legacy whitelist changes detected (or only generatedAt changed)."
           fi
 
       - name: Create PR with silo removal
@@ -133,9 +137,10 @@ jobs:
           commit-message: ${{ steps.market_meta.outputs.commit_message }}
           title: ${{ steps.market_meta.outputs.title }}
           body: |
-            Removes a market from the silo snapshot and legacy positions whitelist.
+            Removes a market from the silo snapshot.
 
-            Positions for this market are dropped on the next `Pull Legacy Positions` run.
+            - v3: also appends the address to `src/data/silos/blacklist/` so full refresh will not re-add it
+            - legacy: also updates the legacy positions whitelist; positions drop on the next `Pull Legacy Positions` run
 
             - chain: `${{ inputs.chainKey }}`
             - siloId: `#${{ steps.market_meta.outputs.silo_id }}`

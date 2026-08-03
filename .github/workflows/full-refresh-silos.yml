@@ -35,10 +35,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Sync snapshot from API + existing files
+      - name: Sync snapshot from GraphQL minus blacklist
         env:
           TEST_API_LIMIT: ${{ inputs.testApiLimit }}
           TEST_GRAPH_LIMIT: ${{ inputs.testGraphLimit }}
+          # Optional override; script defaults to https://api-v3.silo.finance/graphql
+          LIQ_GRAPHQL_URL: ${{ vars.LIQ_GRAPHQL_URL }}
           # Private CI-only RPC endpoints. Unset secrets resolve to empty and the script
           # falls back to its hardcoded public RPC default per chain.
           RPC_URL_ETHEREUM: ${{ secrets.RPC_URL_ETHEREUM }}
@@ -58,7 +60,7 @@ jobs:
       - name: Detect snapshot changes
         id: detect
         run: |
-          if git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/silos; then
+          if git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/silos/*.json; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             echo "::notice::No snapshot changes detected (or only generatedAt changed)."
           else
@@ -75,5 +77,6 @@ jobs:
           body: |
             Automated full refresh for static silo snapshot data.
 
-            - source: union(existing snapshot, earn API)
+            - source: GraphQL v3 markets (`siloId >= 3000`) minus `src/data/silos/blacklist/`
+            - legacy rows in existing snapshots are preserved
             - scope: static silo metadata only
