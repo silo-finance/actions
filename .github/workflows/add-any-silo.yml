@@ -23,12 +23,17 @@ permissions:
   contents: write
   pull-requests: write
 
+env:
+  TARGET_BRANCH: legacy-positions
+
 jobs:
   add-refresh-silo:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -38,10 +43,11 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Record source SHA
+        run: echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
       - name: Add or refresh single silo
         env:
-          # Private CI-only RPC endpoints. Unset secrets resolve to empty and the script
-          # falls back to its hardcoded public RPC default per chain.
           RPC_URL_ETHEREUM: ${{ secrets.RPC_URL_ETHEREUM }}
           RPC_URL_ARBITRUM: ${{ secrets.RPC_URL_ARBITRUM }}
           RPC_URL_AVALANCHE: ${{ secrets.RPC_URL_AVALANCHE }}
@@ -54,16 +60,52 @@ jobs:
             --chainKey=${{ inputs.chainKey }} \
             --siloAddress=${{ inputs.siloAddress }}
 
-      - name: Detect changes
-        id: detect
+      - name: Export sync artifacts
+        id: export
         run: |
-          snapshot_changed=false
-          blacklist_changed=false
-          legacy_whitelist_changed=false
+          set -euo pipefail
+          SILOS_DIR="${RUNNER_TEMP}/silos-data-branch"
+          MASTER_DIR="${RUNNER_TEMP}/silos-master-side"
+          mkdir -p "${SILOS_DIR}" "${MASTER_DIR}/blacklist" "${MASTER_DIR}/positions"
+          cp src/data/silos/*.json "${SILOS_DIR}/"
+          if [ -d src/data/silos/blacklist ]; then
+            cp -R src/data/silos/blacklist/. "${MASTER_DIR}/blacklist/"
+          fi
+          if [ -d src/data/positions ]; then
+            cp -R src/data/positions/. "${MASTER_DIR}/positions/"
+          fi
 
+          snapshot_changed=false
           if ! git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/silos/*.json; then
             snapshot_changed=true
           fi
+          echo "snapshot_changed=${snapshot_changed}" >> "$GITHUB_OUTPUT"
+          echo "SILOS_DIR=${SILOS_DIR}" >> "$GITHUB_ENV"
+          echo "MASTER_DIR=${MASTER_DIR}" >> "$GITHUB_ENV"
+
+      - name: Push silo snapshots to data branch
+        if: steps.export.outputs.snapshot_changed == 'true'
+        env:
+          COMMIT_MESSAGE: 'chore: publish silo snapshots after add'
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/ci/push-silos-to-data-branch.sh
+          ./scripts/ci/push-silos-to-data-branch.sh "${SILOS_DIR}"
+
+      - name: Restore source ref for master-side PR
+        run: |
+          set -euo pipefail
+          git checkout -f "${SOURCE_SHA}"
+          mkdir -p src/data/silos/blacklist src/data/positions
+          cp -R "${MASTER_DIR}/blacklist/." src/data/silos/blacklist/
+          cp -R "${MASTER_DIR}/positions/." src/data/positions/
+
+      - name: Detect master-side changes
+        id: detect
+        run: |
+          blacklist_changed=false
+          legacy_whitelist_changed=false
+
           if ! git diff --quiet -- src/data/silos/blacklist; then
             blacklist_changed=true
           fi
@@ -71,11 +113,11 @@ jobs:
             legacy_whitelist_changed=true
           fi
 
-          if [ "${snapshot_changed}" = true ] || [ "${blacklist_changed}" = true ] || [ "${legacy_whitelist_changed}" = true ]; then
+          if [ "${blacklist_changed}" = true ] || [ "${legacy_whitelist_changed}" = true ]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No snapshot, blacklist, or legacy whitelist changes detected (or only generatedAt changed)."
+            echo "::notice::No blacklist or legacy whitelist changes for master PR (silos may still have been published to ${TARGET_BRANCH})."
           fi
 
       - name: Build PR title and commit message
@@ -94,7 +136,7 @@ jobs:
               const fs = require("fs");
               const chainKey = process.env.CHAIN_KEY;
               const address = (process.env.SILO_ADDRESS || "").toLowerCase();
-              const file = `src/data/silos/${chainKey}.json`;
+              const file = `${process.env.SILOS_DIR}/${chainKey}.json`;
               const payload = JSON.parse(fs.readFileSync(file, "utf8"));
               const silos = Array.isArray(payload?.silos) ? payload.silos : [];
               let symbol = "";
@@ -127,17 +169,20 @@ jobs:
           echo "silo_id=${silo_id}" >> "$GITHUB_OUTPUT"
           echo "address=${address}" >> "$GITHUB_OUTPUT"
 
-      - name: Create PR with silo refresh
+      - name: Create PR for blacklist / legacy whitelist
         if: steps.detect.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
           branch: chore/add-any-silo-${{ inputs.chainKey }}
           commit-message: ${{ steps.pr_meta.outputs.commit_message }}
           title: ${{ steps.pr_meta.outputs.title }}
+          add-paths: |
+            src/data/silos/blacklist
+            src/data/positions
           body: |
-            Automated add/refresh for a single silo snapshot entry (target only).
-
             Clears the address from `src/data/silos/blacklist/` when present so the next Refresh V3 Silos run can include it again.
+
+            Updated silo chain JSON (if any) was published directly to `${{ env.TARGET_BRANCH }}` for the Positions UI — this PR does not change `src/data/silos/*.json` on master.
 
             - chain: `${{ inputs.chainKey }}`
             - siloId: `#${{ steps.pr_meta.outputs.silo_id }}`
