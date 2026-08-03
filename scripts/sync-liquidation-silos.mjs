@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Contract, FetchRequest, Interface, JsonRpcProvider, getAddress } from 'ethers'
@@ -11,6 +11,7 @@ import SiloOracleAbi from '../src/abis/ISiloOracle.json' with { type: 'json' }
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const snapshotDir = join(root, 'src', 'data', 'silos')
+const blacklistDir = join(snapshotDir, 'blacklist')
 const legacyWhitelistDir = join(root, 'src', 'data', 'positions')
 
 const CHAIN_ID_BY_KEY = {
@@ -21,13 +22,21 @@ const CHAIN_ID_BY_KEY = {
   arbitrum: 42161,
   avalanche: 43114,
 }
+const SUPPORTED_CHAIN_KEYS = Object.keys(CHAIN_ID_BY_KEY)
 
 const EARN_SILOS_URL = (process.env.EARN_SILOS_URL || 'https://app.silo.finance/api/earn-silos').replace(/\/$/, '')
+const LIQ_GRAPHQL_URL = (
+  process.env.LIQ_GRAPHQL_URL ||
+  process.env.NEXT_PUBLIC_LIQ_GRAPHQL_URL ||
+  'https://api-v3.silo.finance/graphql'
+).replace(/\/$/, '')
 // Cloudflare-fronted gateways/RPC nodes ban the default urllib/node user agent (403 / code 1010);
 // present a browser-like signature on every outbound request instead.
 const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 const EARN_PAGE_SIZE = Number(process.env.TEST_API_LIMIT || 1000)
+const GRAPHQL_PAGE_SIZE = Number(process.env.TEST_GRAPH_LIMIT || 200)
+const V3_SILO_ID_MIN = 3000
 const siloAbi = Array.isArray(SiloAbi) ? SiloAbi : SiloAbi.abi
 const siloConfigAbi = Array.isArray(SiloConfigAbi) ? SiloConfigAbi : SiloConfigAbi.abi
 const erc20Abi = Array.isArray(Erc20Abi) ? Erc20Abi : Erc20Abi.abi
@@ -119,13 +128,71 @@ function ensureSnapshotDir() {
   mkdirSync(snapshotDir, { recursive: true })
 }
 
+function ensureBlacklistDir() {
+  mkdirSync(blacklistDir, { recursive: true })
+}
+
+function blacklistPath(chainKey) {
+  return join(blacklistDir, `${chainKey}.json`)
+}
+
+function readBlacklistAddresses(chainKey) {
+  ensureBlacklistDir()
+  const fullPath = blacklistPath(chainKey)
+  if (!existsSync(fullPath)) return []
+  const payload = JSON.parse(readFileSync(fullPath, 'utf8'))
+  if (!Array.isArray(payload)) {
+    throw new Error(`Invalid blacklist format in ${fullPath}`)
+  }
+  return [
+    ...new Set(
+      payload
+        .map((entry) => (typeof entry === 'string' ? normalizeAddress(entry) : null))
+        .filter(Boolean)
+    ),
+  ].sort()
+}
+
+function writeBlacklistAddresses(chainKey, addresses) {
+  ensureBlacklistDir()
+  const unique = [...new Set(addresses.map((entry) => normalizeAddress(entry)).filter(Boolean))].sort()
+  writeFileSync(blacklistPath(chainKey), `${JSON.stringify(unique, null, 2)}\n`, 'utf8')
+  return unique
+}
+
+function addToBlacklist(chainKey, siloAddress) {
+  const current = readBlacklistAddresses(chainKey)
+  if (current.includes(siloAddress)) {
+    console.log(`[sync-liquidation-silos] blacklist already contains ${siloAddress} for ${chainKey}`)
+    return current
+  }
+  const next = writeBlacklistAddresses(chainKey, [...current, siloAddress])
+  console.log(
+    `[sync-liquidation-silos] blacklist added ${siloAddress} for ${chainKey} (${next.length} total)`
+  )
+  return next
+}
+
+function removeFromBlacklist(chainKey, siloAddress) {
+  const current = readBlacklistAddresses(chainKey)
+  const next = current.filter((entry) => entry !== siloAddress)
+  if (next.length === current.length) {
+    console.log(`[sync-liquidation-silos] blacklist skip missing ${siloAddress} for ${chainKey}`)
+    return current
+  }
+  writeBlacklistAddresses(chainKey, next)
+  console.log(
+    `[sync-liquidation-silos] blacklist removed ${siloAddress} for ${chainKey} (kept ${next.length})`
+  )
+  return next
+}
+
 function loadSnapshotByChain() {
   ensureSnapshotDir()
   const out = new Map()
-  for (const name of readdirSync(snapshotDir)) {
-    if (!name.endsWith('.json')) continue
-    const chainKey = name.replace(/\.json$/, '')
-    const fullPath = join(snapshotDir, name)
+  for (const chainKey of SUPPORTED_CHAIN_KEYS) {
+    const fullPath = join(snapshotDir, `${chainKey}.json`)
+    if (!existsSync(fullPath)) continue
     const parsed = JSON.parse(readFileSync(fullPath, 'utf8'))
     const silos = Array.isArray(parsed.silos) ? parsed.silos : []
     out.set(chainKey, {
@@ -135,6 +202,10 @@ function loadSnapshotByChain() {
     })
   }
   return out
+}
+
+function marketVersionOf(row) {
+  return row?.marketVersion === 'legacy' ? 'legacy' : 'v3'
 }
 
 function writeChainSnapshot(chainKey, chainId, silos) {
@@ -153,35 +224,6 @@ function writeChainSnapshot(chainKey, chainId, silos) {
     silos: sorted,
   }
   writeFileSync(fullPath, `${JSON.stringify(payload, null, 2)}\n`)
-}
-
-async function fetchAllEarnSilos() {
-  const out = []
-  let offset = 0
-  for (;;) {
-    const body = {
-      siloIds: [],
-      search: null,
-      riskProfiles: [],
-      chainKeys: [],
-      minTotalSupplyUsd: null,
-      sort: null,
-      limit: EARN_PAGE_SIZE,
-      offset,
-    }
-    const res = await fetch(EARN_SILOS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'User-Agent': BROWSER_USER_AGENT },
-      body: JSON.stringify(body),
-    })
-    if (!res.ok) throw new Error(`earn-silos HTTP ${res.status}`)
-    const json = await res.json()
-    const silos = Array.isArray(json.silos) ? json.silos : []
-    out.push(...silos)
-    if (silos.length < EARN_PAGE_SIZE) break
-    offset += EARN_PAGE_SIZE
-  }
-  return out
 }
 
 async function fetchEarnSilosForChain(chainKey) {
@@ -210,6 +252,54 @@ async function fetchEarnSilosForChain(chainKey) {
     if (silos.length < EARN_PAGE_SIZE) break
     offset += EARN_PAGE_SIZE
   }
+  return out
+}
+
+const V3_MARKETS_QUERY = `
+query V3MarketsByChain($chainId: Int!, $limit: Int!, $offset: Int!) {
+  markets(limit: $limit, offset: $offset, where: { chainId: $chainId }) {
+    items {
+      id
+      silo {
+        siloId
+      }
+    }
+  }
+}
+`
+
+async function fetchV3MarketAddressesForChain(chainId) {
+  const out = new Set()
+  let offset = 0
+  const pageSize = Number.isFinite(GRAPHQL_PAGE_SIZE) && GRAPHQL_PAGE_SIZE > 0 ? GRAPHQL_PAGE_SIZE : 200
+
+  for (;;) {
+    const res = await fetch(LIQ_GRAPHQL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': BROWSER_USER_AGENT },
+      body: JSON.stringify({
+        query: V3_MARKETS_QUERY,
+        variables: { chainId, limit: pageSize, offset },
+      }),
+    })
+    if (!res.ok) throw new Error(`GraphQL HTTP ${res.status}`)
+    const json = await res.json()
+    if (Array.isArray(json.errors) && json.errors.length > 0) {
+      const msg = json.errors.map((e) => e?.message ?? '').filter(Boolean).join('; ')
+      throw new Error(msg || 'GraphQL error while listing v3 markets')
+    }
+    const items = json?.data?.markets?.items
+    if (!Array.isArray(items) || items.length === 0) break
+    for (const item of items) {
+      const siloId = Number(item?.silo?.siloId)
+      if (!Number.isFinite(siloId) || siloId < V3_SILO_ID_MIN) continue
+      const address = normalizeAddress(item?.id)
+      if (address) out.add(address)
+    }
+    if (items.length < pageSize) break
+    offset += pageSize
+  }
+
   return out
 }
 
@@ -543,43 +633,50 @@ async function refreshTargets(targetsByChain) {
 async function runFullRefresh() {
   const chainFilter = splitCsv(getFlag('chainKeys'))
   const snapshot = loadSnapshotByChain()
-  const earnRows = await fetchAllEarnSilos()
+  const chainKeys =
+    chainFilter.length > 0
+      ? chainFilter.filter((key) => CHAIN_ID_BY_KEY[key])
+      : SUPPORTED_CHAIN_KEYS
 
-  const targetsByChain = new Map()
+  for (const chainKey of chainKeys) {
+    const chainId = CHAIN_ID_BY_KEY[chainKey]
+    const existing = snapshot.get(chainKey)?.silos ?? []
+    const legacyRows = existing.filter((row) => marketVersionOf(row) === 'legacy')
+    const blacklist = new Set(readBlacklistAddresses(chainKey))
 
-  for (const row of earnRows) {
-    const chainKey = row?.chainKey?.toLowerCase?.()
-    const siloAddress = normalizeAddress(row?.siloAddress)
-    if (!chainKey || !siloAddress || !CHAIN_ID_BY_KEY[chainKey]) continue
-    if (chainFilter.length > 0 && !chainFilter.includes(chainKey)) continue
-    if (!targetsByChain.has(chainKey)) targetsByChain.set(chainKey, new Set())
-    targetsByChain.get(chainKey).add(siloAddress)
-  }
-
-  for (const [chainKey, file] of snapshot) {
-    if (chainFilter.length > 0 && !chainFilter.includes(chainKey)) continue
-    if (!targetsByChain.has(chainKey)) targetsByChain.set(chainKey, new Set())
-    for (const row of file.silos) {
-      const address = normalizeAddress(row?.siloAddress)
-      if (!address) continue
-      targetsByChain.get(chainKey).add(address)
+    let gqlV3Addresses
+    try {
+      gqlV3Addresses = await fetchV3MarketAddressesForChain(chainId)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to list GraphQL v3 markets for ${chainKey}: ${message}`)
     }
-  }
 
-  const refreshed = await refreshTargets(targetsByChain)
-  for (const [chainKey, rows] of refreshed) {
-    const existingBySilo = new Map(
-      (snapshot.get(chainKey)?.silos ?? [])
-        .map((row) => [normalizeAddress(row?.siloAddress), row])
-        .filter(([address]) => Boolean(address))
+    let v3Targets = new Set(
+      [...gqlV3Addresses].filter((address) => !blacklist.has(address))
     )
-    const withMarketVersion = rows.map((row) => {
-      const existing = existingBySilo.get(normalizeAddress(row.siloAddress))
-      const marketVersion = existing?.marketVersion === 'legacy' ? 'legacy' : 'v3'
-      return { ...row, marketVersion }
-    })
-    writeChainSnapshot(chainKey, CHAIN_ID_BY_KEY[chainKey], withMarketVersion)
-    console.log(`[sync-liquidation-silos] full refresh wrote ${withMarketVersion.length} records for ${chainKey}`)
+
+    if (gqlV3Addresses.size === 0) {
+      const keptExistingV3 = existing
+        .filter((row) => marketVersionOf(row) === 'v3')
+        .map((row) => normalizeAddress(row.siloAddress))
+        .filter((address) => address && !blacklist.has(address))
+      v3Targets = new Set(keptExistingV3)
+      console.warn(
+        `[sync-liquidation-silos] GraphQL returned 0 v3 markets for ${chainKey}; keeping ${v3Targets.size} existing v3 row(s) minus blacklist`
+      )
+    }
+
+    const refreshed =
+      v3Targets.size > 0
+        ? (await refreshTargets(new Map([[chainKey, v3Targets]]))).get(chainKey) ?? []
+        : []
+    const v3Rows = refreshed.map((row) => ({ ...row, marketVersion: 'v3' }))
+    const merged = [...v3Rows, ...legacyRows]
+    writeChainSnapshot(chainKey, chainId, merged)
+    console.log(
+      `[sync-liquidation-silos] full refresh wrote ${merged.length} records for ${chainKey} (v3=${v3Rows.length}, legacy=${legacyRows.length}, gql=${gqlV3Addresses.size}, blacklisted=${blacklist.size})`
+    )
   }
 }
 
@@ -593,46 +690,31 @@ async function runAddOrRefreshSingle() {
     throw new Error('add mode requires --siloAddress=0x...')
   }
 
+  removeFromBlacklist(chainKey, siloAddress)
+
   const snapshot = loadSnapshotByChain()
   const current = snapshot.get(chainKey)?.silos ?? []
-  const targetSet = new Set(current.map((row) => normalizeAddress(row.siloAddress)).filter(Boolean))
 
-  const apiRows = await fetchEarnSilosForChain(chainKey)
-  const apiMatch = apiRows.find((row) => normalizeAddress(row?.siloAddress) === siloAddress)
+  let apiMatch = null
+  try {
+    const apiRows = await fetchEarnSilosForChain(chainKey)
+    apiMatch = apiRows.find((row) => normalizeAddress(row?.siloAddress) === siloAddress) ?? null
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn(`[sync-liquidation-silos] earn lookup failed for ${chainKey}: ${message}`)
+  }
   if (apiMatch) {
-    console.log(`[sync-liquidation-silos] source=api found ${chainKey}:${siloAddress}`)
+    console.log(`[sync-liquidation-silos] source=earn found ${chainKey}:${siloAddress}`)
   } else {
     console.warn(
-      `[sync-liquidation-silos] source=rpc-fallback ${chainKey}:${siloAddress} not found in API; collecting directly from contracts via multicall`
+      `[sync-liquidation-silos] source=rpc ${chainKey}:${siloAddress}; collecting directly from contracts via multicall`
     )
   }
 
-  targetSet.add(siloAddress)
-  const targetsByChain = new Map([[chainKey, targetSet]])
-  const refreshed = await refreshTargets(targetsByChain)
-  const out = refreshed.get(chainKey) ?? []
-  const existingBySilo = new Map(
-    current
-      .map((row) => [normalizeAddress(row?.siloAddress), row])
-      .filter(([address]) => Boolean(address))
+  const refreshed = await refreshTargets(new Map([[chainKey, new Set([siloAddress])]]))
+  const targetRows = (refreshed.get(chainKey) ?? []).filter(
+    (row) => normalizeAddress(row.siloAddress) === siloAddress
   )
-  const outWithVersion = out.map((row) => {
-    const isTarget = normalizeAddress(row.siloAddress) === siloAddress
-    const existing = existingBySilo.get(normalizeAddress(row.siloAddress))
-    const siloId = Number(row.siloId)
-    const forceV3BySiloId = Number.isFinite(siloId) && siloId > 3000
-    const marketVersion = isTarget
-      ? forceV3BySiloId
-        ? 'v3'
-        : apiMatch
-          ? 'v3'
-          : 'legacy'
-      : existing?.marketVersion === 'legacy'
-        ? 'legacy'
-        : 'v3'
-    return { ...row, marketVersion }
-  })
-  const targetRows = outWithVersion.filter((row) => normalizeAddress(row.siloAddress) === siloAddress)
   if (targetRows.length === 0) {
     throw new Error(
       `Requested address is not a valid Silo market on ${chainKey}: ${siloAddress} (could not resolve silo config/data)`
@@ -647,9 +729,17 @@ async function runAddOrRefreshSingle() {
       `Incomplete Silo data for ${chainKey}:${siloAddress} (missing config/token metadata); refusing to write snapshot`
     )
   }
-  writeChainSnapshot(chainKey, CHAIN_ID_BY_KEY[chainKey], outWithVersion)
-  console.log(`[sync-liquidation-silos] add/refresh wrote ${outWithVersion.length} records for ${chainKey}`)
-  if (targetRow.marketVersion === 'legacy') {
+
+  const siloId = Number(targetRow.siloId)
+  const forceV3BySiloId = Number.isFinite(siloId) && siloId >= V3_SILO_ID_MIN
+  const marketVersion = forceV3BySiloId || Boolean(apiMatch) ? 'v3' : 'legacy'
+  const nextRow = { ...targetRow, marketVersion }
+
+  const withoutTarget = current.filter((row) => normalizeAddress(row.siloAddress) !== siloAddress)
+  const out = [...withoutTarget, nextRow]
+  writeChainSnapshot(chainKey, CHAIN_ID_BY_KEY[chainKey], out)
+  console.log(`[sync-liquidation-silos] add/refresh wrote target ${siloAddress} into ${chainKey} (${out.length} total)`)
+  if (nextRow.marketVersion === 'legacy') {
     addToLegacyWhitelist(chainKey, siloAddress)
   }
 }
@@ -706,6 +796,39 @@ function removeFromLegacyWhitelist(chainKey, siloAddress) {
   )
 }
 
+function removeMarketFromChain(chainKey, siloAddress) {
+  if (!chainKey || !CHAIN_ID_BY_KEY[chainKey]) {
+    throw new Error(`Unsupported chainKey: ${chainKey}`)
+  }
+  if (!siloAddress) {
+    throw new Error('remove requires a valid siloAddress')
+  }
+
+  const snapshot = loadSnapshotByChain()
+  const current = snapshot.get(chainKey)?.silos ?? []
+  const existing = current.find((row) => normalizeAddress(row.siloAddress) === siloAddress) ?? null
+  const version = existing ? marketVersionOf(existing) : 'v3'
+  const filtered = current.filter((row) => normalizeAddress(row.siloAddress) !== siloAddress)
+
+  if (filtered.length !== current.length) {
+    writeChainSnapshot(chainKey, CHAIN_ID_BY_KEY[chainKey], filtered)
+    console.log(
+      `[sync-liquidation-silos] remove wrote ${filtered.length} records for ${chainKey} (removed ${siloAddress})`
+    )
+  } else {
+    console.log(
+      `[sync-liquidation-silos] remove: ${siloAddress} not in ${chainKey} snapshot; treating as ${version}`
+    )
+  }
+
+  // v3: durable blacklist so full refresh will not re-add. legacy: snapshot drop + whitelist only.
+  if (version === 'legacy') {
+    removeFromLegacyWhitelist(chainKey, siloAddress)
+  } else {
+    addToBlacklist(chainKey, siloAddress)
+  }
+}
+
 function runRemoveSingle() {
   const chainKey = (getFlag('chainKey') || '').toLowerCase()
   const siloAddress = normalizeAddress(getFlag('siloAddress') || '')
@@ -715,14 +838,53 @@ function runRemoveSingle() {
   if (!siloAddress) {
     throw new Error('remove mode requires --siloAddress=0x...')
   }
-  const snapshot = loadSnapshotByChain()
-  const current = snapshot.get(chainKey)?.silos ?? []
-  const filtered = current.filter((row) => normalizeAddress(row.siloAddress) !== siloAddress)
-  writeChainSnapshot(chainKey, CHAIN_ID_BY_KEY[chainKey], filtered)
-  console.log(
-    `[sync-liquidation-silos] remove wrote ${filtered.length} records for ${chainKey} (removed ${siloAddress})`
-  )
-  removeFromLegacyWhitelist(chainKey, siloAddress)
+  removeMarketFromChain(chainKey, siloAddress)
+}
+
+function parseBlacklistConfig(raw) {
+  let parsed
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new Error('blacklist mode requires valid JSON in --config or --configFile')
+  }
+  const markets = Array.isArray(parsed?.markets) ? parsed.markets : null
+  if (!markets) {
+    throw new Error('blacklist config must be { "markets": [ { "chainKey", "siloAddress" } ] }')
+  }
+  const out = []
+  for (const entry of markets) {
+    const chainKey = typeof entry?.chainKey === 'string' ? entry.chainKey.trim().toLowerCase() : ''
+    const siloAddress = normalizeAddress(entry?.siloAddress || '')
+    if (!chainKey || !CHAIN_ID_BY_KEY[chainKey]) {
+      throw new Error(`Invalid or unsupported chainKey in blacklist config: ${entry?.chainKey}`)
+    }
+    if (!siloAddress) {
+      throw new Error(`Invalid siloAddress in blacklist config for ${chainKey}`)
+    }
+    out.push({ chainKey, siloAddress })
+  }
+  if (out.length === 0) {
+    throw new Error('blacklist config markets array is empty')
+  }
+  return out
+}
+
+function runBlacklistBatch() {
+  const configFile = getFlag('configFile')
+  const configRaw = getFlag('config')
+  let raw = configRaw
+  if (configFile) {
+    raw = readFileSync(configFile, 'utf8')
+  }
+  if (!raw || !String(raw).trim()) {
+    throw new Error('blacklist mode requires --config=<json> or --configFile=<path>')
+  }
+  const markets = parseBlacklistConfig(String(raw))
+  for (const entry of markets) {
+    removeMarketFromChain(entry.chainKey, entry.siloAddress)
+  }
+  console.log(`[sync-liquidation-silos] blacklist batch processed ${markets.length} market(s)`)
 }
 
 async function main() {
@@ -738,7 +900,11 @@ async function main() {
     runRemoveSingle()
     return
   }
-  throw new Error(`Unknown mode "${mode}". Use: full | add | remove`)
+  if (mode === 'blacklist') {
+    runBlacklistBatch()
+    return
+  }
+  throw new Error(`Unknown mode "${mode}". Use: full | add | remove | blacklist`)
 }
 
 main().catch((error) => {
