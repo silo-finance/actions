@@ -6,7 +6,12 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import HotValueFlame from '@/components/HotValueFlame'
+import FormattedDecimal from '@/components/FormattedDecimal'
 import PositionPriorityTicks from '@/components/PositionPriorityTicks'
+import BlacklistMarketsBar, {
+  type BlacklistBarItem,
+} from '@/components/positions/BlacklistMarketsBar'
+import BlacklistTrashButton from '@/components/positions/BlacklistTrashButton'
 import { useWeb3 } from '@/contexts/Web3Context'
 import {
   getExplorerAddressUrl,
@@ -14,7 +19,12 @@ import {
   getNetworkIconPath,
   getNetworkShortName,
 } from '@/utils/networks'
-import { getLiquidationSnapshotEntries, getLiquidationSnapshotConfig } from '@/utils/liquidationSnapshot'
+import {
+  buildLiquidationSnapshotKey,
+  getLiquidationSnapshotEntries,
+  getLiquidationSnapshotConfig,
+} from '@/utils/liquidationSnapshot'
+import { ensureLocalStorageSchema } from '@/utils/storage/localStorageSchema'
 import {
   fetchAllOpenPositionsByMarket,
   fetchAllOpenPositionsByChainAndMarket,
@@ -44,6 +54,7 @@ import {
 
 type MarketRow = {
   chainId: number
+  chainKey: string
   chainName: string
   chainDisplayName: string
   chainIconPath: string | null
@@ -82,6 +93,10 @@ type MarketRow = {
   insolventPositionsCount: number | null
   needsSanityAlert: boolean
   marketVersion: 'v3' | 'legacy'
+}
+
+function marketRowKey(row: Pick<MarketRow, 'chainId' | 'siloAddress'>): string {
+  return `${row.chainId}:${row.siloAddress.toLowerCase()}`
 }
 
 const DEFAULT_GRAPH_PAGE_LIMIT = 1000
@@ -255,6 +270,17 @@ function formatPositionLtv(raw: string | null): string {
   const n = parseScaledNumber(raw, 18)
   if (n == null) return '—'
   return `${capDisplayLtvPercent(n * 100).toFixed(2)}%`
+}
+
+function PositionLtvDisplay({ raw }: { raw: string | null }) {
+  const formatted = formatPositionLtv(raw)
+  if (formatted === '—' || !formatted.endsWith('%')) return formatted
+  return (
+    <span className="inline-flex items-baseline tabular-nums">
+      <span>{formatted.slice(0, -1)}</span>
+      <span className="text-[0.82em]">%</span>
+    </span>
+  )
 }
 
 function formatHealthFactor(value: number | null): string {
@@ -793,6 +819,7 @@ function OtherSiloMetricSubline({
   enabled,
   isLoading,
   hasError,
+  styledFraction = false,
 }: {
   value: bigint | null
   /** From snapshot `otherSilo.tokenDecimals` (paired token may differ from primary). */
@@ -801,6 +828,7 @@ function OtherSiloMetricSubline({
   enabled: boolean
   isLoading: boolean
   hasError: boolean
+  styledFraction?: boolean
 }) {
   if (!enabled) return <MetricSublineSpacer />
   return (
@@ -811,6 +839,8 @@ function OtherSiloMetricSubline({
         ) : (
           '—'
         )
+      ) : styledFraction ? (
+        <FormattedDecimal value={formatMetric(value, decimals, maximumFractionDigits)} />
       ) : (
         formatMetric(value, decimals, maximumFractionDigits)
       )}
@@ -935,6 +965,8 @@ function PositionsPageInner() {
   const graphPageLimit = config.testGraphLimit ?? DEFAULT_GRAPH_PAGE_LIMIT
 
   useEffect(() => {
+    // Clear legacy oversized keys once (missing schema marker) before any persisted reads.
+    ensureLocalStorageSchema()
     setIsClientMounted(true)
   }, [])
 
@@ -945,27 +977,29 @@ function PositionsPageInner() {
   }, [isClientMounted])
 
   const snapshotEntries = useMemo(() => getLiquidationSnapshotEntries(), [])
-  const snapshotKey = useMemo(
-    () => snapshotEntries.map((row) => `${row.chainId}:${row.siloAddress.toLowerCase()}`).join('|'),
-    [snapshotEntries]
-  )
-  const marketsDynamicStorageKey = useMemo(() => `liq:markets:dynamic:v1:${snapshotKey}`, [snapshotKey])
+  const snapshotKey = useMemo(() => buildLiquidationSnapshotKey(snapshotEntries), [snapshotEntries])
+  const marketsDynamicStorageKey = useMemo(() => `liq:markets:dynamic:v2:${snapshotKey}`, [snapshotKey])
   const marketsCountsStorageKey = useMemo(
-    () => `liq:markets:counts:v3:${snapshotKey}:${config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK}`,
+    () => `liq:markets:counts:v4:${snapshotKey}:${config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK}`,
     [config.testGraphLimit, snapshotKey]
   )
   const marketsPrefetchStorageKey = useMemo(
-    () => `liq:markets:positions-prefetch:v3:${snapshotKey}:${graphPageLimit}`,
+    () => `liq:markets:positions-prefetch:v4:${snapshotKey}:${graphPageLimit}`,
     [snapshotKey, graphPageLimit]
   )
-  const marketsTimerStorageKey = useMemo(() => `liq:markets:timer:v1:${snapshotKey}`, [snapshotKey])
+  const marketsTimerStorageKey = useMemo(() => `liq:markets:timer:v2:${snapshotKey}`, [snapshotKey])
   const missingMarketRefreshRef = useRef<string | null>(null)
   const wasMarketFetchingRef = useRef(false)
+
+  const [blacklistSelection, setBlacklistSelection] = useState<Map<string, BlacklistBarItem>>(
+    () => new Map()
+  )
 
   const staticMarketRows = useMemo(
     () =>
       snapshotEntries.map((row) => ({
         chainId: row.chainId,
+        chainKey: row.chainKey,
         chainName: getNetworkDisplayName(row.chainId),
         chainDisplayName: getNetworkShortName(row.chainId),
         chainIconPath: getNetworkIconPath(row.chainId),
@@ -2087,7 +2121,7 @@ function PositionsPageInner() {
       const current = parseMarketSortColumn(params.get('sort')) ?? DEFAULT_MARKET_SORT_COLUMN
       const currentDir = parseSortDirection(params.get('dir'))
       params.set('sort', column)
-      if (current !== column) params.set('dir', 'asc')
+      if (current !== column) params.set('dir', 'desc')
       else params.set('dir', currentDir === 'asc' ? 'desc' : 'asc')
     })
   }
@@ -2291,6 +2325,29 @@ function PositionsPageInner() {
     })
   }
 
+  const toggleBlacklistSelection = useCallback((row: MarketRow) => {
+    const key = marketRowKey(row)
+    setBlacklistSelection((prev) => {
+      const next = new Map(prev)
+      if (next.has(key)) {
+        next.delete(key)
+        return next
+      }
+      next.set(key, {
+        chainKey: row.chainKey,
+        chainId: row.chainId,
+        siloAddress: row.siloAddress.toLowerCase(),
+        siloId: row.siloId,
+        tokenSymbol: row.tokenSymbol,
+        chainIconPath: row.chainIconPath,
+        chainDisplayName: row.chainDisplayName,
+      })
+      return next
+    })
+  }, [])
+
+  const blacklistBarItems = useMemo(() => Array.from(blacklistSelection.values()), [blacklistSelection])
+
   return (
     <div className="silo-page px-4 py-8 sm:px-6 max-w-7xl mx-auto">
       <div className="mb-6">
@@ -2308,10 +2365,18 @@ function PositionsPageInner() {
                   {selectedRow.tokenSymbol ?? selectedRow.quoteTokenSymbol ?? 'Unknown'}
                 </h2>
                 <span className="ml-6 text-sm text-[var(--silo-text)]">
-                  total assets {formatMetricFixed(selectedRow.totalAssets, selectedRow.tokenDecimals, 4)}
+                  total assets{' '}
+                  <FormattedDecimal
+                    value={formatMetricFixed(selectedRow.totalAssets, selectedRow.tokenDecimals, 4)}
+                    fractionDigits={4}
+                  />
                 </span>
                 <span className="text-sm text-[var(--silo-text)]">
-                  total debt {formatMetricFixed(selectedRow.totalDebt, selectedRow.tokenDecimals, 4)}
+                  total debt{' '}
+                  <FormattedDecimal
+                    value={formatMetricFixed(selectedRow.totalDebt, selectedRow.tokenDecimals, 4)}
+                    fractionDigits={4}
+                  />
                 </span>
               </div>
               <button type="button" onClick={backToMarkets} className="silo-btn-secondary">
@@ -2683,7 +2748,10 @@ function PositionsPageInner() {
                             <td className={`px-4 py-3 text-right ${staleColumnClass}`}>
                               <span className="inline-flex flex-wrap items-baseline justify-end gap-x-1.5 w-full tabular-nums leading-none">
                                 <span className="inline-flex items-baseline gap-1">
-                                  <span>{formatScaledValue(row.collateralValue, 18, 2)}</span>
+                                  <FormattedDecimal
+                                    value={formatScaledValue(row.collateralValue, 18, 2)}
+                                    fractionDigits={2}
+                                  />
                                 </span>
                                 {row.collateralValue ? (
                                   <span className={symbolToneClass}>
@@ -2696,7 +2764,10 @@ function PositionsPageInner() {
                               <span className="inline-flex flex-wrap items-baseline justify-end gap-x-1.5 w-full tabular-nums leading-none">
                                 <span className="inline-flex items-baseline gap-1">
                                   {hotDebtPositionIds.has(row.id) ? <HotValueFlame /> : null}
-                                  <span>{formatScaledValue(row.debtValue, 18, 2)}</span>
+                                  <FormattedDecimal
+                                    value={formatScaledValue(row.debtValue, 18, 2)}
+                                    fractionDigits={2}
+                                  />
                                 </span>
                                 {row.debtValue ? (
                                   <span className={symbolToneClass}>
@@ -2726,7 +2797,7 @@ function PositionsPageInner() {
                                     title="Add position to realtime monitoring"
                                   />
                                 ) : null}
-                                <span>{formatPositionLtv(effectiveLtvRaw)}</span>
+                                <PositionLtvDisplay raw={effectiveLtvRaw} />
                               </span>
                             </td>
                             <td className={`px-4 py-3 ${liveMetricClass}`}>{formatHealthFactor(healthFactor)}</td>
@@ -2962,6 +3033,8 @@ function PositionsPageInner() {
                       <FragmentRow
                         key={`${row.chainId}:${row.siloAddress}`}
                         row={row}
+                        isBlacklistSelected={blacklistSelection.has(marketRowKey(row))}
+                        onToggleBlacklist={() => toggleBlacklistSelection(row)}
                         isDynamicLoading={
                           !isClientMounted || dynamicStateQuery.isLoading || dynamicStateQuery.isFetching
                         }
@@ -2987,6 +3060,18 @@ function PositionsPageInner() {
               </div>
             </div>
             </>
+            <BlacklistMarketsBar
+              items={blacklistBarItems}
+              onClear={() => setBlacklistSelection(new Map())}
+              onRemoveItem={(key) => {
+                setBlacklistSelection((prev) => {
+                  const next = new Map(prev)
+                  next.delete(key)
+                  return next
+                })
+              }}
+              copyToClipboard={copyToClipboard}
+            />
         </div>
       )}
     </div>
@@ -2996,6 +3081,8 @@ function PositionsPageInner() {
 function FragmentRow({
   row,
   onOpenPositions,
+  isBlacklistSelected,
+  onToggleBlacklist,
   isDynamicLoading,
   isPrefetchLoading,
   hasDynamicError,
@@ -3003,6 +3090,8 @@ function FragmentRow({
 }: {
   row: MarketRow
   onOpenPositions: () => void
+  isBlacklistSelected: boolean
+  onToggleBlacklist: () => void
   isDynamicLoading: boolean
   isPrefetchLoading: boolean
   hasDynamicError: boolean
@@ -3020,10 +3109,13 @@ function FragmentRow({
   const hasRiskyPositions = warningCount > 0 || insolventCount > 0
   const liquidityStressAlertCount: 1 | 2 = hasRiskyPositions ? 2 : 1
   const liquidityStressAlertTone: 'danger' | 'warning' = hasRiskyPositions ? 'danger' : 'warning'
+  const rowBgClass = isBlacklistSelected
+    ? 'bg-[color-mix(in_srgb,var(--silo-danger)_10%,var(--silo-surface))] hover:bg-[color-mix(in_srgb,var(--silo-danger)_14%,var(--silo-surface))]'
+    : 'hover:bg-[color-mix(in_srgb,var(--silo-soft-purple)_18%,var(--silo-surface))]'
 
   return (
     <>
-      <tr className="border-t border-[var(--silo-border)] hover:bg-[color-mix(in_srgb,var(--silo-soft-purple)_18%,var(--silo-surface))]">
+      <tr className={`border-t border-[var(--silo-border)] ${rowBgClass}`}>
         <td className="px-4 py-3">
           <div className="inline-flex items-center gap-2">
             {row.chainIconPath ? (
@@ -3075,9 +3167,10 @@ function FragmentRow({
               </>
             ) : null}
           </p>
-          <div className="text-xs mt-1">
+          <div className="text-xs mt-1 inline-flex items-center gap-1.5 flex-wrap">
             <span className="silo-text-soft">#{row.siloId ?? '—'}</span>
-            <span className="silo-text-faint"> • {row.marketTokenPair}</span>
+            <span className="silo-text-faint">• {row.marketTokenPair}</span>
+            <BlacklistTrashButton selected={isBlacklistSelected} onToggle={onToggleBlacklist} />
           </div>
         </td>
         <td className="px-4 py-3">
@@ -3135,27 +3228,27 @@ function FragmentRow({
             ? isDynamicLoading || !hasDynamicError
               ? <InlineLoadingHint />
               : '—'
-            : formatMetric(row.totalAssets, row.tokenDecimals, 0)}
+            : <FormattedDecimal value={formatMetric(row.totalAssets, row.tokenDecimals)} />}
           <OtherSiloMetricSubline
             value={row.otherTotalAssets}
             decimals={row.otherTokenDecimals}
-            maximumFractionDigits={0}
             enabled={row.otherSiloAddress != null}
             isLoading={isDynamicLoading}
             hasError={hasDynamicError}
+            styledFraction
           />
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
           {row.totalDebt == null
             ? (isDynamicLoading || !hasDynamicError ? <InlineLoadingHint /> : '—')
-            : formatMetric(row.totalDebt, row.tokenDecimals, 0)}
+            : <FormattedDecimal value={formatMetric(row.totalDebt, row.tokenDecimals)} />}
           <OtherSiloMetricSubline
             value={row.otherTotalDebt}
             decimals={row.otherTokenDecimals}
-            maximumFractionDigits={0}
             enabled={row.otherSiloAddress != null}
             isLoading={isDynamicLoading}
             hasError={hasDynamicError}
+            styledFraction
           />
         </td>
         <td className="px-4 py-3 text-right tabular-nums overflow-visible">
@@ -3165,7 +3258,7 @@ function FragmentRow({
                 ? isDynamicLoading || !hasDynamicError
                   ? <InlineLoadingHint />
                   : '—'
-                : formatMetric(row.liquidity, row.tokenDecimals)}
+                : <FormattedDecimal value={formatMetric(row.liquidity, row.tokenDecimals)} />}
             </div>
             {showLiquidityStressAlert ? (
               <span
@@ -3190,6 +3283,7 @@ function FragmentRow({
             enabled={row.otherSiloAddress != null}
             isLoading={isDynamicLoading}
             hasError={hasDynamicError}
+            styledFraction
           />
         </td>
         <td className="px-4 py-3 text-right tabular-nums">
@@ -3202,7 +3296,7 @@ function FragmentRow({
                 className="mt-1 tabular-nums inline-flex flex-col items-end w-full"
               >
                 <span className="text-sm text-[var(--silo-text)]">
-                  {formatWholeTokenMetric(source.amount, row.tokenDecimals)}
+                  <FormattedDecimal value={formatWholeTokenMetric(source.amount, row.tokenDecimals)} />
                 </span>
                 <a
                   href={getExplorerAddressUrl(row.chainId, source.sourceAddress)}
@@ -3218,7 +3312,7 @@ function FragmentRow({
           ) : row.externalLiquidity == null ? (
             isDynamicLoading || !hasDynamicError ? <InlineLoadingHint /> : '—'
           ) : (
-            formatWholeTokenMetric(row.externalLiquidity, row.tokenDecimals)
+            <FormattedDecimal value={formatWholeTokenMetric(row.externalLiquidity, row.tokenDecimals)} />
           )}
         </td>
         <td className="px-4 py-3 text-right tabular-nums">

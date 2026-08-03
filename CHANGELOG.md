@@ -1,6 +1,24 @@
 # Changelog
 
+## [0.35.0] - 2026-08-03
+
+### Added
+- Add Positions multi-select remove UI for silo blacklist workflow.
+- Wire silo sync workflows to GraphQL blacklist membership.
+- Sync Positions v3 markets from GraphQL minus a durable blacklist.
+- format floating point
+- sort positions by desc first
+- Hash Positions markets cache keys and wipe legacy localStorage once.
+
 ## [Unreleased]
+
+### Updated
+- sync Positions v3 markets from GraphQL minus a durable blacklist, with multi-select remove UI for all markets and Blacklist Silo Action
+- shorten Positions markets localStorage keys with a snapshot hash and one-shot schema wipe for oversized legacy entries
+- show Positions asset/liquidity metric fractional digits in a smaller type style and inherit row colors; LTV percent sign matches that scale
+
+### Fixed
+- sort Positions market columns descending first on header click, then ascending
 
 ## [0.34.0] - 2026-07-31
 ### Updated

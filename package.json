@@ -1,6 +1,6 @@
 {
   "name": "silo-actions",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "private": true,
   "engines": {
     "node": ">=24"
@@ -11,6 +11,7 @@
     "sync:liquidation:full": "node ./scripts/sync-liquidation-silos.mjs full",
     "sync:liquidation:add": "node ./scripts/sync-liquidation-silos.mjs add",
     "sync:liquidation:remove": "node ./scripts/sync-liquidation-silos.mjs remove",
+    "sync:liquidation:blacklist": "node ./scripts/sync-liquidation-silos.mjs blacklist",
     "prebuild": "node ./scripts/sync-manifest-version.mjs",
     "build": "NODE_OPTIONS='--require ./scripts/indexeddb-polyfill.cjs' next build",
     "start": "next start",
