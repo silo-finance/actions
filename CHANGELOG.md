@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.36.0] - 2026-08-03
+
+### Added
+- Rename silo full refresh Action to hourly Refresh V3 Silos.
+
 ## [0.35.0] - 2026-08-03
 
 ### Added
