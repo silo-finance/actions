@@ -36,16 +36,16 @@ GitHub Pages deployment is configured in `.github/workflows/deploy-pages.yml`.
 
 The `Positions` page reads static market metadata from local snapshot files in `src/data/silos/`.
 
-**V3 membership:** full refresh loads GraphQL `markets` with `siloId >= 3000`, subtracts durable per-address excludes in `src/data/silos/blacklist/{chainKey}.json`, then writes the chain snapshot. Legacy rows already in a snapshot are preserved and are not managed by the v3 blacklist.
+**V3 membership:** Refresh V3 Silos loads GraphQL `markets` with `siloId >= 3000`, subtracts durable per-address excludes in `src/data/silos/blacklist/{chainKey}.json`, then writes the chain snapshot. Legacy rows already in a snapshot are preserved and are not managed by the v3 blacklist.
 
 Snapshot maintenance is CI-driven:
 
-- `.github/workflows/full-refresh-silos.yml` — GraphQL v3 − blacklist (+ preserve legacy)
+- `.github/workflows/refresh-v3-silos.yml` — GraphQL v3 − blacklist (+ preserve legacy); hourly cron + manual dispatch
 - `.github/workflows/add-any-silo.yml` — refresh one address; clears it from the v3 blacklist when present
 - `.github/workflows/remove-any-silo.yml` — remove one address; v3 also appends to blacklist
 - `.github/workflows/blacklist-silos.yml` — batch paste JSON from the Positions UI (clipboard); v3 → blacklist, legacy → remove only
 
-Local sync commands:
+Local sync commands (script mode `full` = v3 refresh):
 
 ```bash
 node scripts/sync-liquidation-silos.mjs full

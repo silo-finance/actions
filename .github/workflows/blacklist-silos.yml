@@ -75,6 +75,6 @@ jobs:
           commit-message: 'chore: blacklist silo markets'
           title: 'chore: blacklist silo markets'
           body: |
-            Batch-removes markets from the silo snapshot and appends v3 addresses to the durable blacklist so full refresh will not re-add them.
+            Batch-removes markets from the silo snapshot and appends v3 addresses to the durable blacklist so Refresh V3 Silos will not re-add them.
 
             Paste source: Positions UI clipboard JSON.
