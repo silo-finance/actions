@@ -122,3 +122,28 @@ export function getLiquidationSnapshotEntries(): LiquidationSnapshotEntry[] {
   if (config.testApiLimit == null) return filtered
   return filtered.slice(0, config.testApiLimit)
 }
+
+const FNV1A64_OFFSET = BigInt('0xcbf29ce484222325')
+const FNV1A64_PRIME = BigInt('0x100000001b3')
+const FNV1A64_MASK = BigInt('0xffffffffffffffff')
+
+/** Non-cryptographic fingerprint for cache keys (FNV-1a 64-bit → 16 hex chars). */
+function fnv1a64Hex(input: string): string {
+  let hash = FNV1A64_OFFSET
+  for (let i = 0; i < input.length; i++) {
+    hash ^= BigInt(input.charCodeAt(i))
+    hash = (hash * FNV1A64_PRIME) & FNV1A64_MASK
+  }
+  return hash.toString(16).padStart(16, '0')
+}
+
+/**
+ * Short stable key for a snapshot market set (localStorage / React Query).
+ * Hashes the canonical `chainId:address|…` join so keys stay small as markets grow.
+ */
+export function buildLiquidationSnapshotKey(
+  entries: Pick<LiquidationSnapshotEntry, 'chainId' | 'siloAddress'>[]
+): string {
+  const canonical = entries.map((row) => `${row.chainId}:${row.siloAddress.toLowerCase()}`).join('|')
+  return fnv1a64Hex(canonical)
+}

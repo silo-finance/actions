@@ -14,7 +14,12 @@ import {
   getNetworkIconPath,
   getNetworkShortName,
 } from '@/utils/networks'
-import { getLiquidationSnapshotEntries, getLiquidationSnapshotConfig } from '@/utils/liquidationSnapshot'
+import {
+  buildLiquidationSnapshotKey,
+  getLiquidationSnapshotEntries,
+  getLiquidationSnapshotConfig,
+} from '@/utils/liquidationSnapshot'
+import { ensureLocalStorageSchema } from '@/utils/storage/localStorageSchema'
 import {
   fetchAllOpenPositionsByMarket,
   fetchAllOpenPositionsByChainAndMarket,
@@ -935,6 +940,8 @@ function PositionsPageInner() {
   const graphPageLimit = config.testGraphLimit ?? DEFAULT_GRAPH_PAGE_LIMIT
 
   useEffect(() => {
+    // Clear legacy oversized keys once (missing schema marker) before any persisted reads.
+    ensureLocalStorageSchema()
     setIsClientMounted(true)
   }, [])
 
@@ -945,20 +952,17 @@ function PositionsPageInner() {
   }, [isClientMounted])
 
   const snapshotEntries = useMemo(() => getLiquidationSnapshotEntries(), [])
-  const snapshotKey = useMemo(
-    () => snapshotEntries.map((row) => `${row.chainId}:${row.siloAddress.toLowerCase()}`).join('|'),
-    [snapshotEntries]
-  )
-  const marketsDynamicStorageKey = useMemo(() => `liq:markets:dynamic:v1:${snapshotKey}`, [snapshotKey])
+  const snapshotKey = useMemo(() => buildLiquidationSnapshotKey(snapshotEntries), [snapshotEntries])
+  const marketsDynamicStorageKey = useMemo(() => `liq:markets:dynamic:v2:${snapshotKey}`, [snapshotKey])
   const marketsCountsStorageKey = useMemo(
-    () => `liq:markets:counts:v3:${snapshotKey}:${config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK}`,
+    () => `liq:markets:counts:v4:${snapshotKey}:${config.testGraphLimit ?? DEFAULT_POSITIONS_COUNT_CHUNK}`,
     [config.testGraphLimit, snapshotKey]
   )
   const marketsPrefetchStorageKey = useMemo(
-    () => `liq:markets:positions-prefetch:v3:${snapshotKey}:${graphPageLimit}`,
+    () => `liq:markets:positions-prefetch:v4:${snapshotKey}:${graphPageLimit}`,
     [snapshotKey, graphPageLimit]
   )
-  const marketsTimerStorageKey = useMemo(() => `liq:markets:timer:v1:${snapshotKey}`, [snapshotKey])
+  const marketsTimerStorageKey = useMemo(() => `liq:markets:timer:v2:${snapshotKey}`, [snapshotKey])
   const missingMarketRefreshRef = useRef<string | null>(null)
   const wasMarketFetchingRef = useRef(false)
 
