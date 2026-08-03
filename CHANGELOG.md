@@ -5,6 +5,9 @@
 ### Updated
 - shorten Positions markets localStorage keys with a snapshot hash and one-shot schema wipe for oversized legacy entries
 
+### Fixed
+- sort Positions market columns descending first on header click, then ascending
+
 ## [0.34.0] - 2026-07-31
 ### Updated
 - Remove #32 (scBTC) from SONIC

@@ -2091,7 +2091,7 @@ function PositionsPageInner() {
       const current = parseMarketSortColumn(params.get('sort')) ?? DEFAULT_MARKET_SORT_COLUMN
       const currentDir = parseSortDirection(params.get('dir'))
       params.set('sort', column)
-      if (current !== column) params.set('dir', 'asc')
+      if (current !== column) params.set('dir', 'desc')
       else params.set('dir', currentDir === 'asc' ? 'desc' : 'asc')
     })
   }
