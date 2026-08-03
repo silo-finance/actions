@@ -36,11 +36,14 @@ GitHub Pages deployment is configured in `.github/workflows/deploy-pages.yml`.
 
 The `Positions` page reads static market metadata from local snapshot files in `src/data/silos/`.
 
+**V3 membership:** full refresh loads GraphQL `markets` with `siloId >= 3000`, subtracts durable per-address excludes in `src/data/silos/blacklist/{chainKey}.json`, then writes the chain snapshot. Legacy rows already in a snapshot are preserved and are not managed by the v3 blacklist.
+
 Snapshot maintenance is CI-driven:
 
-- `.github/workflows/full-refresh-silos.yml`
-- `.github/workflows/add-any-silo.yml`
-- `.github/workflows/remove-any-silo.yml`
+- `.github/workflows/full-refresh-silos.yml` — GraphQL v3 − blacklist (+ preserve legacy)
+- `.github/workflows/add-any-silo.yml` — refresh one address; clears it from the v3 blacklist when present
+- `.github/workflows/remove-any-silo.yml` — remove one address; v3 also appends to blacklist
+- `.github/workflows/blacklist-silos.yml` — batch paste JSON from the Positions UI (clipboard); v3 → blacklist, legacy → remove only
 
 Local sync commands:
 
@@ -48,12 +51,14 @@ Local sync commands:
 node scripts/sync-liquidation-silos.mjs full
 node scripts/sync-liquidation-silos.mjs add --chainKey=arbitrum --siloAddress=0x...
 node scripts/sync-liquidation-silos.mjs remove --chainKey=arbitrum --siloAddress=0x...
+node scripts/sync-liquidation-silos.mjs blacklist --config='{"markets":[{"chainKey":"arbitrum","siloAddress":"0x..."}]}'
 ```
 
 Optional runtime envs for dashboard testing:
 
 ```bash
 NEXT_PUBLIC_LIQ_GRAPHQL_URL=https://api-v3.silo.finance/graphql
+# Local/dev slice only — filters the snapshot in the browser; not the durable sync blacklist
 NEXT_PUBLIC_TEST_SILO_IDS=0x...,0x...
 NEXT_PUBLIC_TEST_API_LIMIT=20
 NEXT_PUBLIC_TEST_GRAPH_LIMIT=50
@@ -73,9 +78,7 @@ For a **private** RPC used **only by CI scripts** (legacy positions pull and sil
 1. GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **Secrets** → **New repository secret**
 2. Name: `RPC_URL_ETHEREUM` (and/or `RPC_URL_ARBITRUM`, `RPC_URL_AVALANCHE`, `RPC_URL_SONIC`, `RPC_URL_XDC`, `RPC_URL_INJECTIVE`), value: your private RPC URL
 
-CI scripts prefer `RPC_URL_<CHAIN>`, then fall back to `NEXT_PUBLIC_RPC_<CHAIN>` (local `.env` only), then the hardcoded public default. These secrets are passed only to script steps, never to `npm run build`, so they stay out of the published bundle.
-
-Data contract details live in `docs/liquidation-dashboard-data.md`.
+CI scripts prefer `RPC_URL_<CHAIN>`, then fall back to `NEXT_PUBLIC_RPC_<CHAIN>` (local `.env` only), then the hardcoded public default. These secrets are passed only to script steps, never to `npm run build`, so they stay out of the published bundle. Sync GraphQL URL can be overridden with `LIQ_GRAPHQL_URL` / `NEXT_PUBLIC_LIQ_GRAPHQL_URL`.
 
 For WalletConnect on the deployed site, add a **repository variable** (not required for local-only extension wallets):
 

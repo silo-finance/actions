@@ -8,6 +8,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import HotValueFlame from '@/components/HotValueFlame'
 import FormattedDecimal from '@/components/FormattedDecimal'
 import PositionPriorityTicks from '@/components/PositionPriorityTicks'
+import BlacklistMarketsBar, {
+  type BlacklistBarItem,
+} from '@/components/positions/BlacklistMarketsBar'
+import BlacklistTrashButton from '@/components/positions/BlacklistTrashButton'
 import { useWeb3 } from '@/contexts/Web3Context'
 import {
   getExplorerAddressUrl,
@@ -50,6 +54,7 @@ import {
 
 type MarketRow = {
   chainId: number
+  chainKey: string
   chainName: string
   chainDisplayName: string
   chainIconPath: string | null
@@ -88,6 +93,10 @@ type MarketRow = {
   insolventPositionsCount: number | null
   needsSanityAlert: boolean
   marketVersion: 'v3' | 'legacy'
+}
+
+function marketRowKey(row: Pick<MarketRow, 'chainId' | 'siloAddress'>): string {
+  return `${row.chainId}:${row.siloAddress.toLowerCase()}`
 }
 
 const DEFAULT_GRAPH_PAGE_LIMIT = 1000
@@ -982,10 +991,15 @@ function PositionsPageInner() {
   const missingMarketRefreshRef = useRef<string | null>(null)
   const wasMarketFetchingRef = useRef(false)
 
+  const [blacklistSelection, setBlacklistSelection] = useState<Map<string, BlacklistBarItem>>(
+    () => new Map()
+  )
+
   const staticMarketRows = useMemo(
     () =>
       snapshotEntries.map((row) => ({
         chainId: row.chainId,
+        chainKey: row.chainKey,
         chainName: getNetworkDisplayName(row.chainId),
         chainDisplayName: getNetworkShortName(row.chainId),
         chainIconPath: getNetworkIconPath(row.chainId),
@@ -2311,6 +2325,29 @@ function PositionsPageInner() {
     })
   }
 
+  const toggleBlacklistSelection = useCallback((row: MarketRow) => {
+    const key = marketRowKey(row)
+    setBlacklistSelection((prev) => {
+      const next = new Map(prev)
+      if (next.has(key)) {
+        next.delete(key)
+        return next
+      }
+      next.set(key, {
+        chainKey: row.chainKey,
+        chainId: row.chainId,
+        siloAddress: row.siloAddress.toLowerCase(),
+        siloId: row.siloId,
+        tokenSymbol: row.tokenSymbol,
+        chainIconPath: row.chainIconPath,
+        chainDisplayName: row.chainDisplayName,
+      })
+      return next
+    })
+  }, [])
+
+  const blacklistBarItems = useMemo(() => Array.from(blacklistSelection.values()), [blacklistSelection])
+
   return (
     <div className="silo-page px-4 py-8 sm:px-6 max-w-7xl mx-auto">
       <div className="mb-6">
@@ -2996,6 +3033,8 @@ function PositionsPageInner() {
                       <FragmentRow
                         key={`${row.chainId}:${row.siloAddress}`}
                         row={row}
+                        isBlacklistSelected={blacklistSelection.has(marketRowKey(row))}
+                        onToggleBlacklist={() => toggleBlacklistSelection(row)}
                         isDynamicLoading={
                           !isClientMounted || dynamicStateQuery.isLoading || dynamicStateQuery.isFetching
                         }
@@ -3021,6 +3060,18 @@ function PositionsPageInner() {
               </div>
             </div>
             </>
+            <BlacklistMarketsBar
+              items={blacklistBarItems}
+              onClear={() => setBlacklistSelection(new Map())}
+              onRemoveItem={(key) => {
+                setBlacklistSelection((prev) => {
+                  const next = new Map(prev)
+                  next.delete(key)
+                  return next
+                })
+              }}
+              copyToClipboard={copyToClipboard}
+            />
         </div>
       )}
     </div>
@@ -3030,6 +3081,8 @@ function PositionsPageInner() {
 function FragmentRow({
   row,
   onOpenPositions,
+  isBlacklistSelected,
+  onToggleBlacklist,
   isDynamicLoading,
   isPrefetchLoading,
   hasDynamicError,
@@ -3037,6 +3090,8 @@ function FragmentRow({
 }: {
   row: MarketRow
   onOpenPositions: () => void
+  isBlacklistSelected: boolean
+  onToggleBlacklist: () => void
   isDynamicLoading: boolean
   isPrefetchLoading: boolean
   hasDynamicError: boolean
@@ -3054,10 +3109,13 @@ function FragmentRow({
   const hasRiskyPositions = warningCount > 0 || insolventCount > 0
   const liquidityStressAlertCount: 1 | 2 = hasRiskyPositions ? 2 : 1
   const liquidityStressAlertTone: 'danger' | 'warning' = hasRiskyPositions ? 'danger' : 'warning'
+  const rowBgClass = isBlacklistSelected
+    ? 'bg-[color-mix(in_srgb,var(--silo-danger)_10%,var(--silo-surface))] hover:bg-[color-mix(in_srgb,var(--silo-danger)_14%,var(--silo-surface))]'
+    : 'hover:bg-[color-mix(in_srgb,var(--silo-soft-purple)_18%,var(--silo-surface))]'
 
   return (
     <>
-      <tr className="border-t border-[var(--silo-border)] hover:bg-[color-mix(in_srgb,var(--silo-soft-purple)_18%,var(--silo-surface))]">
+      <tr className={`border-t border-[var(--silo-border)] ${rowBgClass}`}>
         <td className="px-4 py-3">
           <div className="inline-flex items-center gap-2">
             {row.chainIconPath ? (
@@ -3109,9 +3167,10 @@ function FragmentRow({
               </>
             ) : null}
           </p>
-          <div className="text-xs mt-1">
+          <div className="text-xs mt-1 inline-flex items-center gap-1.5 flex-wrap">
             <span className="silo-text-soft">#{row.siloId ?? '—'}</span>
-            <span className="silo-text-faint"> • {row.marketTokenPair}</span>
+            <span className="silo-text-faint">• {row.marketTokenPair}</span>
+            <BlacklistTrashButton selected={isBlacklistSelected} onToggle={onToggleBlacklist} />
           </div>
         </td>
         <td className="px-4 py-3">
