@@ -58,20 +58,24 @@ jobs:
         id: detect
         run: |
           snapshot_changed=false
+          blacklist_changed=false
           legacy_whitelist_changed=false
 
-          if ! git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/silos; then
+          if ! git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/silos/*.json; then
             snapshot_changed=true
+          fi
+          if ! git diff --quiet -- src/data/silos/blacklist; then
+            blacklist_changed=true
           fi
           if ! git diff --quiet -- src/data/positions; then
             legacy_whitelist_changed=true
           fi
 
-          if [ "${snapshot_changed}" = true ] || [ "${legacy_whitelist_changed}" = true ]; then
+          if [ "${snapshot_changed}" = true ] || [ "${blacklist_changed}" = true ] || [ "${legacy_whitelist_changed}" = true ]; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No snapshot or legacy whitelist changes detected (or only generatedAt changed)."
+            echo "::notice::No snapshot, blacklist, or legacy whitelist changes detected (or only generatedAt changed)."
           fi
 
       - name: Build PR title and commit message
@@ -131,7 +135,9 @@ jobs:
           commit-message: ${{ steps.pr_meta.outputs.commit_message }}
           title: ${{ steps.pr_meta.outputs.title }}
           body: |
-            Automated add/refresh for a single silo snapshot entry.
+            Automated add/refresh for a single silo snapshot entry (target only).
+
+            Clears the address from `src/data/silos/blacklist/` when present so the next full refresh can include it again.
 
             - chain: `${{ inputs.chainKey }}`
             - siloId: `#${{ steps.pr_meta.outputs.silo_id }}`
