@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Updated
+- sync Positions v3 markets from GraphQL minus a durable blacklist, with multi-select remove UI for all markets and Blacklist Silo Action
 - shorten Positions markets localStorage keys with a snapshot hash and one-shot schema wipe for oversized legacy entries
 - show Positions asset/liquidity metric fractional digits in a smaller type style and inherit row colors; LTV percent sign matches that scale
 
