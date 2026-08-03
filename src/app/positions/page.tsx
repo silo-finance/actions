@@ -21,7 +21,7 @@ import {
 } from '@/utils/networks'
 import {
   buildLiquidationSnapshotKey,
-  getLiquidationSnapshotEntries,
+  fetchLiquidationSnapshotEntries,
   getLiquidationSnapshotConfig,
 } from '@/utils/liquidationSnapshot'
 import { ensureLocalStorageSchema } from '@/utils/storage/localStorageSchema'
@@ -976,7 +976,18 @@ function PositionsPageInner() {
     return () => window.clearInterval(timer)
   }, [isClientMounted])
 
-  const snapshotEntries = useMemo(() => getLiquidationSnapshotEntries(), [])
+  const snapshotsQuery = useQuery({
+    queryKey: ['liquidation-silo-snapshots'],
+    queryFn: fetchLiquidationSnapshotEntries,
+    enabled: isClientMounted,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  })
+  const snapshotEntries = useMemo(
+    () => snapshotsQuery.data ?? [],
+    [snapshotsQuery.data]
+  )
+  const snapshotsReady = snapshotsQuery.isSuccess && snapshotEntries.length > 0
   const snapshotKey = useMemo(() => buildLiquidationSnapshotKey(snapshotEntries), [snapshotEntries])
   const marketsDynamicStorageKey = useMemo(() => `liq:markets:dynamic:v2:${snapshotKey}`, [snapshotKey])
   const marketsCountsStorageKey = useMemo(
@@ -1028,7 +1039,7 @@ function PositionsPageInner() {
   const externalPositionsQuery = useQuery({
     queryKey: ['liq', 'positions', 'external', snapshotKey],
     queryFn: () => fetchExternalPositionsData(snapshotEntries.map((row) => row.chainId)),
-    enabled: isClientMounted && snapshotEntries.length > 0,
+    enabled: isClientMounted && snapshotsReady,
     staleTime: 0,
     gcTime: 1000 * 60 * 60 * 24,
     refetchOnMount: true,
@@ -1059,7 +1070,7 @@ function PositionsPageInner() {
       }
       return out
     },
-    enabled: isClientMounted && snapshotEntries.length > 0,
+    enabled: isClientMounted && snapshotsReady,
     initialData: () => {
       if (!isClientMounted) return undefined
       const cached = readPersisted<Array<readonly [string, PersistedDynamicState]>>(marketsDynamicStorageKey)
@@ -1103,7 +1114,7 @@ function PositionsPageInner() {
       }
       return out
     },
-    enabled: isClientMounted && snapshotEntries.length > 0,
+    enabled: isClientMounted && snapshotsReady,
     initialData: () => {
       if (!isClientMounted) return undefined
       const cached = readPersisted<Array<readonly [string, number]>>(marketsCountsStorageKey)
@@ -1194,7 +1205,7 @@ function PositionsPageInner() {
       }
       return out
     },
-    enabled: isClientMounted && snapshotEntries.length > 0,
+    enabled: isClientMounted && snapshotsReady,
     initialData: () => {
       if (!isClientMounted) return undefined
       const cached = readPersisted<Array<readonly [string, PrefetchedMarketPositionsEntry]>>(marketsPrefetchStorageKey)
@@ -2347,6 +2358,51 @@ function PositionsPageInner() {
   }, [])
 
   const blacklistBarItems = useMemo(() => Array.from(blacklistSelection.values()), [blacklistSelection])
+
+  if (!isClientMounted || snapshotsQuery.isLoading || (snapshotsQuery.isFetching && !snapshotsQuery.data)) {
+    return (
+      <div className="silo-page px-4 py-8 sm:px-6 max-w-7xl mx-auto">
+        <div className="mb-6">
+          <Link href="/" className="text-sm font-semibold silo-text-soft hover:silo-text-main">
+            ← Home
+          </Link>
+        </div>
+        <div className="silo-panel p-6">
+          <h1 className="text-xl font-semibold silo-text-main m-0 mb-2">Positions</h1>
+          <p className="text-sm silo-text-soft m-0">Loading market snapshots…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (snapshotsQuery.isError || !snapshotsReady) {
+    const detail =
+      snapshotsQuery.error instanceof Error
+        ? snapshotsQuery.error.message
+        : 'Remote silo snapshots failed to load.'
+    return (
+      <div className="silo-page px-4 py-8 sm:px-6 max-w-7xl mx-auto">
+        <div className="mb-6">
+          <Link href="/" className="text-sm font-semibold silo-text-soft hover:silo-text-main">
+            ← Home
+          </Link>
+        </div>
+        <div className="silo-panel p-6 space-y-3">
+          <h1 className="text-xl font-semibold silo-text-main m-0">Positions</h1>
+          <p className="text-sm silo-text-soft m-0">
+            Could not load silo market snapshots from the data branch. Set repository / local env{' '}
+            <code className="text-xs">NEXT_PUBLIC_LIQ_SILOS_BASE_URL</code> to the raw GitHub URL for{' '}
+            <code className="text-xs">legacy-positions</code> (
+            <code className="text-xs">…/src/data/silos</code>), then reload.
+          </p>
+          <p className="text-xs silo-text-faint m-0 break-words">{detail}</p>
+          <button type="button" className="silo-btn-secondary" onClick={() => void snapshotsQuery.refetch()}>
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="silo-page px-4 py-8 sm:px-6 max-w-7xl mx-auto">
