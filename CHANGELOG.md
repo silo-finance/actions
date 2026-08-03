@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Updated
+- Load Positions market snapshots from the legacy-positions data branch at runtime and publish Refresh/mutate silo JSON there without a master merge
+
 ## [0.36.0] - 2026-08-03
 
 ### Added
