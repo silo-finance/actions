@@ -139,7 +139,7 @@ jobs:
           body: |
             Removes a market from the silo snapshot.
 
-            - v3: also appends the address to `src/data/silos/blacklist/` so full refresh will not re-add it
+            - v3: also appends the address to `src/data/silos/blacklist/` so Refresh V3 Silos will not re-add it
             - legacy: also updates the legacy positions whitelist; positions drop on the next `Pull Legacy Positions` run
 
             - chain: `${{ inputs.chainKey }}`

@@ -675,7 +675,7 @@ async function runFullRefresh() {
     const merged = [...v3Rows, ...legacyRows]
     writeChainSnapshot(chainKey, chainId, merged)
     console.log(
-      `[sync-liquidation-silos] full refresh wrote ${merged.length} records for ${chainKey} (v3=${v3Rows.length}, legacy=${legacyRows.length}, gql=${gqlV3Addresses.size}, blacklisted=${blacklist.size})`
+      `[sync-liquidation-silos] v3 refresh wrote ${merged.length} records for ${chainKey} (v3=${v3Rows.length}, legacy=${legacyRows.length}, gql=${gqlV3Addresses.size}, blacklisted=${blacklist.size})`
     )
   }
 }
@@ -821,7 +821,7 @@ function removeMarketFromChain(chainKey, siloAddress) {
     )
   }
 
-  // v3: durable blacklist so full refresh will not re-add. legacy: snapshot drop + whitelist only.
+  // v3: durable blacklist so v3 refresh will not re-add. legacy: snapshot drop + whitelist only.
   if (version === 'legacy') {
     removeFromLegacyWhitelist(chainKey, siloAddress)
   } else {

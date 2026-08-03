@@ -137,7 +137,7 @@ jobs:
           body: |
             Automated add/refresh for a single silo snapshot entry (target only).
 
-            Clears the address from `src/data/silos/blacklist/` when present so the next full refresh can include it again.
+            Clears the address from `src/data/silos/blacklist/` when present so the next Refresh V3 Silos run can include it again.
 
             - chain: `${{ inputs.chainKey }}`
             - siloId: `#${{ steps.pr_meta.outputs.silo_id }}`

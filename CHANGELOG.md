@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.36.0] - 2026-08-03
+
+### Added
+- Rename silo full refresh Action to hourly Refresh V3 Silos.
+
 ## [0.35.0] - 2026-08-03
 
 ### Added
@@ -10,10 +15,8 @@
 - sort positions by desc first
 - Hash Positions markets cache keys and wipe legacy localStorage once.
 
-## [Unreleased]
-
 ### Updated
-- sync Positions v3 markets from GraphQL minus a durable blacklist, with multi-select remove UI for all markets and Blacklist Silo Action
+- sync Positions v3 markets from GraphQL minus a durable blacklist via hourly Refresh V3 Silos, with multi-select remove UI and Blacklist Silo Action
 - shorten Positions markets localStorage keys with a snapshot hash and one-shot schema wipe for oversized legacy entries
 - show Positions asset/liquidity metric fractional digits in a smaller type style and inherit row colors; LTV percent sign matches that scale
 

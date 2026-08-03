@@ -1,4 +1,4 @@
-name: FULL REFRESH SILOS
+name: Refresh V3 Silos
 
 on:
   workflow_dispatch:
@@ -12,16 +12,23 @@ on:
         required: false
         default: ''
       testGraphLimit:
-        description: 'Optional Graph chunk size override for testing'
+        description: 'Optional GraphQL page size override for testing'
         required: false
         default: ''
+  schedule:
+    # Every hour at minute 0 (UTC); same cadence as Pull Legacy Positions.
+    - cron: '0 * * * *'
 
 permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: refresh-v3-silos
+  cancel-in-progress: false
+
 jobs:
-  full-refresh:
+  refresh-v3:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,7 +42,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Sync snapshot from GraphQL minus blacklist
+      - name: Refresh v3 snapshot from GraphQL minus blacklist
         env:
           TEST_API_LIMIT: ${{ inputs.testApiLimit }}
           TEST_GRAPH_LIMIT: ${{ inputs.testGraphLimit }}
@@ -62,21 +69,21 @@ jobs:
         run: |
           if git diff --quiet -I '^[[:space:]]*"generatedAt":[[:space:]]*".*",$' -- src/data/silos/*.json; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No snapshot changes detected (or only generatedAt changed)."
+            echo "::notice::No v3 snapshot changes detected (or only generatedAt changed)."
           else
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create PR with refreshed snapshot
+      - name: Create PR with refreshed v3 snapshot
         if: steps.detect.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
-          branch: chore/full-refresh-silos
-          commit-message: 'chore: refresh silo snapshots'
-          title: 'chore: refresh silo snapshots'
+          branch: chore/refresh-v3-silos
+          commit-message: 'chore: refresh v3 silo snapshots'
+          title: 'chore: refresh v3 silo snapshots'
           body: |
-            Automated full refresh for static silo snapshot data.
+            Automated v3 silo snapshot refresh.
 
             - source: GraphQL v3 markets (`siloId >= 3000`) minus `src/data/silos/blacklist/`
-            - legacy rows in existing snapshots are preserved
+            - legacy rows in existing snapshots are preserved (not re-fetched)
             - scope: static silo metadata only
