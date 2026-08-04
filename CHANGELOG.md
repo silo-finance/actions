@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Updated
-- Load Positions market snapshots from the legacy-positions data branch at runtime; stop tracking chain silo JSON on app branches and publish/bootstrap only via that data branch
+- Load Positions silo and legacy-position JSON from one legacy-positions branch root env; stop tracking chain silo JSON on app branches
 
 ## [0.36.0] - 2026-08-03
 

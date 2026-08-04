@@ -1,3 +1,4 @@
+import { resolveLegacyPositionsUrl } from '@/utils/liquidationDataBranch'
 import { buildLiquidationPositionKey } from '@/utils/liquidationPositionIdentity'
 
 export type ExternalPositionRecord = {
@@ -16,15 +17,6 @@ export type ExternalPositionsData = {
   byMarketKey: Map<string, ExternalPositionRecord[]>
 }
 
-const CHAIN_URL_ENV_KEYS: Record<number, string> = {
-  1: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_ETHEREUM',
-  50: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_XDC',
-  146: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_SONIC',
-  1776: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_INJECTIVE',
-  42161: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_ARBITRUM',
-  43114: 'NEXT_PUBLIC_LIQ_POSITIONS_URL_AVALANCHE',
-}
-
 const CHAIN_KEY_BY_ID: Record<number, string> = {
   1: 'ethereum',
   50: 'xdc',
@@ -32,15 +24,6 @@ const CHAIN_KEY_BY_ID: Record<number, string> = {
   1776: 'injective',
   42161: 'arbitrum',
   43114: 'avalanche',
-}
-
-const CHAIN_FILE_NAMES: Record<number, string> = {
-  1: 'ethereum_positions.json',
-  50: 'xdc_positions.json',
-  146: 'sonic_positions.json',
-  1776: 'injective_positions.json',
-  42161: 'arbitrum_positions.json',
-  43114: 'avalanche_positions.json',
 }
 
 function normalizeAddress(value: unknown): string | null {
@@ -67,16 +50,9 @@ function appendCacheBust(url: string): string {
 }
 
 function resolvePositionsSourceUrl(chainId: number): string | null {
-  const envKey = CHAIN_URL_ENV_KEYS[chainId]
-  const direct = envKey ? process.env[envKey]?.trim() : ''
-  if (direct) return direct
-
-  const base = process.env.NEXT_PUBLIC_LIQ_POSITIONS_BASE_URL?.trim() || ''
-  const fileName = CHAIN_FILE_NAMES[chainId]
-  if (base && fileName) return `${base.replace(/\/$/, '')}/${fileName}`
   const chainKey = CHAIN_KEY_BY_ID[chainId]
-  if (chainKey) return `/legacy-positions/${chainKey}_positions.json`
-  return null
+  if (!chainKey) return null
+  return resolveLegacyPositionsUrl(chainKey)
 }
 
 function parseExternalRecord(chainId: number, raw: unknown): ExternalPositionRecord | null {
@@ -109,9 +85,8 @@ export async function fetchExternalPositionsData(chainIds: number[]): Promise<Ex
       const chainKey = CHAIN_KEY_BY_ID[chainId] ?? String(chainId)
       const sourceUrl = resolvePositionsSourceUrl(chainId)
       if (!sourceUrl) {
-        const envKey = CHAIN_URL_ENV_KEYS[chainId]
         console.info(
-          `[positions-external] no source URL for ${chainKey}; set ${envKey ?? 'NEXT_PUBLIC_LIQ_POSITIONS_BASE_URL'}`
+          `[positions-external] no source URL for ${chainKey}; set NEXT_PUBLIC_LIQ_SILOS_BASE_URL to the legacy-positions branch root`
         )
         return
       }
