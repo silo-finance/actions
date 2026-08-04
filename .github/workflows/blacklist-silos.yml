@@ -36,15 +36,17 @@ jobs:
           echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
 
       - name: Checkout source ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ steps.refs.outputs.source_ref }}
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
+          # No packageManager in package.json; keep install step explicit.
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
