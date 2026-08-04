@@ -1,6 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [0.38.0] - 2026-08-04
+
+### Added
+- chore: blacklist silo markets
 
 ### Updated
 - Target BLACKLIST SILOS pull requests at develop instead of master
