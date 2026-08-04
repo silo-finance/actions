@@ -13,7 +13,7 @@
 - Add runtime silo snapshot fetcher with fail-hard remote load.
 
 ### Updated
-- Load Positions silo and legacy-position JSON from one legacy-positions branch root env; stop tracking chain silo JSON on app branches
+- Load Positions silo and legacy-position JSON from one legacy-positions branch root env; stop tracking chain silo JSON on app branches; fix blacklist/add/remove PRs after data-branch push
 
 ## [0.36.0] - 2026-08-03
 

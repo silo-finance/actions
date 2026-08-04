@@ -59,9 +59,6 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Record source SHA
-        run: echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
-
       - name: Bootstrap silo baseline from legacy-positions
         run: |
           set -euo pipefail
@@ -114,10 +111,12 @@ jobs:
           chmod +x ./scripts/ci/push-silos-to-data-branch.sh
           ./scripts/ci/push-silos-to-data-branch.sh "${SILOS_DIR}"
 
-      - name: Restore source ref for master-side PR
+      - name: Checkout master for blacklist / whitelist PR
         run: |
           set -euo pipefail
-          git checkout -f "${SOURCE_SHA}"
+          # Push to the data branch leaves a detached HEAD; create-pull-request needs a branch + base.
+          git fetch origin master
+          git checkout -B master origin/master
           mkdir -p src/data/silos/blacklist src/data/positions
           cp -R "${MASTER_DIR}/blacklist/." src/data/silos/blacklist/
           cp -R "${MASTER_DIR}/positions/." src/data/positions/
@@ -193,8 +192,9 @@ jobs:
 
       - name: Create PR for blacklist / legacy whitelist
         if: steps.detect.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
+          base: master
           branch: chore/add-any-silo-${{ inputs.chainKey }}
           commit-message: ${{ steps.pr_meta.outputs.commit_message }}
           title: ${{ steps.pr_meta.outputs.title }}
