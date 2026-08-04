@@ -3,6 +3,11 @@ name: Refresh V3 Silos
 on:
   workflow_dispatch:
     inputs:
+      source_ref:
+        description: 'Source ref for sync scripts (branch, tag, or SHA). Data always writes to legacy-positions.'
+        required: false
+        default: 'master'
+        type: string
       chainKeys:
         description: 'Optional CSV chain keys (e.g. ethereum,arbitrum)'
         required: false
@@ -21,18 +26,48 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: refresh-v3-silos
   cancel-in-progress: false
 
+env:
+  # Same data branch as Pull Legacy Positions — never the feature/PR branch.
+  TARGET_BRANCH: legacy-positions
+
 jobs:
   refresh-v3:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Resolve source ref
+        id: refs
+        run: |
+          set -euo pipefail
+          SOURCE_REF="${{ inputs.source_ref }}"
+          if [ -z "$SOURCE_REF" ]; then
+            # Scheduled runs have no inputs; always use master (like Pull Legacy Positions).
+            SOURCE_REF="master"
+          fi
+          echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
+          echo "::notice::Scripts from ${SOURCE_REF}; silo JSON publishes to ${TARGET_BRANCH} only."
+
+      - name: Checkout source ref (scripts + working silo baseline)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.refs.outputs.source_ref }}
+          fetch-depth: 0
+
+      - name: Use master blacklist (source of truth)
+        run: |
+          set -euo pipefail
+          git fetch origin master
+          git checkout origin/master -- src/data/silos/blacklist
+
+      - name: Bootstrap silo baseline from legacy-positions
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/ci/bootstrap-silos-from-data-branch.sh
+          ./scripts/ci/bootstrap-silos-from-data-branch.sh
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -74,16 +109,30 @@ jobs:
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create PR with refreshed v3 snapshot
+      - name: Prepare silo export bundle
         if: steps.detect.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v7
-        with:
-          branch: chore/refresh-v3-silos
-          commit-message: 'chore: refresh v3 silo snapshots'
-          title: 'chore: refresh v3 silo snapshots'
-          body: |
-            Automated v3 silo snapshot refresh.
+        run: |
+          set -euo pipefail
+          EXPORT_DIR="${RUNNER_TEMP}/silos-data-branch"
+          mkdir -p "${EXPORT_DIR}"
+          cp src/data/silos/*.json "${EXPORT_DIR}/"
+          echo "EXPORT_DIR=${EXPORT_DIR}" >> "$GITHUB_ENV"
 
-            - source: GraphQL v3 markets (`siloId >= 3000`) minus `src/data/silos/blacklist/`
-            - legacy rows in existing snapshots are preserved (not re-fetched)
-            - scope: static silo metadata only
+      - name: Push silo snapshots to legacy-positions
+        if: steps.detect.outputs.has_changes == 'true'
+        env:
+          COMMIT_MESSAGE: 'chore: refresh v3 silo snapshots'
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/ci/push-silos-to-data-branch.sh
+          ./scripts/ci/push-silos-to-data-branch.sh "${EXPORT_DIR}"
+
+      - name: Log published URLs
+        if: steps.detect.outputs.has_changes == 'true'
+        run: |
+          echo "::notice::Source ref: ${{ steps.refs.outputs.source_ref }}"
+          echo "::notice::Target branch: ${TARGET_BRANCH}"
+          echo "::notice::Silos base URL: https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${TARGET_BRANCH}/src/data/silos"
+          for f in ethereum arbitrum avalanche injective sonic xdc; do
+            echo "::notice:: - https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${TARGET_BRANCH}/src/data/silos/${f}.json"
+          done

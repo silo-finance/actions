@@ -34,18 +34,30 @@ GitHub Pages deployment is configured in `.github/workflows/deploy-pages.yml`.
 
 ## Positions dashboard snapshot
 
-The `Positions` page reads static market metadata from local snapshot files in `src/data/silos/`.
+The `Positions` page **always** loads market metadata at runtime from the `legacy-positions` data branch (same branch as legacy borrower/position JSON). There is **no** bundled fallback: if the remote fetch fails, Positions shows an error.
 
-**V3 membership:** Refresh V3 Silos loads GraphQL `markets` with `siloId >= 3000`, subtracts durable per-address excludes in `src/data/silos/blacklist/{chainKey}.json`, then writes the chain snapshot. Legacy rows already in a snapshot are preserved and are not managed by the v3 blacklist.
+**Required build / local env** (repository variable for GitHub Pages deploy) — data-branch **root** only; app appends paths for silo snapshots and legacy positions:
+
+```bash
+NEXT_PUBLIC_LIQ_SILOS_BASE_URL=https://raw.githubusercontent.com/silo-finance/actions/refs/heads/legacy-positions
+# → …/src/data/silos/{chain}.json
+# → …/scripts/pull_borrowers/{chain}_positions.json
+```
+
+Do not set `NEXT_PUBLIC_LIQ_POSITIONS_BASE_URL` (removed). Fetches use `cache: 'no-store'` plus a cache-bust query param so CDN/browser do not serve stale files after data-branch pushes.
+
+**V3 membership:** Refresh V3 Silos runs like Pull Legacy Positions: scripts/blacklist from `master` by default (`source_ref`), then **pushes only** `src/data/silos/{chain}.json` to the shared data branch `legacy-positions` (never to a feature/PR branch). Membership = GraphQL `markets` with `siloId >= 3000` minus `src/data/silos/blacklist/` on `master`. Legacy rows already in a snapshot are preserved. Blacklist / legacy whitelist changes still land on `master` via PR.
+
+**Bootstrap order:** publish silo JSON onto `legacy-positions` first (run Refresh V3 Silos once), set `NEXT_PUBLIC_LIQ_SILOS_BASE_URL`, then deploy the app. Deploying the fetch-capable build before the data branch has files shows the Positions error UI until the branch is populated.
 
 Snapshot maintenance is CI-driven:
 
-- `.github/workflows/refresh-v3-silos.yml` — GraphQL v3 − blacklist (+ preserve legacy); hourly cron + manual dispatch
-- `.github/workflows/add-any-silo.yml` — refresh one address; clears it from the v3 blacklist when present
-- `.github/workflows/remove-any-silo.yml` — remove one address; v3 also appends to blacklist
-- `.github/workflows/blacklist-silos.yml` — batch paste JSON from the Positions UI (clipboard); v3 → blacklist, legacy → remove only
+- `.github/workflows/refresh-v3-silos.yml` — GraphQL v3 − blacklist (+ preserve legacy); hourly cron + manual; pushes silos to `legacy-positions`
+- `.github/workflows/add-any-silo.yml` — refresh one address; clears blacklist when present; publishes silos to data branch; PR for blacklist/whitelist on `master`
+- `.github/workflows/remove-any-silo.yml` — remove one address; v3 also appends to blacklist; publishes silos; PR for blacklist/whitelist
+- `.github/workflows/blacklist-silos.yml` — batch paste JSON from the Positions UI; publishes silos; PR for blacklist/whitelist
 
-Local sync commands (script mode `full` = v3 refresh):
+Chain silo JSON is **not** tracked on `master` / feature branches (gitignored). CI bootstraps the working-tree baseline from `legacy-positions` before sync, then publishes updates back there. Local sync commands also write `src/data/silos/*.json` in the working tree; that does **not** feed the UI unless published to `legacy-positions`:
 
 ```bash
 node scripts/sync-liquidation-silos.mjs full
@@ -58,7 +70,7 @@ Optional runtime envs for dashboard testing:
 
 ```bash
 NEXT_PUBLIC_LIQ_GRAPHQL_URL=https://api-v3.silo.finance/graphql
-# Local/dev slice only — filters the snapshot in the browser; not the durable sync blacklist
+# Local/dev slice only — filters the remote snapshot in the browser; not the durable sync blacklist
 NEXT_PUBLIC_TEST_SILO_IDS=0x...,0x...
 NEXT_PUBLIC_TEST_API_LIMIT=20
 NEXT_PUBLIC_TEST_GRAPH_LIMIT=50

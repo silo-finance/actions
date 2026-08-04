@@ -1,9 +1,4 @@
-import arbitrumSnapshot from '@/data/silos/arbitrum.json'
-import avalancheSnapshot from '@/data/silos/avalanche.json'
-import ethereumSnapshot from '@/data/silos/ethereum.json'
-import injectiveSnapshot from '@/data/silos/injective.json'
-import sonicSnapshot from '@/data/silos/sonic.json'
-import xdcSnapshot from '@/data/silos/xdc.json'
+import { fetchChainSiloSnapshot } from '@/utils/liquidationSilosRemote'
 
 export type StaticSiloConfigData = {
   daoFee: string
@@ -52,21 +47,15 @@ export type LiquidationSnapshotEntry = {
   otherSilo?: RelatedSiloSnapshotData | null
 }
 
-type ChainSnapshotFile = {
-  chainId: number
-  chainKey: string
-  generatedAt: string
-  silos: LiquidationSnapshotEntry[]
-}
-
-const SNAPSHOTS: ChainSnapshotFile[] = [
-  arbitrumSnapshot as ChainSnapshotFile,
-  avalancheSnapshot as ChainSnapshotFile,
-  ethereumSnapshot as ChainSnapshotFile,
-  injectiveSnapshot as ChainSnapshotFile,
-  sonicSnapshot as ChainSnapshotFile,
-  xdcSnapshot as ChainSnapshotFile,
-]
+/** Chains whose silo snapshots the Positions UI always loads from the data branch. */
+export const LIQUIDATION_SNAPSHOT_CHAIN_KEYS = [
+  'arbitrum',
+  'avalanche',
+  'ethereum',
+  'injective',
+  'sonic',
+  'xdc',
+] as const
 
 function normalizeMarketVersion(value: unknown): 'v3' | 'legacy' {
   return value === 'legacy' ? 'legacy' : 'v3'
@@ -105,22 +94,29 @@ export function getLiquidationSnapshotConfig(): LiquidationSnapshotConfig {
   }
 }
 
-export function getLiquidationSnapshotEntries(): LiquidationSnapshotEntry[] {
+function applySnapshotFilters(entries: LiquidationSnapshotEntry[]): LiquidationSnapshotEntry[] {
   const config = getLiquidationSnapshotConfig()
-  const out = SNAPSHOTS.flatMap((snapshot) =>
-    snapshot.silos.map((row) => ({
-      ...row,
-      marketVersion: normalizeMarketVersion(row.marketVersion),
-    }))
-  )
+  const normalized = entries.map((row) => ({
+    ...row,
+    marketVersion: normalizeMarketVersion(row.marketVersion),
+  }))
   const filtered =
     config.filteredSiloAddresses.size > 0
-      ? out.filter((row) =>
-          config.filteredSiloAddresses.has(row.siloAddress.toLowerCase())
-        )
-      : out
+      ? normalized.filter((row) => config.filteredSiloAddresses.has(row.siloAddress.toLowerCase()))
+      : normalized
   if (config.testApiLimit == null) return filtered
   return filtered.slice(0, config.testApiLimit)
+}
+
+/**
+ * Load all chain silo snapshots from the remote data branch.
+ * Fails hard if any chain URL is missing, HTTP fails, JSON is invalid, or silos is empty.
+ */
+export async function fetchLiquidationSnapshotEntries(): Promise<LiquidationSnapshotEntry[]> {
+  const snapshots = await Promise.all(
+    LIQUIDATION_SNAPSHOT_CHAIN_KEYS.map((chainKey) => fetchChainSiloSnapshot(chainKey))
+  )
+  return applySnapshotFilters(snapshots.flatMap((snapshot) => snapshot.silos))
 }
 
 const FNV1A64_OFFSET = BigInt('0xcbf29ce484222325')
