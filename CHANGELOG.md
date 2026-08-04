@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.38.0] - 2026-08-04
+
+### Added
+- chore: blacklist silo markets
+
+### Updated
+- Target BLACKLIST SILOS pull requests at develop instead of master
+
+### Fixed
+- Run BLACKLIST SILOS with actions/checkout@v5 and actions/setup-node@v5 to drop the Node 20 action runtime warning
+
 ## [0.37.1] - 2026-08-04
 
 ### Fixed

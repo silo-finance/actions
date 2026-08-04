@@ -46,7 +46,7 @@ NEXT_PUBLIC_LIQ_SILOS_BASE_URL=https://raw.githubusercontent.com/silo-finance/ac
 
 Do not set `NEXT_PUBLIC_LIQ_POSITIONS_BASE_URL` (removed). Fetches use `cache: 'no-store'` plus a cache-bust query param so CDN/browser do not serve stale files after data-branch pushes.
 
-**V3 membership:** Refresh V3 Silos runs like Pull Legacy Positions: scripts/blacklist from `master` by default (`source_ref`), then **pushes only** `src/data/silos/{chain}.json` to the shared data branch `legacy-positions` (never to a feature/PR branch). Membership = GraphQL `markets` with `siloId >= 3000` minus `src/data/silos/blacklist/` on `master`. Legacy rows already in a snapshot are preserved. Blacklist / legacy whitelist changes still land on `master` via PR.
+**V3 membership:** Refresh V3 Silos runs like Pull Legacy Positions: scripts from `master` by default (`source_ref`), then **pushes only** `src/data/silos/{chain}.json` to the shared data branch `legacy-positions` (never to a feature/PR branch). Membership = GraphQL `markets` with `siloId >= 3000` minus `src/data/silos/blacklist/`. Legacy rows already in a snapshot are preserved. Batch **BLACKLIST SILOS** opens PRs against `develop` (blacklist / legacy whitelist); ADD/REMOVE still open those PRs against `master`.
 
 **Bootstrap order:** publish silo JSON onto `legacy-positions` first (run Refresh V3 Silos once), set `NEXT_PUBLIC_LIQ_SILOS_BASE_URL`, then deploy the app. Deploying the fetch-capable build before the data branch has files shows the Positions error UI until the branch is populated.
 
@@ -55,7 +55,7 @@ Snapshot maintenance is CI-driven:
 - `.github/workflows/refresh-v3-silos.yml` — GraphQL v3 − blacklist (+ preserve legacy); hourly cron + manual; pushes silos to `legacy-positions`
 - `.github/workflows/add-any-silo.yml` — refresh one address; clears blacklist when present; publishes silos to data branch; PR for blacklist/whitelist on `master`
 - `.github/workflows/remove-any-silo.yml` — remove one address; v3 also appends to blacklist; publishes silos; PR for blacklist/whitelist
-- `.github/workflows/blacklist-silos.yml` — batch paste JSON from the Positions UI; publishes silos; PR for blacklist/whitelist
+- `.github/workflows/blacklist-silos.yml` — batch paste JSON from the Positions UI; publishes silos; PR for blacklist/whitelist onto `develop`
 
 Chain silo JSON is **not** tracked on `master` / feature branches (gitignored). CI bootstraps the working-tree baseline from `legacy-positions` before sync, then publishes updates back there. Local sync commands also write `src/data/silos/*.json` in the working tree; that does **not** feed the UI unless published to `legacy-positions`:
 
