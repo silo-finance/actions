@@ -51,6 +51,12 @@ jobs:
       - name: Record source SHA
         run: echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
+      - name: Bootstrap silo baseline from legacy-positions
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/ci/bootstrap-silos-from-data-branch.sh
+          ./scripts/ci/bootstrap-silos-from-data-branch.sh
+
       - name: Apply blacklist batch
         env:
           BLACKLIST_CONFIG: ${{ inputs.config }}

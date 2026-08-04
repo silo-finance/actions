@@ -27,3 +27,7 @@ next-env.d.ts
 
 __pycache__/
 public/legacy-positions/
+
+# Chain silo snapshots live on the legacy-positions data branch (UI / Refresh publish).
+# Keep blacklist tracked on master; ignore only top-level chain JSON.
+/src/data/silos/*.json

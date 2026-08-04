@@ -58,7 +58,7 @@ Snapshot maintenance is CI-driven:
 - `.github/workflows/remove-any-silo.yml` — remove one address; v3 also appends to blacklist; publishes silos; PR for blacklist/whitelist
 - `.github/workflows/blacklist-silos.yml` — batch paste JSON from the Positions UI; publishes silos; PR for blacklist/whitelist
 
-Local sync commands still write `src/data/silos/*.json` in the working tree (for scripts/CI); that does **not** feed the UI unless published to `legacy-positions`:
+Chain silo JSON is **not** tracked on `master` / feature branches (gitignored). CI bootstraps the working-tree baseline from `legacy-positions` before sync, then publishes updates back there. Local sync commands also write `src/data/silos/*.json` in the working tree; that does **not** feed the UI unless published to `legacy-positions`:
 
 ```bash
 node scripts/sync-liquidation-silos.mjs full
