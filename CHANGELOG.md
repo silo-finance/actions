@@ -1,6 +1,16 @@
 # Changelog
 
-## [Unreleased]
+## [0.37.0] - 2026-08-04
+
+### Added
+- Use one data-branch root env for silo and legacy position fetches.
+- Stop tracking chain silo JSON on app branches after publishing to legacy-positions.
+- Pin silo Actions to master scripts and legacy-positions data writes.
+- Document runtime silo snapshots and bootstrap order for the data branch.
+- Publish ADD/REMOVE/BLACKLIST silo JSON to the data branch.
+- Push Refresh V3 Silos snapshots to the legacy-positions data branch.
+- Load Positions market snapshots via React Query from the data branch.
+- Add runtime silo snapshot fetcher with fail-hard remote load.
 
 ### Updated
 - Load Positions silo and legacy-position JSON from one legacy-positions branch root env; stop tracking chain silo JSON on app branches
