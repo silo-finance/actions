@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.37.1] - 2026-08-04
+
+### Fixed
+- Recheckout master and set create-pull-request base after BLACKLIST/ADD/REMOVE push to the data branch
+
 ## [0.37.0] - 2026-08-04
 
 ### Added
