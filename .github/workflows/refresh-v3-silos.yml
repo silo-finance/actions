@@ -3,6 +3,11 @@ name: Refresh V3 Silos
 on:
   workflow_dispatch:
     inputs:
+      source_ref:
+        description: 'Source ref for sync scripts (branch, tag, or SHA). Data always writes to legacy-positions.'
+        required: false
+        default: 'master'
+        type: string
       chainKeys:
         description: 'Optional CSV chain keys (e.g. ethereum,arbitrum)'
         required: false
@@ -27,15 +32,29 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # Same data branch as Pull Legacy Positions — never the feature/PR branch.
   TARGET_BRANCH: legacy-positions
 
 jobs:
   refresh-v3:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout workflow ref (scripts)
+      - name: Resolve source ref
+        id: refs
+        run: |
+          set -euo pipefail
+          SOURCE_REF="${{ inputs.source_ref }}"
+          if [ -z "$SOURCE_REF" ]; then
+            # Scheduled runs have no inputs; always use master (like Pull Legacy Positions).
+            SOURCE_REF="master"
+          fi
+          echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
+          echo "::notice::Scripts from ${SOURCE_REF}; silo JSON publishes to ${TARGET_BRANCH} only."
+
+      - name: Checkout source ref (scripts + working silo baseline)
         uses: actions/checkout@v4
         with:
+          ref: ${{ steps.refs.outputs.source_ref }}
           fetch-depth: 0
 
       - name: Use master blacklist (source of truth)
@@ -93,7 +112,7 @@ jobs:
           cp src/data/silos/*.json "${EXPORT_DIR}/"
           echo "EXPORT_DIR=${EXPORT_DIR}" >> "$GITHUB_ENV"
 
-      - name: Push silo snapshots to data branch
+      - name: Push silo snapshots to legacy-positions
         if: steps.detect.outputs.has_changes == 'true'
         env:
           COMMIT_MESSAGE: 'chore: refresh v3 silo snapshots'
@@ -105,6 +124,7 @@ jobs:
       - name: Log published URLs
         if: steps.detect.outputs.has_changes == 'true'
         run: |
+          echo "::notice::Source ref: ${{ steps.refs.outputs.source_ref }}"
           echo "::notice::Target branch: ${TARGET_BRANCH}"
           echo "::notice::Silos base URL: https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${TARGET_BRANCH}/src/data/silos"
           for f in ethereum arbitrum avalanche injective sonic xdc; do
