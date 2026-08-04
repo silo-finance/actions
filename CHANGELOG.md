@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.39.0] - 2026-08-04
+
+### Fixed
+- Show Positions markets Total Assets as collateral plus protected storage from getCollateralAndProtectedTotalsStorage
+
 ## [0.38.0] - 2026-08-04
 
 ### Added

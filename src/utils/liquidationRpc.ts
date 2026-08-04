@@ -231,6 +231,7 @@ export async function fetchMarketsDynamicState(
   const marketCalls: ReadMulticallCall<bigint | string>[] = siloAddresses.flatMap((marketAddress) => {
     const direct = new Contract(marketAddress, SiloAbi, provider)
     return [
+      // Collateral storage + protected storage (UI Total Assets); not ERC4626 totalAssets().
       buildReadMulticallCall<bigint | string>({
         target: marketAddress,
         abi: SiloAbi,
@@ -243,13 +244,6 @@ export async function fetchMarketsDynamicState(
           const tuple = decoded as [bigint, bigint]
           return tuple[0] + tuple[1]
         },
-      }),
-      buildReadMulticallCall<bigint | string>({
-        target: marketAddress,
-        abi: SiloAbi,
-        functionName: 'totalAssets',
-        fallback: async () => (await direct.totalAssets()) as bigint,
-        decodeResult: (decoded) => decoded as bigint,
       }),
       buildReadMulticallCall<bigint | string>({
         target: marketAddress,
@@ -376,12 +370,11 @@ export async function fetchMarketsDynamicState(
   }
 
   for (let i = 0; i < siloAddresses.length; i += 1) {
-    const baseIndex = i * 4
+    const baseIndex = i * 3
     const totalAssetsStorage = (results[baseIndex] as bigint | null) ?? BIGINT_ZERO
-    const totalAssets = (results[baseIndex + 1] as bigint | null) ?? BIGINT_ZERO
-    const liquidity = (results[baseIndex + 2] as bigint | null) ?? BIGINT_ZERO
-    const totalDebt = (results[baseIndex + 3] as bigint | null) ?? BIGINT_ZERO
-    const interest = totalAssets > totalAssetsStorage ? totalAssets - totalAssetsStorage : BIGINT_ZERO
+    const totalAssets = totalAssetsStorage
+    const liquidity = (results[baseIndex + 1] as bigint | null) ?? BIGINT_ZERO
+    const totalDebt = (results[baseIndex + 2] as bigint | null) ?? BIGINT_ZERO
     const siloAddress = siloAddresses[i]!.toLowerCase()
     const tokenAddress = tokenAddressBySilo.get(siloAddress) ?? null
     const hasExternalLiquiditySource = tokenAddress ? externalSourcesByToken.has(tokenAddress) : false
@@ -391,7 +384,7 @@ export async function fetchMarketsDynamicState(
       siloAddress,
       totalAssetsStorage,
       totalAssets,
-      interest,
+      interest: BIGINT_ZERO,
       liquidity,
       totalDebt,
       externalLiquidity,

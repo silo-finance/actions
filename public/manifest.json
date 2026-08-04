@@ -1,6 +1,6 @@
 {
   "name": "Silo Control Panel",
-  "version": "0.38.0",
+  "version": "0.39.0",
   "description": "Execute actions across markets and vaults",
   "iconPath": "safe-app-icon.svg",
   "icons": [
