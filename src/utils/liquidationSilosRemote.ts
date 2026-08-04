@@ -1,3 +1,4 @@
+import { resolveSiloSnapshotUrl } from '@/utils/liquidationDataBranch'
 import type { LiquidationSnapshotEntry } from '@/utils/liquidationSnapshot'
 
 export type ChainSnapshotFile = {
@@ -7,34 +8,11 @@ export type ChainSnapshotFile = {
   silos: LiquidationSnapshotEntry[]
 }
 
-const CHAIN_URL_ENV_KEYS: Record<string, string> = {
-  ethereum: 'NEXT_PUBLIC_LIQ_SILOS_URL_ETHEREUM',
-  xdc: 'NEXT_PUBLIC_LIQ_SILOS_URL_XDC',
-  sonic: 'NEXT_PUBLIC_LIQ_SILOS_URL_SONIC',
-  injective: 'NEXT_PUBLIC_LIQ_SILOS_URL_INJECTIVE',
-  arbitrum: 'NEXT_PUBLIC_LIQ_SILOS_URL_ARBITRUM',
-  avalanche: 'NEXT_PUBLIC_LIQ_SILOS_URL_AVALANCHE',
-}
-
 /** Append a unique value so the browser/CDN never serves a stale silo snapshot. */
 function appendCacheBust(url: string): string {
   const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
   const separator = url.includes('?') ? '&' : '?'
   return `${url}${separator}_cb=${token}`
-}
-
-export function resolveSilosSourceUrl(chainKey: string): string {
-  const envKey = CHAIN_URL_ENV_KEYS[chainKey]
-  const direct = envKey ? process.env[envKey]?.trim() : ''
-  if (direct) return direct
-
-  const base = process.env.NEXT_PUBLIC_LIQ_SILOS_BASE_URL?.trim() || ''
-  if (!base) {
-    throw new Error(
-      `Missing silo snapshot URL for ${chainKey}. Set ${envKey ?? 'NEXT_PUBLIC_LIQ_SILOS_URL_*'} or NEXT_PUBLIC_LIQ_SILOS_BASE_URL.`
-    )
-  }
-  return `${base.replace(/\/$/, '')}/${chainKey}.json`
 }
 
 function isSnapshotEntry(value: unknown): value is LiquidationSnapshotEntry {
@@ -76,7 +54,7 @@ export function parseChainSnapshotFile(chainKey: string, payload: unknown): Chai
 }
 
 export async function fetchChainSiloSnapshot(chainKey: string): Promise<ChainSnapshotFile> {
-  const sourceUrl = resolveSilosSourceUrl(chainKey)
+  const sourceUrl = resolveSiloSnapshotUrl(chainKey)
   const requestUrl = appendCacheBust(sourceUrl)
   console.info(`[silos-remote] loading ${chainKey} from ${requestUrl}`)
   const res = await fetch(requestUrl, { cache: 'no-store' })

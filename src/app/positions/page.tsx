@@ -2391,9 +2391,8 @@ function PositionsPageInner() {
           <h1 className="text-xl font-semibold silo-text-main m-0">Positions</h1>
           <p className="text-sm silo-text-soft m-0">
             Could not load silo market snapshots from the data branch. Set repository / local env{' '}
-            <code className="text-xs">NEXT_PUBLIC_LIQ_SILOS_BASE_URL</code> to the raw GitHub URL for{' '}
-            <code className="text-xs">legacy-positions</code> (
-            <code className="text-xs">…/src/data/silos</code>), then reload.
+            <code className="text-xs">NEXT_PUBLIC_LIQ_SILOS_BASE_URL</code> to the raw GitHub root of{' '}
+            <code className="text-xs">legacy-positions</code> (no path suffix), then reload.
           </p>
           <p className="text-xs silo-text-faint m-0 break-words">{detail}</p>
           <button type="button" className="silo-btn-secondary" onClick={() => void snapshotsQuery.refetch()}>

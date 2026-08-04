@@ -125,7 +125,6 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
           # Repository variable: Settings → Secrets and variables → Actions → Variables
           NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
-          NEXT_PUBLIC_LIQ_POSITIONS_BASE_URL: ${{ vars.NEXT_PUBLIC_LIQ_POSITIONS_BASE_URL }}
           NEXT_PUBLIC_LIQ_SILOS_BASE_URL: ${{ vars.NEXT_PUBLIC_LIQ_SILOS_BASE_URL }}
         run: npm run build
 
@@ -484,7 +483,6 @@ jobs:
         env:
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
           NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
-          NEXT_PUBLIC_LIQ_POSITIONS_BASE_URL: ${{ vars.NEXT_PUBLIC_LIQ_POSITIONS_BASE_URL }}
           NEXT_PUBLIC_LIQ_SILOS_BASE_URL: ${{ vars.NEXT_PUBLIC_LIQ_SILOS_BASE_URL }}
         run: npm run build
 

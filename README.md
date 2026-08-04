@@ -36,16 +36,15 @@ GitHub Pages deployment is configured in `.github/workflows/deploy-pages.yml`.
 
 The `Positions` page **always** loads market metadata at runtime from the `legacy-positions` data branch (same branch as legacy borrower/position JSON). There is **no** bundled fallback: if the remote fetch fails, Positions shows an error.
 
-**Required build / local env** (repository variable for GitHub Pages deploy):
+**Required build / local env** (repository variable for GitHub Pages deploy) — data-branch **root** only; app appends paths for silo snapshots and legacy positions:
 
 ```bash
-# Raw GitHub base ending at …/src/data/silos (no trailing file name)
-NEXT_PUBLIC_LIQ_SILOS_BASE_URL=https://raw.githubusercontent.com/silo-finance/actions/refs/heads/legacy-positions/src/data/silos
+NEXT_PUBLIC_LIQ_SILOS_BASE_URL=https://raw.githubusercontent.com/silo-finance/actions/refs/heads/legacy-positions
+# → …/src/data/silos/{chain}.json
+# → …/scripts/pull_borrowers/{chain}_positions.json
 ```
 
-Optional per-chain overrides: `NEXT_PUBLIC_LIQ_SILOS_URL_ETHEREUM`, `_ARBITRUM`, `_AVALANCHE`, `_INJECTIVE`, `_SONIC`, `_XDC`.
-
-Fetches use `cache: 'no-store'` plus a cache-bust query param (same idea as legacy positions) so CDN/browser do not serve stale snapshots after Refresh pushes.
+Do not set `NEXT_PUBLIC_LIQ_POSITIONS_BASE_URL` (removed). Fetches use `cache: 'no-store'` plus a cache-bust query param so CDN/browser do not serve stale files after data-branch pushes.
 
 **V3 membership:** Refresh V3 Silos runs like Pull Legacy Positions: scripts/blacklist from `master` by default (`source_ref`), then **pushes only** `src/data/silos/{chain}.json` to the shared data branch `legacy-positions` (never to a feature/PR branch). Membership = GraphQL `markets` with `siloId >= 3000` minus `src/data/silos/blacklist/` on `master`. Legacy rows already in a snapshot are preserved. Blacklist / legacy whitelist changes still land on `master` via PR.
 
