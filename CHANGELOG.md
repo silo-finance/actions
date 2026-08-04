@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.39.1] - 2026-08-04
+
+### Added
+- Revert "chore: blacklist silo markets"
+
 ## [0.39.0] - 2026-08-04
 
 ### Fixed
