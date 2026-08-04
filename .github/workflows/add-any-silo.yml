@@ -18,6 +18,11 @@ on:
         description: 'Silo market address (0x...)'
         required: true
         type: string
+      source_ref:
+        description: 'Source ref for scripts (default master). Silo JSON always publishes to legacy-positions; PR targets master-side blacklist/whitelist only.'
+        required: false
+        default: 'master'
+        type: string
 
 permissions:
   contents: write
@@ -30,9 +35,20 @@ jobs:
   add-refresh-silo:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Resolve source ref
+        id: refs
+        run: |
+          set -euo pipefail
+          SOURCE_REF="${{ inputs.source_ref }}"
+          if [ -z "$SOURCE_REF" ]; then
+            SOURCE_REF="master"
+          fi
+          echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout source ref
         uses: actions/checkout@v4
         with:
+          ref: ${{ steps.refs.outputs.source_ref }}
           fetch-depth: 0
 
       - name: Setup Node.js

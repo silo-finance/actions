@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Updated
-- Load Positions market snapshots from the legacy-positions data branch at runtime and publish Refresh/mutate silo JSON there without a master merge
+- Load Positions market snapshots from the legacy-positions data branch at runtime; Refresh/mutate run scripts from master and publish silo JSON only to that data branch
 
 ## [0.36.0] - 2026-08-03
 

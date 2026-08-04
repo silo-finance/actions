@@ -47,7 +47,7 @@ Optional per-chain overrides: `NEXT_PUBLIC_LIQ_SILOS_URL_ETHEREUM`, `_ARBITRUM`,
 
 Fetches use `cache: 'no-store'` plus a cache-bust query param (same idea as legacy positions) so CDN/browser do not serve stale snapshots after Refresh pushes.
 
-**V3 membership:** Refresh V3 Silos loads GraphQL `markets` with `siloId >= 3000`, subtracts durable per-address excludes in `src/data/silos/blacklist/{chainKey}.json` on `master`, then **pushes** `src/data/silos/{chain}.json` to `legacy-positions` (no PR). Legacy rows already in a snapshot are preserved and are not managed by the v3 blacklist. Blacklist / legacy whitelist changes still land on `master` via PR.
+**V3 membership:** Refresh V3 Silos runs like Pull Legacy Positions: scripts/blacklist from `master` by default (`source_ref`), then **pushes only** `src/data/silos/{chain}.json` to the shared data branch `legacy-positions` (never to a feature/PR branch). Membership = GraphQL `markets` with `siloId >= 3000` minus `src/data/silos/blacklist/` on `master`. Legacy rows already in a snapshot are preserved. Blacklist / legacy whitelist changes still land on `master` via PR.
 
 **Bootstrap order:** publish silo JSON onto `legacy-positions` first (run Refresh V3 Silos once), set `NEXT_PUBLIC_LIQ_SILOS_BASE_URL`, then deploy the app. Deploying the fetch-capable build before the data branch has files shows the Positions error UI until the branch is populated.
 
