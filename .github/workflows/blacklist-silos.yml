@@ -8,9 +8,9 @@ on:
         required: true
         type: string
       source_ref:
-        description: 'Source ref for scripts (default master). Silo JSON always publishes to legacy-positions; PR targets master-side blacklist/whitelist only.'
+        description: 'Source ref for scripts (default develop). Silo JSON always publishes to legacy-positions; PR targets develop for blacklist/whitelist.'
         required: false
-        default: 'master'
+        default: 'develop'
         type: string
 
 permissions:
@@ -19,6 +19,7 @@ permissions:
 
 env:
   TARGET_BRANCH: legacy-positions
+  PR_BASE_BRANCH: develop
 
 jobs:
   blacklist-silos:
@@ -30,7 +31,7 @@ jobs:
           set -euo pipefail
           SOURCE_REF="${{ inputs.source_ref }}"
           if [ -z "$SOURCE_REF" ]; then
-            SOURCE_REF="master"
+            SOURCE_REF="develop"
           fi
           echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
 
@@ -73,14 +74,14 @@ jobs:
         run: |
           set -euo pipefail
           SILOS_DIR="${RUNNER_TEMP}/silos-data-branch"
-          MASTER_DIR="${RUNNER_TEMP}/silos-master-side"
-          mkdir -p "${SILOS_DIR}" "${MASTER_DIR}/blacklist" "${MASTER_DIR}/positions"
+          APP_SIDE_DIR="${RUNNER_TEMP}/silos-app-side"
+          mkdir -p "${SILOS_DIR}" "${APP_SIDE_DIR}/blacklist" "${APP_SIDE_DIR}/positions"
           cp src/data/silos/*.json "${SILOS_DIR}/"
           if [ -d src/data/silos/blacklist ]; then
-            cp -R src/data/silos/blacklist/. "${MASTER_DIR}/blacklist/"
+            cp -R src/data/silos/blacklist/. "${APP_SIDE_DIR}/blacklist/"
           fi
           if [ -d src/data/positions ]; then
-            cp -R src/data/positions/. "${MASTER_DIR}/positions/"
+            cp -R src/data/positions/. "${APP_SIDE_DIR}/positions/"
           fi
 
           snapshot_changed=false
@@ -89,7 +90,7 @@ jobs:
           fi
           echo "snapshot_changed=${snapshot_changed}" >> "$GITHUB_OUTPUT"
           echo "SILOS_DIR=${SILOS_DIR}" >> "$GITHUB_ENV"
-          echo "MASTER_DIR=${MASTER_DIR}" >> "$GITHUB_ENV"
+          echo "APP_SIDE_DIR=${APP_SIDE_DIR}" >> "$GITHUB_ENV"
 
       - name: Push silo snapshots to data branch
         if: steps.export.outputs.snapshot_changed == 'true'
@@ -100,17 +101,17 @@ jobs:
           chmod +x ./scripts/ci/push-silos-to-data-branch.sh
           ./scripts/ci/push-silos-to-data-branch.sh "${SILOS_DIR}"
 
-      - name: Checkout master for blacklist / whitelist PR
+      - name: Checkout develop for blacklist / whitelist PR
         run: |
           set -euo pipefail
           # Push to the data branch leaves a detached HEAD; create-pull-request needs a branch + base.
-          git fetch origin master
-          git checkout -B master origin/master
+          git fetch origin "${PR_BASE_BRANCH}"
+          git checkout -B "${PR_BASE_BRANCH}" "origin/${PR_BASE_BRANCH}"
           mkdir -p src/data/silos/blacklist src/data/positions
-          cp -R "${MASTER_DIR}/blacklist/." src/data/silos/blacklist/
-          cp -R "${MASTER_DIR}/positions/." src/data/positions/
+          cp -R "${APP_SIDE_DIR}/blacklist/." src/data/silos/blacklist/
+          cp -R "${APP_SIDE_DIR}/positions/." src/data/positions/
 
-      - name: Detect master-side changes
+      - name: Detect develop-side changes
         id: detect
         run: |
           blacklist_changed=false
@@ -127,14 +128,14 @@ jobs:
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No blacklist or legacy whitelist changes for master PR (silos may still have been published to ${TARGET_BRANCH})."
+            echo "::notice::No blacklist or legacy whitelist changes for ${PR_BASE_BRANCH} PR (silos may still have been published to ${TARGET_BRANCH})."
           fi
 
       - name: Create PR for blacklist / legacy whitelist
         if: steps.detect.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v8
         with:
-          base: master
+          base: develop
           branch: chore/blacklist-silos
           commit-message: 'chore: blacklist silo markets'
           title: 'chore: blacklist silo markets'
@@ -142,6 +143,6 @@ jobs:
             src/data/silos/blacklist
             src/data/positions
           body: |
-            Batch-removes markets from the live silo list on `${{ env.TARGET_BRANCH }}` (published directly) and appends v3 addresses to the durable blacklist on master so Refresh V3 Silos will not re-add them.
+            Batch-removes markets from the live silo list on `${{ env.TARGET_BRANCH }}` (published directly) and appends v3 addresses to the durable blacklist on `develop` so Refresh V3 Silos will not re-add them after merge.
 
             Paste source: Positions UI clipboard JSON.

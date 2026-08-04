@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Updated
+- Target BLACKLIST SILOS pull requests at develop instead of master
+
 ## [0.37.1] - 2026-08-04
 
 ### Fixed
