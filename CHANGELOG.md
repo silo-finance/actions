@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Updated
-- Load Positions market snapshots from the legacy-positions data branch at runtime; Refresh/mutate run scripts from master and publish silo JSON only to that data branch
+- Load Positions market snapshots from the legacy-positions data branch at runtime; stop tracking chain silo JSON on app branches and publish/bootstrap only via that data branch
 
 ## [0.36.0] - 2026-08-03
 

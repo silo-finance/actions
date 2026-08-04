@@ -63,6 +63,12 @@ jobs:
           git fetch origin master
           git checkout origin/master -- src/data/silos/blacklist
 
+      - name: Bootstrap silo baseline from legacy-positions
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/ci/bootstrap-silos-from-data-branch.sh
+          ./scripts/ci/bootstrap-silos-from-data-branch.sh
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
