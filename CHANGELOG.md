@@ -220,9 +220,6 @@
 - hide collateral-only silos from Positions market tracking (static LT consume filter)
 - add user lookup page with multicall position, market totals, and borrower health metrics
 
-### Updated
-- show market-role icons on the paired other-token line in Positions markets
-
 ## [0.23.0] - 2026-05-18
 
 ### Added

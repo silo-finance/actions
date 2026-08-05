@@ -3170,7 +3170,6 @@ function FragmentRow({
     ? 'bg-[color-mix(in_srgb,var(--silo-danger)_10%,var(--silo-surface))] hover:bg-[color-mix(in_srgb,var(--silo-danger)_14%,var(--silo-surface))]'
     : 'hover:bg-[color-mix(in_srgb,var(--silo-soft-purple)_18%,var(--silo-surface))]'
   const marketRole = resolveSiloMarketRole(row.ltRaw, row.otherLtRaw)
-  const otherMarketRole = resolveSiloMarketRole(row.otherLtRaw, row.ltRaw)
 
   return (
     <>
@@ -3259,7 +3258,6 @@ function FragmentRow({
             </div>
             {row.otherTokenSymbol ? (
               <div className="text-xs mt-1 silo-text-faint inline-flex items-center gap-1.5">
-                {otherMarketRole ? <SiloMarketRoleIcon role={otherMarketRole} /> : null}
                 {row.otherTokenAddress ? (
                   <a
                     href={getExplorerAddressUrl(row.chainId, row.otherTokenAddress)}
