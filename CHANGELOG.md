@@ -217,6 +217,7 @@
 
 ### Added
 - show collateral / debt / two-way icons before token names on Positions markets (from static LT)
+- hide collateral-only silos from Positions market tracking (static LT consume filter)
 - add user lookup page with multicall position, market totals, and borrower health metrics
 
 ### Updated

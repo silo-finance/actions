@@ -1,4 +1,5 @@
 import { fetchChainSiloSnapshot } from '@/utils/liquidationSilosRemote'
+import { isCollateralOnlySilo } from '@/utils/siloMarketRole'
 
 export type StaticSiloConfigData = {
   daoFee: string
@@ -100,10 +101,15 @@ function applySnapshotFilters(entries: LiquidationSnapshotEntry[]): LiquidationS
     ...row,
     marketVersion: normalizeMarketVersion(row.marketVersion),
   }))
-  const filtered =
+  const allowlisted =
     config.filteredSiloAddresses.size > 0
       ? normalized.filter((row) => config.filteredSiloAddresses.has(row.siloAddress.toLowerCase()))
       : normalized
+  // Consume-path only: keep full static JSON on the data branch; skip one-way collateral markets here.
+  const filtered = allowlisted.filter(
+    (row) =>
+      !isCollateralOnlySilo(row.siloConfig?.lt ?? null, row.otherSilo?.siloConfig?.lt ?? null)
+  )
   if (config.testApiLimit == null) return filtered
   return filtered.slice(0, config.testApiLimit)
 }

@@ -1,31 +1,22 @@
-import { formatUnits } from 'ethers'
+/**
+ * Typed re-export of the dependency-free SoT in `siloMarketRole.mjs`.
+ * App and tests import from this module; do not re-implement LT role rules elsewhere.
+ */
 
 export type SiloMarketRole = 'collateral' | 'debt' | 'two-way'
 
-/** Parse a WAD (1e18) LT string the same way Positions markets do. */
-function parseLtRatio(raw: string | null): number | null {
-  if (!raw) return null
-  const parsed = /^-?\d+$/.test(raw) ? Number(formatUnits(BigInt(raw), 18)) : Number(raw)
-  return Number.isFinite(parsed) ? parsed : null
-}
+import {
+  isCollateralOnlySilo as isCollateralOnlySiloImpl,
+  resolveSiloMarketRole as resolveSiloMarketRoleImpl,
+} from './siloMarketRole.mjs'
 
-/**
- * Classify a silo market side from its LT vs the sibling silo LT.
- * LT = 0 means this side cannot serve as collateral (one-way debt silo).
- * Both sides LT > 0 means two-way. Missing / unparseable / both-zero → null.
- */
 export function resolveSiloMarketRole(
   ltRaw: string | null,
   otherLtRaw: string | null
 ): SiloMarketRole | null {
-  const thisLt = parseLtRatio(ltRaw)
-  const otherLt = parseLtRatio(otherLtRaw)
-  if (thisLt == null || otherLt == null) return null
+  return resolveSiloMarketRoleImpl(ltRaw, otherLtRaw) as SiloMarketRole | null
+}
 
-  const thisZero = thisLt === 0
-  const otherZero = otherLt === 0
-  if (!thisZero && !otherZero) return 'two-way'
-  if (!thisZero && otherZero) return 'collateral'
-  if (thisZero && !otherZero) return 'debt'
-  return null
+export function isCollateralOnlySilo(ltRaw: string | null, otherLtRaw: string | null): boolean {
+  return isCollateralOnlySiloImpl(ltRaw, otherLtRaw)
 }

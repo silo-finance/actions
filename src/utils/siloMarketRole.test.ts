@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveSiloMarketRole } from '@/utils/siloMarketRole'
+import { isCollateralOnlySilo, resolveSiloMarketRole } from '@/utils/siloMarketRole'
 
 const NON_ZERO = '740000000000000000'
 const ZERO = '0'
@@ -25,5 +25,15 @@ describe('resolveSiloMarketRole', () => {
     expect(resolveSiloMarketRole(NON_ZERO, null)).toBeNull()
     expect(resolveSiloMarketRole(null, NON_ZERO)).toBeNull()
     expect(resolveSiloMarketRole(null, null)).toBeNull()
+  })
+})
+
+describe('isCollateralOnlySilo', () => {
+  it('is true only for collateral-only sides', () => {
+    expect(isCollateralOnlySilo(NON_ZERO, ZERO)).toBe(true)
+    expect(isCollateralOnlySilo(ZERO, NON_ZERO)).toBe(false)
+    expect(isCollateralOnlySilo(NON_ZERO, '950000000000000000')).toBe(false)
+    expect(isCollateralOnlySilo(ZERO, ZERO)).toBe(false)
+    expect(isCollateralOnlySilo(null, NON_ZERO)).toBe(false)
   })
 })
