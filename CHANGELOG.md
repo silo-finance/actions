@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.40.1] - 2026-08-05
+
+### Added
+- chore: blacklist silo markets
+
 ## [0.40.0] - 2026-08-05
 
 ### Added
