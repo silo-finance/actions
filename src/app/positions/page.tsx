@@ -12,6 +12,8 @@ import BlacklistMarketsBar, {
   type BlacklistBarItem,
 } from '@/components/positions/BlacklistMarketsBar'
 import BlacklistTrashButton from '@/components/positions/BlacklistTrashButton'
+import SiloMarketRoleIcon from '@/components/positions/SiloMarketRoleIcon'
+import { resolveSiloMarketRole } from '@/utils/siloMarketRole'
 import { useWeb3 } from '@/contexts/Web3Context'
 import {
   getExplorerAddressUrl,
@@ -3167,6 +3169,7 @@ function FragmentRow({
   const rowBgClass = isBlacklistSelected
     ? 'bg-[color-mix(in_srgb,var(--silo-danger)_10%,var(--silo-surface))] hover:bg-[color-mix(in_srgb,var(--silo-danger)_14%,var(--silo-surface))]'
     : 'hover:bg-[color-mix(in_srgb,var(--silo-soft-purple)_18%,var(--silo-surface))]'
+  const marketRole = resolveSiloMarketRole(row.ltRaw, row.otherLtRaw)
 
   return (
     <>
@@ -3231,6 +3234,7 @@ function FragmentRow({
         <td className="px-4 py-3">
           <div className="flex flex-col items-start">
             <div className="inline-flex items-center gap-1.5">
+              {marketRole ? <SiloMarketRoleIcon role={marketRole} /> : null}
               {row.tokenAddress ? (
                 <a
                   href={getExplorerAddressUrl(row.chainId, row.tokenAddress)}

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.40.0] - 2026-08-05
+
+### Added
+- Revert "Show market-role icons on the paired other-token line."
+- Hide collateral-only silos from Positions market tracking.
+- Show market-role icons on the paired other-token line.
+- Add LT-based collateral/debt/two-way icons on Positions markets.
+
 ## [0.39.2] - 2026-08-04
 
 ### Added
@@ -216,6 +224,8 @@
 ## Unreleased
 
 ### Added
+- show collateral / debt / two-way icons before token names on Positions markets (from static LT)
+- hide collateral-only silos from Positions market tracking (static LT consume filter)
 - add user lookup page with multicall position, market totals, and borrower health metrics
 
 ## [0.23.0] - 2026-05-18
