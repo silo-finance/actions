@@ -1,7 +1,7 @@
 {
   "chainId": 1,
   "chainKey": "ethereum",
-  "generatedAt": "2026-08-05T06:59:59.163Z",
+  "generatedAt": "2026-08-05T14:33:19.816Z",
   "silos": [
     {
       "chainId": 1,
@@ -238,66 +238,6 @@
           "liquidationFee": "0",
           "flashloanFee": "0",
           "hookReceiver": "0x5f6305bb2e46a76a303163b952fc65c07208e09e",
-          "callBeforeQuote": false
-        }
-      },
-      "marketVersion": "v3"
-    },
-    {
-      "chainId": 1,
-      "chainKey": "ethereum",
-      "siloAddress": "0x9d1b81589054ecd65a2744cc095857c01f7f49fd",
-      "siloConfigAddress": "0xb61ad7976c49f1fd651d183491f5e2a28d7ece17",
-      "siloId": 3022,
-      "siloIndex": 1,
-      "tokenAddress": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-      "tokenSymbol": "USDC",
-      "quoteTokenSymbol": "USD",
-      "tokenDecimals": 6,
-      "siloConfig": {
-        "daoFee": "100000000000000000",
-        "deployerFee": "0",
-        "silo": "0x9d1b81589054ecd65a2744cc095857c01f7f49fd",
-        "token": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-        "protectedShareToken": "0x55f91f0b85c9871865e6081dd104ab382e821cf1",
-        "collateralShareToken": "0x9d1b81589054ecd65a2744cc095857c01f7f49fd",
-        "debtShareToken": "0x21c0260feeb3d1664e73a2ab3126b30cffd30a0a",
-        "solvencyOracle": "0xda010c2cca1c2f99d05479e33f5e2a03bbb30089",
-        "maxLtvOracle": "0xda010c2cca1c2f99d05479e33f5e2a03bbb30089",
-        "interestRateModel": "0x9a7cd55e411686712c84051131c702b27d3e3ae8",
-        "maxLtv": "0",
-        "lt": "0",
-        "liquidationTargetLtv": "0",
-        "liquidationFee": "0",
-        "flashloanFee": "0",
-        "hookReceiver": "0xc963656c56804a01fdd44abedbc0725bc52b034a",
-        "callBeforeQuote": false
-      },
-      "otherSilo": {
-        "siloAddress": "0xfc56fb7def13658abd854b279175d64e067a1597",
-        "siloConfigAddress": "0xb61ad7976c49f1fd651d183491f5e2a28d7ece17",
-        "siloId": 3022,
-        "tokenAddress": "0x890a5122aa1da30fec4286de7904ff808f0bd74a",
-        "tokenSymbol": "msY",
-        "quoteTokenSymbol": "USD",
-        "tokenDecimals": 18,
-        "siloConfig": {
-          "daoFee": "100000000000000000",
-          "deployerFee": "0",
-          "silo": "0xfc56fb7def13658abd854b279175d64e067a1597",
-          "token": "0x890a5122aa1da30fec4286de7904ff808f0bd74a",
-          "protectedShareToken": "0xcae92adcfe4129b3dd57bfca124a4c9e095d768d",
-          "collateralShareToken": "0xfc56fb7def13658abd854b279175d64e067a1597",
-          "debtShareToken": "0x5b81abd5b7765415586834c496033e5c5007869e",
-          "solvencyOracle": "0xc6384ae943d56ddbef6f44f35abf0f522d8ac212",
-          "maxLtvOracle": "0xc6384ae943d56ddbef6f44f35abf0f522d8ac212",
-          "interestRateModel": "0xfe2b129aec31854eadd61a7b3f7bcb7827830aaa",
-          "maxLtv": "900000000000000000",
-          "lt": "920000000000000000",
-          "liquidationTargetLtv": "900000000000000000",
-          "liquidationFee": "50000000000000000",
-          "flashloanFee": "0",
-          "hookReceiver": "0xc963656c56804a01fdd44abedbc0725bc52b034a",
           "callBeforeQuote": false
         }
       },
