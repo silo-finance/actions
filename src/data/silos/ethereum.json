@@ -1,7 +1,7 @@
 {
   "chainId": 1,
   "chainKey": "ethereum",
-  "generatedAt": "2026-08-05T17:34:46.384Z",
+  "generatedAt": "2026-08-07T07:41:42.524Z",
   "silos": [
     {
       "chainId": 1,
@@ -1318,6 +1318,66 @@
           "liquidationFee": "0",
           "flashloanFee": "0",
           "hookReceiver": "0xa05574ca92394094f57fd77f9fb754bbfe52a815",
+          "callBeforeQuote": false
+        }
+      },
+      "marketVersion": "v3"
+    },
+    {
+      "chainId": 1,
+      "chainKey": "ethereum",
+      "siloAddress": "0xf1577a529ffc5975a015d4bf1f25bf1e43776405",
+      "siloConfigAddress": "0xae01a8bda7799a7ae4d56cc255db56a7e7faf7f8",
+      "siloId": 184,
+      "siloIndex": 1,
+      "tokenAddress": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "tokenSymbol": "WETH",
+      "quoteTokenSymbol": "SVA8D",
+      "tokenDecimals": 18,
+      "siloConfig": {
+        "daoFee": "100000000000000000",
+        "deployerFee": "0",
+        "silo": "0xf1577a529ffc5975a015d4bf1f25bf1e43776405",
+        "token": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        "protectedShareToken": "0xf36070529f70f5ae3886eabc22f3e9462431d943",
+        "collateralShareToken": "0xf1577a529ffc5975a015d4bf1f25bf1e43776405",
+        "debtShareToken": "0x4e2ad0b88119cb1fb8fde38338d4dffe43f27035",
+        "solvencyOracle": "0x8c9519052d1d045d0c23d5a16ff54b0949bd5f10",
+        "maxLtvOracle": "0x8c9519052d1d045d0c23d5a16ff54b0949bd5f10",
+        "interestRateModel": "0xb524283653e62e95b1776b646ac39b5caad87e64",
+        "maxLtv": "0",
+        "lt": "0",
+        "liquidationTargetLtv": "0",
+        "liquidationFee": "0",
+        "flashloanFee": "0",
+        "hookReceiver": "0x1e339d7b0cfed65821e122e8e9b636de50e28ac4",
+        "callBeforeQuote": false
+      },
+      "otherSilo": {
+        "siloAddress": "0x030b3e6a873c8a1ae9733b291301ab1d2fa0640e",
+        "siloConfigAddress": "0xae01a8bda7799a7ae4d56cc255db56a7e7faf7f8",
+        "siloId": 184,
+        "tokenAddress": "0xc824a08db624942c5e5f330d56530cd1598859fd",
+        "tokenSymbol": "hgETH",
+        "quoteTokenSymbol": "SVA8D",
+        "tokenDecimals": 18,
+        "siloConfig": {
+          "daoFee": "100000000000000000",
+          "deployerFee": "0",
+          "silo": "0x030b3e6a873c8a1ae9733b291301ab1d2fa0640e",
+          "token": "0xc824a08db624942c5e5f330d56530cd1598859fd",
+          "protectedShareToken": "0x94b9687ce7c6364139b0c7b58686233f340aab3b",
+          "collateralShareToken": "0x030b3e6a873c8a1ae9733b291301ab1d2fa0640e",
+          "debtShareToken": "0xbf74cbbc7f76658a72b6638d9749d7cf7b7fd9eb",
+          "solvencyOracle": "0x38b7930cbd5c0c0f0d218f285ce63ba88dcf690f",
+          "maxLtvOracle": "0x38b7930cbd5c0c0f0d218f285ce63ba88dcf690f",
+          "interestRateModel": "0x8ca091448ab62c3c421184cf453e8c5794794827",
+          "maxLtv": "920000000000000000",
+          "lt": "940000000000000000",
+          "liquidationTargetLtv": "920000000000000000",
+          "liquidationFee": "40000000000000000",
+          "flashloanFee": "0",
+          "hookReceiver": "0x1e339d7b0cfed65821e122e8e9b636de50e28ac4",
           "callBeforeQuote": false
         }
       },
