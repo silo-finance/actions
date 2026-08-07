@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- override transitive axios to 1.19.0 to close prototype-pollution and DoS advisories
+
 ## [0.40.1] - 2026-08-05
 
 ### Added
