@@ -33,7 +33,7 @@
     "@walletconnect/ethereum-provider": "2.23.9",
     "accounts": "0.6.7",
     "ethers": "6.16.0",
-    "next": "14.2.32",
+    "next": "15.5.21",
     "porto": "0.2.37",
     "react": "18.2.0",
     "react-dom": "18.2.0",
