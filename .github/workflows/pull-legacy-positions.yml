@@ -82,6 +82,12 @@ jobs:
           ref: ${{ env.SOURCE_REF }}
           fetch-depth: 0
 
+      - name: Bootstrap silo baseline from legacy-positions
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/ci/bootstrap-silos-from-data-branch.sh
+          ./scripts/ci/bootstrap-silos-from-data-branch.sh
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
