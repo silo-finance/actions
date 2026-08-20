@@ -5,6 +5,11 @@
 ### Fixed
 - override transitive axios to 1.19.0 to close prototype-pollution and DoS advisories
 
+## [0.40.2] - 2026-08-20
+
+### Fixed
+- Bootstrap silo snapshots from the legacy-positions branch before Pull Legacy Positions builds the market index.
+
 ## [0.40.1] - 2026-08-05
 
 ### Added
