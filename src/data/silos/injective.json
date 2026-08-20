@@ -1,7 +1,7 @@
 {
   "chainId": 1776,
   "chainKey": "injective",
-  "generatedAt": "2026-08-20T03:20:52.187Z",
+  "generatedAt": "2026-08-20T04:16:22.091Z",
   "silos": [
     {
       "chainId": 1776,
@@ -40,7 +40,7 @@
         "tokenAddress": "0x2d6e0e0c209d79b43f5d3d62e93d6a9f1e9317bd",
         "tokenSymbol": "yINJ",
         "quoteTokenSymbol": "WINJ",
-        "tokenDecimals": null,
+        "tokenDecimals": 18,
         "siloConfig": {
           "daoFee": "100000000000000000",
           "deployerFee": "0",
@@ -73,7 +73,7 @@
       "tokenAddress": "0x2d6e0e0c209d79b43f5d3d62e93d6a9f1e9317bd",
       "tokenSymbol": "yINJ",
       "quoteTokenSymbol": "WINJ",
-      "tokenDecimals": null,
+      "tokenDecimals": 18,
       "siloConfig": {
         "daoFee": "100000000000000000",
         "deployerFee": "0",
