@@ -1,14 +1,14 @@
 {
   "chainId": 1776,
   "chainKey": "injective",
-  "generatedAt": "2026-08-21T18:11:00.348Z",
+  "generatedAt": "2026-08-21T20:07:58.229Z",
   "silos": [
     {
       "chainId": 1776,
       "chainKey": "injective",
       "siloAddress": "0x2de94d1aa2246ce8c78c2f716cc94ec8ade0ade2",
       "siloConfigAddress": "0xcd73f3f6dc33b46502cb9c53a67bdded0bbaefc4",
-      "siloId": null,
+      "siloId": 3003,
       "siloIndex": 1,
       "tokenAddress": null,
       "tokenSymbol": null,
@@ -18,30 +18,36 @@
       "otherSilo": {
         "siloAddress": "0x4aaadf5c3a4d839055531743121e1227153ff0fb",
         "siloConfigAddress": "0xcd73f3f6dc33b46502cb9c53a67bdded0bbaefc4",
-        "siloId": null,
-        "tokenAddress": "0x2d6e0e0c209d79b43f5d3d62e93d6a9f1e9317bd",
+        "siloId": 3003,
+        "tokenAddress": null,
         "tokenSymbol": null,
         "quoteTokenSymbol": null,
-        "tokenDecimals": 18,
-        "siloConfig": {
-          "daoFee": "100000000000000000",
-          "deployerFee": "0",
-          "silo": "0x4aaadf5c3a4d839055531743121e1227153ff0fb",
-          "token": "0x2d6e0e0c209d79b43f5d3d62e93d6a9f1e9317bd",
-          "protectedShareToken": "0xd1feb9147dc461dd4f07f36189f79a808fb9b7ea",
-          "collateralShareToken": "0x4aaadf5c3a4d839055531743121e1227153ff0fb",
-          "debtShareToken": "0x4c33627c1fe6f8abb00b3a2a76bd6d77c6d75aa8",
-          "solvencyOracle": "0x777398dc329a8a0a92c3d22ab5f0248b87c8e6f6",
-          "maxLtvOracle": "0x777398dc329a8a0a92c3d22ab5f0248b87c8e6f6",
-          "interestRateModel": "0x679d047ce293162edd8b352fe573c070646d1751",
-          "maxLtv": "940000000000000000",
-          "lt": "950000000000000000",
-          "liquidationTargetLtv": "940000000000000000",
-          "liquidationFee": "20000000000000000",
-          "flashloanFee": "0",
-          "hookReceiver": "0x7c828776a3d61f55e4fcf34e806b5e1cfc7172ab",
-          "callBeforeQuote": false
-        }
+        "tokenDecimals": null,
+        "siloConfig": null
+      },
+      "marketVersion": "v3"
+    },
+    {
+      "chainId": 1776,
+      "chainKey": "injective",
+      "siloAddress": "0x4aaadf5c3a4d839055531743121e1227153ff0fb",
+      "siloConfigAddress": "0xcd73f3f6dc33b46502cb9c53a67bdded0bbaefc4",
+      "siloId": 3003,
+      "siloIndex": 0,
+      "tokenAddress": null,
+      "tokenSymbol": null,
+      "quoteTokenSymbol": null,
+      "tokenDecimals": null,
+      "siloConfig": null,
+      "otherSilo": {
+        "siloAddress": "0x2de94d1aa2246ce8c78c2f716cc94ec8ade0ade2",
+        "siloConfigAddress": "0xcd73f3f6dc33b46502cb9c53a67bdded0bbaefc4",
+        "siloId": 3003,
+        "tokenAddress": null,
+        "tokenSymbol": null,
+        "quoteTokenSymbol": null,
+        "tokenDecimals": null,
+        "siloConfig": null
       },
       "marketVersion": "v3"
     }
