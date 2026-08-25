@@ -195,11 +195,6 @@
     "last_updated_timestamp": 1762793891
   },
   {
-    "account_id": "0x7d5187bc7cedb5b38faf473f17c9adf6e6bcccdb",
-    "debt_market_id": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
-    "last_updated_timestamp": 1756883608
-  },
-  {
     "account_id": "0x7e5384507336278eca39c204f23bbd58089dd69d",
     "debt_market_id": "0x016c306e103fbf48ec24810d078c65ad13c5f11b",
     "last_updated_timestamp": 1741415406
@@ -1022,7 +1017,7 @@
   {
     "account_id": "0xc993ef2e69fb55a2beb1c2344469be4fe0fc72b9",
     "debt_market_id": "0xf55902de87bd80c6a35614b48d7f8b612a083c12",
-    "last_updated_timestamp": 1756284868
+    "last_updated_timestamp": 1787638948
   },
   {
     "account_id": "0xc9be1e9fb27ebe685aff995183772946dece4fc3",
