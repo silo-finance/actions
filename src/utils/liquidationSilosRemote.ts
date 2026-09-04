@@ -64,7 +64,7 @@ export async function fetchChainSiloSnapshot(chainKey: string): Promise<ChainSna
   const payload = (await res.json()) as unknown
   const parsed = parseChainSnapshotFile(chainKey, payload)
   if (parsed.silos.length === 0) {
-    throw new Error(`Silo snapshot for ${chainKey} has no markets (empty silos array)`)
+    console.warn(`[silos-remote] ${chainKey} snapshot lists no markets; chain is skipped`)
   }
   console.info(`[silos-remote] loaded ${chainKey}: markets=${parsed.silos.length}`)
   return parsed
