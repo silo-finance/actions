@@ -673,6 +673,14 @@ async function runFullRefresh() {
         : []
     const v3Rows = refreshed.map((row) => ({ ...row, marketVersion: 'v3' }))
     const merged = [...v3Rows, ...legacyRows]
+    // Resolving none of the requested targets means the chain reads failed, not that the
+    // markets are gone. Keep the previous snapshot; only `remove`/`blacklist` may empty one.
+    if (v3Targets.size > 0 && refreshed.length === 0) {
+      console.warn(
+        `[sync-liquidation-silos] refusing to rewrite ${chainKey}: resolved 0 of ${v3Targets.size} target(s), keeping previous ${existing.length} record(s)`
+      )
+      continue
+    }
     writeChainSnapshot(chainKey, chainId, merged)
     console.log(
       `[sync-liquidation-silos] v3 refresh wrote ${merged.length} records for ${chainKey} (v3=${v3Rows.length}, legacy=${legacyRows.length}, gql=${gqlV3Addresses.size}, blacklisted=${blacklist.size})`
