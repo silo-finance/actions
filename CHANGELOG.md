@@ -5,6 +5,11 @@
 ### Fixed
 - override transitive axios to 1.19.0 to close prototype-pollution and DoS advisories
 
+## [0.40.3] - 2026-09-04
+
+### Fixed
+- Keep Positions loading when one chain snapshot is empty, and stop v3 refresh from wiping a chain after failed reads.
+
 ## [0.40.2] - 2026-08-20
 
 ### Fixed

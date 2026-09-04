@@ -116,13 +116,27 @@ function applySnapshotFilters(entries: LiquidationSnapshotEntry[]): LiquidationS
 
 /**
  * Load all chain silo snapshots from the remote data branch.
- * Fails hard if any chain URL is missing, HTTP fails, JSON is invalid, or silos is empty.
+ * A chain that is unreachable, malformed or empty is skipped; only a total failure throws.
  */
 export async function fetchLiquidationSnapshotEntries(): Promise<LiquidationSnapshotEntry[]> {
-  const snapshots = await Promise.all(
+  const settled = await Promise.allSettled(
     LIQUIDATION_SNAPSHOT_CHAIN_KEYS.map((chainKey) => fetchChainSiloSnapshot(chainKey))
   )
-  return applySnapshotFilters(snapshots.flatMap((snapshot) => snapshot.silos))
+
+  const failures = settled.flatMap((result, index) =>
+    result.status === 'rejected'
+      ? [`${LIQUIDATION_SNAPSHOT_CHAIN_KEYS[index]}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`]
+      : []
+  )
+  if (failures.length === settled.length) {
+    throw new Error(`No silo snapshot could be loaded from the data branch. ${failures.join(' | ')}`)
+  }
+  if (failures.length > 0) {
+    console.warn(`[silos-remote] continuing without ${failures.length} chain(s): ${failures.join(' | ')}`)
+  }
+
+  const loaded = settled.flatMap((result) => (result.status === 'fulfilled' ? result.value.silos : []))
+  return applySnapshotFilters(loaded)
 }
 
 const FNV1A64_OFFSET = BigInt('0xcbf29ce484222325')
