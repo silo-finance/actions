@@ -1,7 +1,7 @@
 {
   "chainId": 146,
   "chainKey": "sonic",
-  "generatedAt": "2026-09-05T23:11:12.378Z",
+  "generatedAt": "2026-09-06T09:13:28.225Z",
   "silos": [
     {
       "chainId": 146,
@@ -38,9 +38,9 @@
         "siloConfigAddress": "0x180a8ff4c343b6eea2ff0feb2dcc92a360bf7025",
         "siloId": 3001,
         "tokenAddress": "0x039e2fb66102314ce7b64ce5ce3e5183bc94ad38",
-        "tokenSymbol": null,
+        "tokenSymbol": "wS",
         "quoteTokenSymbol": "USD",
-        "tokenDecimals": null,
+        "tokenDecimals": 18,
         "siloConfig": {
           "daoFee": "100000000000000000",
           "deployerFee": "0",
