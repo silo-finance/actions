@@ -1,7 +1,7 @@
 {
   "chainId": 50,
   "chainKey": "xdc",
-  "generatedAt": "2026-09-17T17:12:11.102Z",
+  "generatedAt": "2026-09-17T18:19:05.121Z",
   "silos": [
     {
       "chainId": 50,
@@ -39,13 +39,40 @@
       "siloAddress": "0x12339f823801debd3da0f6e00dabf1da3e62e0ea",
       "siloConfigAddress": "0x27c2d9f9d4a91e01e066b1416097d70f444231d9",
       "siloId": null,
-      "siloIndex": null,
-      "tokenAddress": null,
+      "siloIndex": 0,
+      "tokenAddress": "0x951857744785e80e2de051c32ee7b25f9c458c42",
       "tokenSymbol": null,
       "quoteTokenSymbol": null,
       "tokenDecimals": null,
-      "siloConfig": null,
-      "otherSilo": null,
+      "siloConfig": {
+        "daoFee": "150000000000000000",
+        "deployerFee": "0",
+        "silo": "0x12339f823801debd3da0f6e00dabf1da3e62e0ea",
+        "token": "0x951857744785e80e2de051c32ee7b25f9c458c42",
+        "protectedShareToken": "0x3e372566ea3cc96075bebd820fcf3d69d283d4f1",
+        "collateralShareToken": "0x12339f823801debd3da0f6e00dabf1da3e62e0ea",
+        "debtShareToken": "0x41c4be100519e563e23f56b018ecb293c93f1893",
+        "solvencyOracle": "0x3c9737b3bcd87aa7f672674bafe07577346f267e",
+        "maxLtvOracle": "0x3c9737b3bcd87aa7f672674bafe07577346f267e",
+        "interestRateModel": "0x8e7fa7679e880c18eb687b2c0ed137023d89e760",
+        "maxLtv": "750000000000000000",
+        "lt": "800000000000000000",
+        "liquidationTargetLtv": "750000000000000000",
+        "liquidationFee": "70000000000000000",
+        "flashloanFee": "0",
+        "hookReceiver": "0xd41cedce11d937b6a0a9c0d55ef6a64734d10527",
+        "callBeforeQuote": false
+      },
+      "otherSilo": {
+        "siloAddress": "0x1f5c3aeaaa18749078765bd2b504b32005221603",
+        "siloConfigAddress": "0x27c2d9f9d4a91e01e066b1416097d70f444231d9",
+        "siloId": null,
+        "tokenAddress": null,
+        "tokenSymbol": null,
+        "quoteTokenSymbol": null,
+        "tokenDecimals": null,
+        "siloConfig": null
+      },
       "marketVersion": "v3"
     },
     {
