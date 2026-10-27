@@ -1,30 +1,21 @@
 {
   "chainId": 50,
   "chainKey": "xdc",
-  "generatedAt": "2026-10-27T15:15:39.034Z",
+  "generatedAt": "2026-10-27T16:13:28.616Z",
   "silos": [
     {
       "chainId": 50,
       "chainKey": "xdc",
-      "siloAddress": "0xf107e8d834eee5716c14b79901912c88baab9805",
-      "siloConfigAddress": "0x3eba91d894d3f20c1284effa8b6fbf4ec50dc8ba",
-      "siloId": 3009,
-      "siloIndex": 0,
+      "siloAddress": "0xf3d1fcb16374fa8f4a5135706c7a5ef4483c1e95",
+      "siloConfigAddress": "0xc23259f0dc7c9704ea978322df1cf80932098594",
+      "siloId": null,
+      "siloIndex": null,
       "tokenAddress": null,
       "tokenSymbol": null,
       "quoteTokenSymbol": null,
       "tokenDecimals": null,
       "siloConfig": null,
-      "otherSilo": {
-        "siloAddress": "0xc414c974d92fc4bafc3b867456d3e38c238e8221",
-        "siloConfigAddress": "0x3eba91d894d3f20c1284effa8b6fbf4ec50dc8ba",
-        "siloId": 3009,
-        "tokenAddress": null,
-        "tokenSymbol": null,
-        "quoteTokenSymbol": null,
-        "tokenDecimals": null,
-        "siloConfig": null
-      },
+      "otherSilo": null,
       "marketVersion": "v3"
     }
   ]
