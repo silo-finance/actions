@@ -1,21 +1,48 @@
 {
   "chainId": 50,
   "chainKey": "xdc",
-  "generatedAt": "2026-10-27T10:15:10.799Z",
+  "generatedAt": "2026-10-27T13:19:28.932Z",
   "silos": [
     {
       "chainId": 50,
       "chainKey": "xdc",
-      "siloAddress": "0x9ebc79a0d5c6a2cb8c294da02f6675cd3f42d677",
-      "siloConfigAddress": "0x0d419dc8128d5738a62753deb8ea3508aed95253",
+      "siloAddress": "0xf107e8d834eee5716c14b79901912c88baab9805",
+      "siloConfigAddress": "0x3eba91d894d3f20c1284effa8b6fbf4ec50dc8ba",
       "siloId": null,
-      "siloIndex": null,
-      "tokenAddress": null,
+      "siloIndex": 0,
+      "tokenAddress": "0xfa2958cb79b0491cc627c1557f441ef849ca8eb1",
       "tokenSymbol": null,
       "quoteTokenSymbol": null,
       "tokenDecimals": null,
-      "siloConfig": null,
-      "otherSilo": null,
+      "siloConfig": {
+        "daoFee": "100000000000000000",
+        "deployerFee": "0",
+        "silo": "0xf107e8d834eee5716c14b79901912c88baab9805",
+        "token": "0xfa2958cb79b0491cc627c1557f441ef849ca8eb1",
+        "protectedShareToken": "0xb4772f3848d224d5446c9cf4c9fdf24b3c781700",
+        "collateralShareToken": "0xf107e8d834eee5716c14b79901912c88baab9805",
+        "debtShareToken": "0xb70ed66271fb59ca6680720d308ea042630d325e",
+        "solvencyOracle": "0xa9d6a0ef635a966ec72ed410326db17edb5fda05",
+        "maxLtvOracle": "0xa9d6a0ef635a966ec72ed410326db17edb5fda05",
+        "interestRateModel": "0x187dd0f457555aee9728de4ac16013b772ae893f",
+        "maxLtv": "0",
+        "lt": "0",
+        "liquidationTargetLtv": "0",
+        "liquidationFee": "0",
+        "flashloanFee": "0",
+        "hookReceiver": "0x50811efd649fc891de1e003e008b1d00334e0bc9",
+        "callBeforeQuote": false
+      },
+      "otherSilo": {
+        "siloAddress": "0xc414c974d92fc4bafc3b867456d3e38c238e8221",
+        "siloConfigAddress": "0x3eba91d894d3f20c1284effa8b6fbf4ec50dc8ba",
+        "siloId": null,
+        "tokenAddress": null,
+        "tokenSymbol": null,
+        "quoteTokenSymbol": null,
+        "tokenDecimals": null,
+        "siloConfig": null
+      },
       "marketVersion": "v3"
     }
   ]
