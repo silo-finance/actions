@@ -13,6 +13,7 @@ import {
   authoritiesForVaultRolePreview,
   setVaultRolePreview,
   type VaultPreviewRole,
+  type VaultPreviewTargets,
 } from '@/utils/vaultRolePreview'
 
 function isExpectedNetworkSwitchError(error: unknown): boolean {
@@ -78,10 +79,24 @@ export function VaultPermissionsProvider({ children, enabled, freeze = false, su
     if (previewRole != null) setPreviewRoleState(null)
   }
 
-  const setPreviewRole = useCallback((role: VaultPreviewRole) => {
-    setVaultRolePreview(role)
-    setPreviewRoleState(role)
-  }, [])
+  const previewTargets = useMemo((): VaultPreviewTargets | null => {
+    if (summary == null) return null
+    return {
+      owner: summary.owner,
+      curator: summary.curator,
+      ownerKind: summary.ownerKind,
+      curatorKind: summary.curatorKind,
+    }
+  }, [summary])
+
+  const setPreviewRole = useCallback(
+    (role: VaultPreviewRole) => {
+      if (previewTargets == null) return
+      setVaultRolePreview(role, previewTargets)
+      setPreviewRoleState(role)
+    },
+    [previewTargets]
+  )
 
   const clearPreviewRole = useCallback(() => {
     setVaultRolePreview(null)
@@ -89,8 +104,12 @@ export function VaultPermissionsProvider({ children, enabled, freeze = false, su
   }, [])
 
   useEffect(() => {
-    setVaultRolePreview(previewRole)
-  }, [previewRole])
+    if (previewRole == null || previewTargets == null) {
+      setVaultRolePreview(null)
+      return
+    }
+    setVaultRolePreview(previewRole, previewTargets)
+  }, [previewRole, previewTargets])
 
   useEffect(() => {
     return () => {
@@ -167,8 +186,11 @@ export function VaultPermissionsProvider({ children, enabled, freeze = false, su
 
   const value = useMemo((): VaultPermissionsContextValue => {
     const active = Boolean(summary && account && (enabled || freeze))
-    const previewing = active && previewRole != null
-    const previewAuths = previewRole != null ? authoritiesForVaultRolePreview(previewRole) : null
+    const previewing = active && previewRole != null && previewTargets != null
+    const previewAuths =
+      previewRole != null && previewTargets != null
+        ? authoritiesForVaultRolePreview(previewRole, previewTargets)
+        : null
     const permissionsReady = previewing
       ? true
       : Boolean(
@@ -209,6 +231,7 @@ export function VaultPermissionsProvider({ children, enabled, freeze = false, su
     allocatorAuth,
     ownerCuratorAuth,
     previewRole,
+    previewTargets,
     setPreviewRole,
     clearPreviewRole,
   ])

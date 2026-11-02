@@ -1,6 +1,7 @@
 import { getAddress, Interface, type Signer } from 'ethers'
 import siloVaultArtifact from '@/abis/SiloVault.json'
 import { loadAbi } from '@/utils/loadAbi'
+import { assertVaultCallSucceeds } from '@/utils/vaultCallRevert'
 
 const vaultIface = new Interface(loadAbi(siloVaultArtifact))
 
@@ -65,11 +66,14 @@ export async function executeVaultCallsFromSigner(
     throw new Error('No vault calls to execute.')
   }
   if (callDatas.length === 1) {
-    const tx = await signer.sendTransaction({ to, data: callDatas[0] })
+    const data = callDatas[0]
+    await assertVaultCallSucceeds(signer, to, data)
+    const tx = await signer.sendTransaction({ to, data })
     const receipt = await tx.wait()
     return receipt?.hash ?? tx.hash
   }
   const data = vaultIface.encodeFunctionData('multicall', [callDatas]) as `0x${string}`
+  await assertVaultCallSucceeds(signer, to, data)
   const tx = await signer.sendTransaction({ to, data })
   const receipt = await tx.wait()
   return receipt?.hash ?? tx.hash
@@ -93,6 +97,7 @@ export async function executeTargetedBatchFromSigner(
   while (i < calls.length) {
     const to = getAddress(calls[i]!.to)
     if (to !== vaultNorm) {
+      await assertVaultCallSucceeds(signer, to, calls[i]!.data)
       const tx = await signer.sendTransaction({ to, data: calls[i]!.data })
       const receipt = await tx.wait()
       lastHash = receipt?.hash ?? tx.hash

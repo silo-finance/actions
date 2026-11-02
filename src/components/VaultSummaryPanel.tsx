@@ -20,9 +20,10 @@ const PREVIEW_ROLE_OPTIONS: { value: VaultPreviewRole; label: string }[] = [
   { value: 'none', label: 'None' },
 ]
 
-function previewRoleNote(role: VaultPreviewRole): string {
+function previewRoleNote(role: VaultPreviewRole, asSafe: boolean): string {
   const asRole = role === 'none' ? 'no role' : `the ${role} role`
-  return `Interface is using ${asRole}. The transaction still sends from the connected wallet.`
+  const sender = asSafe ? 'Actions are sent as that Gnosis Safe.' : 'The transaction still sends from the connected wallet.'
+  return `Interface is using ${asRole}. ${sender}`
 }
 
 function ownerKindLabel(kind: OwnerKind): string {
@@ -191,7 +192,12 @@ export default function VaultSummaryPanel({
                 ) : null}
               </div>
               {perm.previewRole != null ? (
-                <p className="mt-1 pl-28 text-xs silo-text-soft">{previewRoleNote(perm.previewRole)}</p>
+                <p className="mt-1 pl-28 text-xs silo-text-soft">
+                  {previewRoleNote(
+                    perm.previewRole,
+                    perm.allocatorAuth?.mode === 'safe_as_wallet' || perm.ownerCuratorAuth?.mode === 'safe_as_wallet'
+                  )}
+                </p>
               ) : null}
             </div>
           </div>

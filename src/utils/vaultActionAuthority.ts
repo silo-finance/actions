@@ -81,7 +81,7 @@ export async function classifyAllocatorVaultActionOnChain(
 
 /**
  * On-chain allocator authority, or the vault-page role preview when one is selected.
- * Preview stays on `direct` / `denied` so a test role cannot open a Safe proposal.
+ * A previewed Safe role uses `safe_as_wallet` for that Safe. It does not use `safe_propose`.
  */
 export async function classifyAllocatorVaultAction(
   ...args: Parameters<typeof classifyAllocatorVaultActionOnChain>

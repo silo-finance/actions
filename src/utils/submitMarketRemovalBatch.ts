@@ -9,7 +9,7 @@ import {
   vaultCalldatasToTargetedCalls,
 } from '@/utils/reallocateRemoveWithdrawMarket'
 import { getSafeWalletQueueUrl } from '@/utils/safeAppLinks'
-import { toUserErrorMessage } from '@/utils/rpcErrors'
+import { assertVaultCallSucceeds } from '@/utils/vaultCallRevert'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import { classifyOwnerOrCuratorVaultAction } from '@/utils/vaultActionAuthority'
 import { executeVaultCallsFromSigner, sendSafeWalletBatch, type TargetedCall } from '@/utils/vaultMulticall'
@@ -357,8 +357,8 @@ export async function executeSubmitMarketRemoval(
 }
 
 /**
- * EOA path only. Wallet-as-Safe and Safe proposals cannot preflight the internal `multicall`
- * because `msg.sender` at estimate time would be the EOA, not the Safe.
+ * EOA path only. Simulates the vault call and surfaces the decoded revert.
+ * Wallet-as-Safe and Safe proposals skip this because `msg.sender` would be the EOA, not the Safe.
  */
 async function preflightDirectEstimateGas(
   signer: Signer,
@@ -366,14 +366,9 @@ async function preflightDirectEstimateGas(
   callDatas: `0x${string}`[]
 ): Promise<void> {
   const to = getAddress(vaultAddress)
-  try {
-    if (callDatas.length === 1) {
-      await signer.estimateGas({ to, data: callDatas[0] })
-      return
-    }
-    const data = vaultIface.encodeFunctionData('multicall', [callDatas]) as `0x${string}`
-    await signer.estimateGas({ to, data })
-  } catch (e) {
-    throw new Error(toUserErrorMessage(e, 'Could not simulate the market removal batch.'))
-  }
+  const data =
+    callDatas.length === 1
+      ? callDatas[0]
+      : (vaultIface.encodeFunctionData('multicall', [callDatas]) as `0x${string}`)
+  await assertVaultCallSucceeds(signer, to, data)
 }

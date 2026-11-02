@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ActionPermissionHint from '@/components/ActionPermissionHint'
+import VaultActionFailure from '@/components/VaultActionFailure'
 import CopyButton from '@/components/CopyButton'
 import QueueColumn, { type QueueRowSelection } from '@/components/QueueColumn'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
@@ -334,7 +335,7 @@ export default function SubmitMarketRemovalSection({
           </ol>
         </div>
       ) : null}
-      {execErr ? <p className="text-sm silo-alert silo-alert-error">{execErr}</p> : null}
+      <VaultActionFailure message={execErr} />
       {txSuccess ? (
         <TransactionSuccessSummary
           url={txSuccess.url}

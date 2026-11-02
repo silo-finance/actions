@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Added
-- Preview a vault role on the vault page so the interface can be exercised as owner, curator, allocator, guardian, or no role.
+- Preview a vault role on the vault page and follow that role's Gnosis Safe or EOA path, including batched removals when the role is a Safe.
 
 ### Fixed
 - override transitive axios to 1.19.0 to close prototype-pollution and DoS advisories

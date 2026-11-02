@@ -11,6 +11,7 @@ import { getExplorerTxUrl } from '@/utils/networks'
 import { getSafeWalletQueueUrl } from '@/utils/safeAppLinks'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
 import { CLEAR_SUPPLY_QUEUE_DENIED_MESSAGE, classifyAllocatorVaultAction } from '@/utils/vaultActionAuthority'
+import { assertVaultCallSucceeds } from '@/utils/vaultCallRevert'
 import { sendSafeWalletBatch } from '@/utils/vaultMulticall'
 
 const siloVaultAbi = loadAbi(siloVaultArtifact)
@@ -23,6 +24,7 @@ export type Eip1193Provider = {
 
 export async function clearSupplyQueueAsAllocator(signer: Signer, vaultAddress: string): Promise<string> {
   const vault = getAddress(vaultAddress)
+  await assertVaultCallSucceeds(signer, vault, encodeSetSupplyQueueEmpty())
   const c = new Contract(vault, siloVaultAbi, signer)
   const tx = await c.setSupplyQueue([])
   await tx.wait()

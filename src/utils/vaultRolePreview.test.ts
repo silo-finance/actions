@@ -5,7 +5,7 @@ import {
   authoritiesForVaultRolePreview,
   getVaultRolePreview,
   setVaultRolePreview,
-  type VaultPreviewRole,
+  type VaultPreviewTargets,
 } from './vaultRolePreview'
 
 const provider = new JsonRpcProvider('http://127.0.0.1:65535')
@@ -14,21 +14,55 @@ const owner = '0x1111111111111111111111111111111111111111'
 const curator = '0x2222222222222222222222222222222222222222'
 const stranger = '0x3333333333333333333333333333333333333333'
 
+const eoaTargets: VaultPreviewTargets = {
+  owner,
+  curator,
+  ownerKind: 'eoa',
+  curatorKind: 'eoa',
+}
+const safeTargets: VaultPreviewTargets = {
+  owner,
+  curator,
+  ownerKind: 'safe',
+  curatorKind: 'safe',
+}
+
 const DIRECT = { mode: 'direct', executingSafeAddress: null }
 const DENIED = { mode: 'denied', executingSafeAddress: null }
+const ownerSafe = { mode: 'safe_as_wallet', executingSafeAddress: owner }
+const curatorSafe = { mode: 'safe_as_wallet', executingSafeAddress: curator }
 
 describe('authoritiesForVaultRolePreview', () => {
-  it('treats owner and curator as direct for allocator and owner/curator actions', () => {
+  it('treats an EOA owner or curator as a direct wallet', () => {
     for (const role of ['owner', 'curator'] as const) {
-      expect(authoritiesForVaultRolePreview(role)).toEqual({
+      expect(authoritiesForVaultRolePreview(role, eoaTargets)).toEqual({
         allocator: DIRECT,
         ownerCurator: DIRECT,
       })
     }
   })
 
+  it('treats a Safe owner as that Safe for allocator and owner actions', () => {
+    expect(authoritiesForVaultRolePreview('owner', safeTargets)).toEqual({
+      allocator: ownerSafe,
+      ownerCurator: ownerSafe,
+    })
+  })
+
+  it('treats a Safe curator as that Safe, even when the owner is an EOA', () => {
+    expect(
+      authoritiesForVaultRolePreview('curator', {
+        ...eoaTargets,
+        curatorKind: 'safe',
+      })
+    ).toEqual({
+      allocator: curatorSafe,
+      ownerCurator: curatorSafe,
+    })
+  })
+
   it('treats allocator as direct only for allocator actions', () => {
-    expect(authoritiesForVaultRolePreview('allocator')).toEqual({
+    expect(authoritiesForVaultRolePreview('allocator', safeTargets)).toEqual({
       allocator: DIRECT,
       ownerCurator: DENIED,
     })
@@ -36,7 +70,7 @@ describe('authoritiesForVaultRolePreview', () => {
 
   it('treats guardian and none as denied', () => {
     for (const role of ['guardian', 'none'] as const) {
-      expect(authoritiesForVaultRolePreview(role)).toEqual({
+      expect(authoritiesForVaultRolePreview(role, safeTargets)).toEqual({
         allocator: DENIED,
         ownerCurator: DENIED,
       })
@@ -50,9 +84,9 @@ describe('classify functions with a role preview', () => {
     vi.restoreAllMocks()
   })
 
-  it('returns the preview authority and skips chain reads', async () => {
+  it('returns the Safe preview authority and skips chain reads', async () => {
     const call = vi.spyOn(provider, 'call')
-    setVaultRolePreview('owner')
+    setVaultRolePreview('owner', safeTargets)
 
     const allocator = await classifyAllocatorVaultAction(
       provider,
@@ -70,14 +104,14 @@ describe('classify functions with a role preview', () => {
       'eoa'
     )
 
-    expect(allocator).toEqual(DIRECT)
-    expect(ownerCurator).toEqual(DIRECT)
+    expect(allocator).toEqual(ownerSafe)
+    expect(ownerCurator).toEqual(ownerSafe)
     expect(call).not.toHaveBeenCalled()
   })
 
   it('returns denied for none without a chain read', async () => {
     const call = vi.spyOn(provider, 'call')
-    setVaultRolePreview('none')
+    setVaultRolePreview('none', eoaTargets)
 
     const allocator = await classifyAllocatorVaultAction(
       provider,
@@ -93,7 +127,7 @@ describe('classify functions with a role preview', () => {
   })
 
   it('uses the chain result again after clear', async () => {
-    setVaultRolePreview('none')
+    setVaultRolePreview('none', eoaTargets)
     setVaultRolePreview(null)
     expect(getVaultRolePreview()).toBeNull()
 
@@ -106,17 +140,5 @@ describe('classify functions with a role preview', () => {
     )
 
     expect(ownerCurator).toEqual(DIRECT)
-  })
-})
-
-describe('preview role coverage', () => {
-  it('maps every selectable role', () => {
-    const roles: VaultPreviewRole[] = ['owner', 'curator', 'allocator', 'guardian', 'none']
-    for (const role of roles) {
-      const auths = authoritiesForVaultRolePreview(role)
-      expect(auths.allocator.mode === 'direct' || auths.allocator.mode === 'denied').toBe(true)
-      expect(auths.allocator.executingSafeAddress).toBeNull()
-      expect(auths.ownerCurator.executingSafeAddress).toBeNull()
-    }
   })
 })
