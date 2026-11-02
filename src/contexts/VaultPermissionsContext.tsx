@@ -4,11 +4,16 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useWeb3 } from '@/contexts/Web3Context'
 import type { OwnerKind } from '@/utils/ownerKind'
 import {
-  classifyAllocatorVaultAction,
-  classifyOwnerOrCuratorVaultAction,
+  classifyAllocatorVaultActionOnChain,
+  classifyOwnerOrCuratorVaultActionOnChain,
 } from '@/utils/vaultActionAuthority'
 import type { VaultActionAuthority } from '@/utils/vaultActionAuthority'
 import { formatWalletRpcFailureMessage } from '@/utils/rpcErrors'
+import {
+  authoritiesForVaultRolePreview,
+  setVaultRolePreview,
+  type VaultPreviewRole,
+} from '@/utils/vaultRolePreview'
 
 function isExpectedNetworkSwitchError(error: unknown): boolean {
   const e = error as { code?: string; event?: string; message?: string }
@@ -39,6 +44,10 @@ type VaultPermissionsContextValue = {
   ownerCuratorAuth: VaultActionAuthority | null
   canAllocator: boolean
   canOwnerOrCurator: boolean
+  /** Selected virtual role, or null when the UI uses the on-chain role. */
+  previewRole: VaultPreviewRole | null
+  setPreviewRole: (role: VaultPreviewRole) => void
+  clearPreviewRole: () => void
 }
 
 const VaultPermissionsContext = createContext<VaultPermissionsContextValue | null>(null)
@@ -59,6 +68,35 @@ export function VaultPermissionsProvider({ children, enabled, freeze = false, su
   const [retryNonce, setRetryNonce] = useState(0)
   const [allocatorAuth, setAllocatorAuth] = useState<VaultActionAuthority | null>(null)
   const [ownerCuratorAuth, setOwnerCuratorAuth] = useState<VaultActionAuthority | null>(null)
+  const previewScopeKey = `${summary?.vault.toLowerCase() ?? ''}|${account?.toLowerCase() ?? ''}`
+  const [appliedPreviewScope, setAppliedPreviewScope] = useState(previewScopeKey)
+  const [previewRole, setPreviewRoleState] = useState<VaultPreviewRole | null>(null)
+
+  if (appliedPreviewScope !== previewScopeKey) {
+    setAppliedPreviewScope(previewScopeKey)
+    setVaultRolePreview(null)
+    if (previewRole != null) setPreviewRoleState(null)
+  }
+
+  const setPreviewRole = useCallback((role: VaultPreviewRole) => {
+    setVaultRolePreview(role)
+    setPreviewRoleState(role)
+  }, [])
+
+  const clearPreviewRole = useCallback(() => {
+    setVaultRolePreview(null)
+    setPreviewRoleState(null)
+  }, [])
+
+  useEffect(() => {
+    setVaultRolePreview(previewRole)
+  }, [previewRole])
+
+  useEffect(() => {
+    return () => {
+      setVaultRolePreview(null)
+    }
+  }, [])
 
   const retryPermissionCheck = useCallback(() => {
     setClassificationError(null)
@@ -86,7 +124,7 @@ export function VaultPermissionsProvider({ children, enabled, freeze = false, su
     void (async () => {
       try {
         const [a, o] = await Promise.all([
-          classifyAllocatorVaultAction(
+          classifyAllocatorVaultActionOnChain(
             provider,
             summary.vault,
             account,
@@ -94,7 +132,7 @@ export function VaultPermissionsProvider({ children, enabled, freeze = false, su
             summary.ownerKind,
             summary.curatorKind
           ),
-          classifyOwnerOrCuratorVaultAction(
+          classifyOwnerOrCuratorVaultActionOnChain(
             provider,
             account,
             overview,
@@ -129,25 +167,36 @@ export function VaultPermissionsProvider({ children, enabled, freeze = false, su
 
   const value = useMemo((): VaultPermissionsContextValue => {
     const active = Boolean(summary && account && (enabled || freeze))
-    const permissionsReady = Boolean(
-      active &&
-        !loading &&
-        classificationError == null &&
-        allocatorAuth != null &&
-        ownerCuratorAuth != null
-    )
-    const canAllocator = permissionsReady && allocatorAuth!.mode !== 'denied'
-    const canOwnerOrCurator = permissionsReady && ownerCuratorAuth!.mode !== 'denied'
+    const previewing = active && previewRole != null
+    const previewAuths = previewRole != null ? authoritiesForVaultRolePreview(previewRole) : null
+    const permissionsReady = previewing
+      ? true
+      : Boolean(
+          active &&
+            !loading &&
+            classificationError == null &&
+            allocatorAuth != null &&
+            ownerCuratorAuth != null
+        )
+    const canAllocator = previewing
+      ? previewAuths!.allocator.mode !== 'denied'
+      : permissionsReady && allocatorAuth!.mode !== 'denied'
+    const canOwnerOrCurator = previewing
+      ? previewAuths!.ownerCurator.mode !== 'denied'
+      : permissionsReady && ownerCuratorAuth!.mode !== 'denied'
     return {
       active,
-      loading,
-      classificationError,
+      loading: previewing ? false : loading,
+      classificationError: previewing ? null : classificationError,
       retryPermissionCheck,
       permissionsReady,
-      allocatorAuth,
-      ownerCuratorAuth,
+      allocatorAuth: previewing ? previewAuths!.allocator : allocatorAuth,
+      ownerCuratorAuth: previewing ? previewAuths!.ownerCurator : ownerCuratorAuth,
       canAllocator,
       canOwnerOrCurator,
+      previewRole,
+      setPreviewRole,
+      clearPreviewRole,
     }
   }, [
     enabled,
@@ -159,6 +208,9 @@ export function VaultPermissionsProvider({ children, enabled, freeze = false, su
     retryPermissionCheck,
     allocatorAuth,
     ownerCuratorAuth,
+    previewRole,
+    setPreviewRole,
+    clearPreviewRole,
   ])
 
   return <VaultPermissionsContext.Provider value={value}>{children}</VaultPermissionsContext.Provider>

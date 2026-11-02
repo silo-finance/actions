@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { JsonRpcProvider } from 'ethers'
 import { classifyAllocatorVaultAction, classifyOwnerOrCuratorVaultAction } from './vaultActionAuthority'
+import { setVaultRolePreview } from './vaultRolePreview'
 import * as safeOwnerList from './safeOwnerList'
 
 const provider = new JsonRpcProvider('http://127.0.0.1:65535')
@@ -18,6 +19,7 @@ function stubIsAllocator(value: boolean) {
 
 describe('classifyOwnerOrCuratorVaultAction', () => {
   beforeEach(() => {
+    setVaultRolePreview(null)
     vi.spyOn(safeOwnerList, 'isAddressSafeOwner').mockResolvedValue(false)
   })
   afterEach(() => {
@@ -85,6 +87,7 @@ describe('classifyOwnerOrCuratorVaultAction', () => {
 
 describe('classifyAllocatorVaultAction', () => {
   beforeEach(() => {
+    setVaultRolePreview(null)
     vi.spyOn(safeOwnerList, 'isAddressSafeOwner').mockResolvedValue(false)
   })
   afterEach(() => {
