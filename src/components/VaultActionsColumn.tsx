@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getAddress } from 'ethers'
 import ActionPermissionHint from '@/components/ActionPermissionHint'
+import VaultActionFailure from '@/components/VaultActionFailure'
 import CopyButton from '@/components/CopyButton'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
 import WithdrawQueueRemoveWizard from '@/components/WithdrawQueueRemoveWizard'
@@ -224,7 +225,7 @@ export default function VaultActionsColumn({
               <ActionPermissionHint allowed={!clearDeniedByRole} onlyForLabel={ONLY_FOR_ALLOCATOR_ACTIONS} />
             </div>
 
-            {localError ? <p className="text-sm silo-alert silo-alert-error">{localError}</p> : null}
+            <VaultActionFailure message={localError} />
             {txSuccess ? (
               <div className="flex flex-col gap-3 pt-1">
                 <TransactionSuccessSummary

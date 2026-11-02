@@ -5,6 +5,7 @@ import { Contract, formatUnits, getAddress } from 'ethers'
 import erc20Artifact from '@/abis/ERC20.json'
 import CopyButton from '@/components/CopyButton'
 import ActionPermissionHint from '@/components/ActionPermissionHint'
+import VaultActionFailure from '@/components/VaultActionFailure'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
 import { useVaultPermissions } from '@/contexts/VaultPermissionsContext'
 import { useWeb3 } from '@/contexts/Web3Context'
@@ -1093,7 +1094,7 @@ export default function WithdrawQueueRemoveWizard({
                   }
                 />
               ) : null}
-              {execErr ? <p className="text-sm silo-alert silo-alert-error">{execErr}</p> : null}
+              <VaultActionFailure message={execErr} />
 
               {txSuccess ? (
                 <div className="pt-2 border-t border-[var(--silo-border)]">
