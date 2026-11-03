@@ -391,6 +391,50 @@
         "type": "error"
     },
     {
+        "inputs": [
+            {
+                "internalType": "contract IERC4626",
+                "name": "market",
+                "type": "address"
+            }
+        ],
+        "name": "InvalidMarketRemovalNonZeroCap",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "contract IERC4626",
+                "name": "market",
+                "type": "address"
+            }
+        ],
+        "name": "InvalidMarketRemovalNonZeroSupply",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "contract IERC4626",
+                "name": "market",
+                "type": "address"
+            }
+        ],
+        "name": "InvalidMarketRemovalTimelockNotElapsed",
+        "type": "error"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "contract IERC4626",
+                "name": "market",
+                "type": "address"
+            }
+        ],
+        "name": "PendingCap",
+        "type": "error"
+    },
+    {
         "inputs": [],
         "name": "NoPendingValue",
         "type": "error"
