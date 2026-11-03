@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-10-03
+
 ### Added
 - Finalize pending market removals with updateWithdrawQueue after the submitMarketRemoval timelock.
 - Preview a vault role on the vault page and follow that role's Gnosis Safe or EOA path, including batched removals when the role is a Safe.
