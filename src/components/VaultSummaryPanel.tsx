@@ -6,9 +6,24 @@ import { useVaultPermissions } from '@/contexts/VaultPermissionsContext'
 import { getExplorerAddressUrl } from '@/utils/networks'
 import { formatTimelockSeconds } from '@/utils/timelockFormat'
 import type { OwnerKind } from '@/utils/ownerKind'
+import { isVaultPreviewRole, type VaultPreviewRole } from '@/utils/vaultRolePreview'
 
 function shortAddr(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
+}
+
+const PREVIEW_ROLE_OPTIONS: { value: VaultPreviewRole; label: string }[] = [
+  { value: 'owner', label: 'Owner' },
+  { value: 'curator', label: 'Curator' },
+  { value: 'allocator', label: 'Allocator' },
+  { value: 'guardian', label: 'Guardian' },
+  { value: 'none', label: 'None' },
+]
+
+function previewRoleNote(role: VaultPreviewRole, asSafe: boolean): string {
+  const asRole = role === 'none' ? 'no role' : `the ${role} role`
+  const sender = asSafe ? 'Actions are sent as that Gnosis Safe.' : 'The transaction still sends from the connected wallet.'
+  return `Interface is using ${asRole}. ${sender}`
 }
 
 function ownerKindLabel(kind: OwnerKind): string {
@@ -143,9 +158,47 @@ export default function VaultSummaryPanel({
                 {daysText} <span className="silo-text-soft">({rawSeconds} s)</span>
               </span>
             </div>
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-2">
-              <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Your role</span>
-              <span className="text-sm silo-text-main">{yourRoleDisplayed}</span>
+            <div className="py-2">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wide silo-text-soft shrink-0 w-28">Your role</span>
+                <span className="text-sm silo-text-main">{yourRoleDisplayed}</span>
+                <select
+                  id="vault-role-preview"
+                  aria-label="Preview role"
+                  className="silo-input rounded-md px-2 py-1 text-sm w-auto"
+                  value={perm.previewRole ?? ''}
+                  onChange={(e) => {
+                    const next = e.target.value
+                    if (isVaultPreviewRole(next)) perm.setPreviewRole(next)
+                  }}
+                >
+                  <option value="" disabled>
+                    Preview role
+                  </option>
+                  {PREVIEW_ROLE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {perm.previewRole != null ? (
+                  <button
+                    type="button"
+                    className="silo-btn-secondary shrink-0 text-sm"
+                    onClick={() => perm.clearPreviewRole()}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+              {perm.previewRole != null ? (
+                <p className="mt-1 pl-28 text-xs silo-text-soft">
+                  {previewRoleNote(
+                    perm.previewRole,
+                    perm.allocatorAuth?.mode === 'safe_as_wallet' || perm.ownerCuratorAuth?.mode === 'safe_as_wallet'
+                  )}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>

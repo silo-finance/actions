@@ -3,6 +3,7 @@ import siloVaultArtifact from '@/abis/SiloVault.json'
 import { loadAbi } from '@/utils/loadAbi'
 import type { OwnerKind } from '@/utils/ownerKind'
 import { isAddressSafeOwner } from '@/utils/safeOwnerList'
+import { vaultRolePreviewAuthority } from '@/utils/vaultRolePreview'
 
 const siloVaultAbi = loadAbi(siloVaultArtifact)
 
@@ -40,7 +41,7 @@ function n(a: string): string {
  *   the Safe Transaction Service as a pending proposal.
  * - Connected EOA equals the role (and role is EOA) or is allocator → `direct`.
  */
-export async function classifyAllocatorVaultAction(
+export async function classifyAllocatorVaultActionOnChain(
   provider: Provider,
   vaultAddress: string,
   connectedAccount: string,
@@ -79,12 +80,24 @@ export async function classifyAllocatorVaultAction(
 }
 
 /**
+ * On-chain allocator authority, or the vault-page role preview when one is selected.
+ * A previewed Safe role uses `safe_as_wallet` for that Safe. It does not use `safe_propose`.
+ */
+export async function classifyAllocatorVaultAction(
+  ...args: Parameters<typeof classifyAllocatorVaultActionOnChain>
+): Promise<VaultActionAuthority> {
+  const previewed = vaultRolePreviewAuthority('allocator')
+  if (previewed != null) return previewed
+  return classifyAllocatorVaultActionOnChain(...args)
+}
+
+/**
  * Batches that include `submitCap` need `onlyCuratorRole` for those calls: `msg.sender` must be
  * `owner()` or `curator` (SiloVault). Intersection with allocator-only paths is **owner or curator**
  * (directly or via the owner/curator contract wallet). Same `safe_as_wallet` / `safe_propose`
  * routing as {@link classifyAllocatorVaultAction}.
  */
-export async function classifyOwnerOrCuratorVaultAction(
+export async function classifyOwnerOrCuratorVaultActionOnChain(
   provider: Provider,
   connectedAccount: string,
   overview: { owner: string; curator: string },
@@ -115,6 +128,15 @@ export async function classifyOwnerOrCuratorVaultAction(
   }
 
   return { mode: 'denied', executingSafeAddress: null }
+}
+
+/** On-chain owner/curator authority, or the vault-page role preview when one is selected. */
+export async function classifyOwnerOrCuratorVaultAction(
+  ...args: Parameters<typeof classifyOwnerOrCuratorVaultActionOnChain>
+): Promise<VaultActionAuthority> {
+  const previewed = vaultRolePreviewAuthority('ownerCurator')
+  if (previewed != null) return previewed
+  return classifyOwnerOrCuratorVaultActionOnChain(...args)
 }
 
 export const CLEAR_SUPPLY_QUEUE_DENIED_MESSAGE =

@@ -3,6 +3,7 @@
 import { formatUnits, getAddress } from 'ethers'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ActionPermissionHint from '@/components/ActionPermissionHint'
+import VaultActionFailure from '@/components/VaultActionFailure'
 import CopyButton from '@/components/CopyButton'
 import MarketItem from '@/components/MarketItem'
 import TransactionSuccessSummary from '@/components/TransactionSuccessSummary'
@@ -972,8 +973,8 @@ export default function SupplyQueueColumn({
               <ActionPermissionHint allowed={mutationAllowed !== false} onlyForLabel={ONLY_FOR_ALLOCATOR_ACTIONS} />
               {busy ? (
                 <p className="text-xs silo-text-soft m-0">
-                  {ownerKind === 'safe'
-                    ? 'Approve in your wallet to submit the proposed transaction as owner or curator.'
+                  {perm.allocatorAuth?.mode === 'safe_as_wallet' || perm.allocatorAuth?.mode === 'safe_propose'
+                    ? 'Approve in your wallet to submit the proposed transaction as the Gnosis Safe.'
                     : 'Confirm in your wallet to send the vault update on-chain.'}
                 </p>
               ) : null}
@@ -999,7 +1000,7 @@ export default function SupplyQueueColumn({
                   </ol>
                 </div>
               ) : null}
-              {localError ? <p className="text-sm silo-alert silo-alert-error">{localError}</p> : null}
+              <VaultActionFailure message={localError} />
             </div>
           ) : null}
 
