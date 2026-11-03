@@ -9,9 +9,14 @@ import {
   vaultCalldatasToTargetedCalls,
 } from '@/utils/reallocateRemoveWithdrawMarket'
 import { getSafeWalletQueueUrl } from '@/utils/safeAppLinks'
-import { assertVaultCallSucceeds } from '@/utils/vaultCallRevert'
+import { isUserRejectionError, toUserErrorMessage } from '@/utils/rpcErrors'
 import type { TxSubmitOutcome } from '@/utils/txSubmitOutcome'
-import { classifyOwnerOrCuratorVaultAction } from '@/utils/vaultActionAuthority'
+import {
+  classifyAllocatorVaultAction,
+  classifyOwnerOrCuratorVaultAction,
+  type VaultActionAuthority,
+} from '@/utils/vaultActionAuthority'
+import { assertVaultCallSucceeds, describeVaultRevert } from '@/utils/vaultCallRevert'
 import { executeVaultCallsFromSigner, sendSafeWalletBatch, type TargetedCall } from '@/utils/vaultMulticall'
 import type { WithdrawMarketOnchainState } from '@/utils/withdrawMarketStates'
 
@@ -22,6 +27,19 @@ const Z = BigInt(0)
 const CAP_ARG_ZERO = BigInt(0)
 
 const SAFE_TX_ORIGIN = 'Silo Actions: submit market removal (submitCap 0 + submitMarketRemoval)'
+const UPDATE_WITHDRAW_QUEUE_SAFE_TX_ORIGIN = 'Silo Actions: update withdraw queue (updateWithdrawQueue)'
+
+export const SUBMIT_MARKET_REMOVAL_SECOND_STEP =
+  'After the vault timelock elapses, the second step is updateWithdrawQueue, started from Finalize pending removals at the top of this queue.'
+
+export const FINALIZE_REMOVAL_ELAPSED_HINT =
+  'Timelock elapsed. Start Finalize pending removals above to call updateWithdrawQueue.'
+
+export const UPDATE_WITHDRAW_QUEUE_READY_EMPTY =
+  'Timelock elapsed. Vault supply is zero. Ready to remove.'
+
+export const UPDATE_WITHDRAW_QUEUE_READY_WITH_SUPPLY =
+  'Timelock elapsed. The vault still has supply here. updateWithdrawQueue will remove the market and change the vault price per share.'
 
 export type SubmitMarketRemovalDisabledReason =
   | 'not_enabled'
@@ -118,6 +136,111 @@ export function formatRemainingDuration(seconds: bigint): string {
   if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`
   if (m > 0) return `${m}m`
   return '<1m'
+}
+
+export type UpdateWithdrawQueueRemovalBlocker =
+  | 'no_pending_removal'
+  | 'timelock_unknown'
+  | 'timelock_running'
+  | 'non_zero_cap'
+  | 'pending_cap'
+
+/**
+ * Second step of forced removal. Ready only when `submitMarketRemoval` has set `removableAt`,
+ * that timestamp has elapsed, the cap is already zero, and no cap change is pending.
+ * Non-zero vault supply does not block this path — `updateWithdrawQueue` still removes the market.
+ */
+export type UpdateWithdrawQueueRemovalMode =
+  | { kind: 'ready'; hasSupply: boolean }
+  | { kind: 'blocked'; reasons: UpdateWithdrawQueueRemovalBlocker[] }
+
+export function classifyUpdateWithdrawQueueRemoval(
+  state: WithdrawMarketOnchainState | null | undefined,
+  chainNowSec: bigint | null
+): UpdateWithdrawQueueRemovalMode {
+  if (!state || state.removableAt === Z) {
+    return { kind: 'blocked', reasons: ['no_pending_removal'] }
+  }
+  const reasons: UpdateWithdrawQueueRemovalBlocker[] = []
+  if (chainNowSec == null) reasons.push('timelock_unknown')
+  else if (chainNowSec < state.removableAt) reasons.push('timelock_running')
+  if (state.cap !== Z) reasons.push('non_zero_cap')
+  if (state.pendingCapValidAt !== Z) reasons.push('pending_cap')
+  if (reasons.length > 0) return { kind: 'blocked', reasons }
+  return { kind: 'ready', hasSupply: state.supplyShares !== Z }
+}
+
+export function describeUpdateWithdrawQueueRemovalBlocker(
+  reason: UpdateWithdrawQueueRemovalBlocker,
+  state: WithdrawMarketOnchainState | null | undefined,
+  chainNowSec: bigint | null
+): string {
+  switch (reason) {
+    case 'no_pending_removal':
+      return 'No pending market removal. Submit Market Removal first.'
+    case 'timelock_unknown':
+      return 'Checking the removal timelock…'
+    case 'timelock_running':
+      return describeSingleReason('timelock_running', state, chainNowSec)
+    case 'non_zero_cap':
+      return 'Supply cap is not zero, so updateWithdrawQueue cannot remove this market.'
+    case 'pending_cap':
+      return 'A pending cap change blocks removal. Revoke or accept it first.'
+  }
+}
+
+/** Joined blocker copy for a market that cannot be dropped by `updateWithdrawQueue`. `null` when ready. */
+export function describeUpdateWithdrawQueueRemoval(
+  state: WithdrawMarketOnchainState | null | undefined,
+  chainNowSec: bigint | null = null
+): string | null {
+  const mode = classifyUpdateWithdrawQueueRemoval(state, chainNowSec)
+  if (mode.kind === 'ready') return null
+  return mode.reasons
+    .map((reason) => describeUpdateWithdrawQueueRemovalBlocker(reason, state, chainNowSec))
+    .join(' ')
+}
+
+const UPDATE_WITHDRAW_QUEUE_REVERT_HINTS: { name: string; hint: string }[] = [
+  {
+    name: 'InvalidMarketRemovalNonZeroCap',
+    hint: 'This market still has a non-zero supply cap, so updateWithdrawQueue cannot remove it.',
+  },
+  {
+    name: 'PendingCap',
+    hint: 'A pending cap change blocks updateWithdrawQueue. Revoke or accept it first.',
+  },
+  {
+    name: 'InvalidMarketRemovalNonZeroSupply',
+    hint: 'The vault still holds this market and no removal timelock has elapsed.',
+  },
+  {
+    name: 'InvalidMarketRemovalTimelockNotElapsed',
+    hint: 'The removal timelock has not elapsed yet.',
+  },
+  {
+    name: 'NotAllocatorRole',
+    hint: 'This wallet is not an owner, curator, or allocator of the vault.',
+  },
+]
+
+/** Maps a decoded SiloVault revert to a short `updateWithdrawQueue` hint. */
+export function hintForUpdateWithdrawQueueRevert(decoded: string): string | null {
+  const trimmed = decoded.trim()
+  for (const row of UPDATE_WITHDRAW_QUEUE_REVERT_HINTS) {
+    if (trimmed === row.name || trimmed.startsWith(`${row.name}(`)) return row.hint
+  }
+  return null
+}
+
+/** User-facing message for a failed `updateWithdrawQueue` preflight or send. */
+export function describeUpdateWithdrawQueueFailure(err: unknown): string {
+  if (isUserRejectionError(err)) return 'Transaction rejected in wallet.'
+  const decoded = describeVaultRevert(err)
+  const raw = (decoded ?? (err instanceof Error ? err.message : '')).trim()
+  const hint = hintForUpdateWithdrawQueueRevert(raw)
+  if (hint) return hint
+  return toUserErrorMessage(err)
 }
 
 export type SelectedMarketForRemoval = {
@@ -265,49 +388,44 @@ export type SubmitMarketRemovalSuccess = {
 export const SUBMIT_MARKET_REMOVAL_DENIED_MESSAGE =
   'You cannot submit market removals with this wallet. Connect as vault owner or curator (directly or as a Safe signer).'
 
+export const UPDATE_WITHDRAW_QUEUE_DENIED_MESSAGE =
+  'You cannot update the withdraw queue with this wallet. Connect as vault owner, curator, or allocator (directly or as a Safe signer).'
+
+type SendAuthorizedVaultBatchParams = {
+  auth: VaultActionAuthority
+  deniedMessage: string
+  ethereum: Eip1193Provider
+  signer: Signer
+  chainId: number
+  vaultAddress: string
+  connectedAccount: string
+  callDatas: `0x${string}`[]
+  safeOrigin: string
+}
+
 /**
- * Runs the submit-market-removal batch. `submitCap` + `submitMarketRemoval` are `onlyCuratorRole`;
- * `updateWithdrawQueue` is `onlyAllocatorRole` (broader) — vault owner or curator satisfies both,
- * so we gate the whole action on owner-or-curator here regardless of which mode is selected.
+ * Direct sends simulate with `estimateGas` (`assertVaultCallSucceeds`) before the wallet prompt.
+ * Safe paths skip that simulation because `msg.sender` would be the EOA, not the Safe.
  */
-export async function executeSubmitMarketRemoval(
-  params: ExecuteSubmitMarketRemovalParams
+async function sendAuthorizedVaultBatch(
+  params: SendAuthorizedVaultBatchParams
 ): Promise<SubmitMarketRemovalSuccess> {
   const {
+    auth,
+    deniedMessage,
     ethereum,
-    provider,
     signer,
     chainId,
     vaultAddress,
-    ownerAddress,
-    curatorAddress,
-    ownerKind,
-    curatorKind,
     connectedAccount,
-    withdrawQueue,
-    markets,
+    callDatas,
+    safeOrigin,
   } = params
 
-  if (markets.length === 0) {
-    throw new Error('Select at least one market to remove.')
-  }
-
-  const auth = await classifyOwnerOrCuratorVaultAction(
-    provider,
-    connectedAccount,
-    { owner: ownerAddress, curator: curatorAddress },
-    ownerKind,
-    curatorKind
-  )
-
   if (auth.mode === 'denied') {
-    throw new Error(SUBMIT_MARKET_REMOVAL_DENIED_MESSAGE)
+    throw new Error(deniedMessage)
   }
 
-  const callDatas = buildSubmitMarketRemovalVaultCallDatas({
-    withdrawQueue,
-    selected: markets,
-  })
   const batchCalls: TargetedCall[] = vaultCalldatasToTargetedCalls(vaultAddress, callDatas)
 
   if (auth.mode === 'direct') {
@@ -344,7 +462,7 @@ export async function executeSubmitMarketRemoval(
       vaultAddress,
       proposerAccount: connectedAccount,
       batchCalls,
-      origin: SAFE_TX_ORIGIN,
+      origin: safeOrigin,
     })
     const transactionUrl = getSafeWalletQueueUrl(chainId, safeAddress)
     if (!transactionUrl) {
@@ -353,7 +471,113 @@ export async function executeSubmitMarketRemoval(
     return { transactionUrl, successLinkLabel: 'Open queue', outcome: 'safe_queue' }
   }
 
-  throw new Error(SUBMIT_MARKET_REMOVAL_DENIED_MESSAGE)
+  throw new Error(deniedMessage)
+}
+
+/**
+ * Runs the submit-market-removal batch. `submitCap` + `submitMarketRemoval` are `onlyCuratorRole`,
+ * so this path stays owner-or-curator. Dropping markets after the timelock is
+ * {@link executeUpdateWithdrawQueueRemoval}.
+ */
+export async function executeSubmitMarketRemoval(
+  params: ExecuteSubmitMarketRemovalParams
+): Promise<SubmitMarketRemovalSuccess> {
+  const {
+    ethereum,
+    provider,
+    signer,
+    chainId,
+    vaultAddress,
+    ownerAddress,
+    curatorAddress,
+    ownerKind,
+    curatorKind,
+    connectedAccount,
+    withdrawQueue,
+    markets,
+  } = params
+
+  if (markets.length === 0) {
+    throw new Error('Select at least one market to remove.')
+  }
+
+  const auth = await classifyOwnerOrCuratorVaultAction(
+    provider,
+    connectedAccount,
+    { owner: ownerAddress, curator: curatorAddress },
+    ownerKind,
+    curatorKind
+  )
+
+  const callDatas = buildSubmitMarketRemovalVaultCallDatas({
+    withdrawQueue,
+    selected: markets,
+  })
+
+  return sendAuthorizedVaultBatch({
+    auth,
+    deniedMessage: SUBMIT_MARKET_REMOVAL_DENIED_MESSAGE,
+    ethereum,
+    signer,
+    chainId,
+    vaultAddress,
+    connectedAccount,
+    callDatas,
+    safeOrigin: SAFE_TX_ORIGIN,
+  })
+}
+
+/**
+ * Drops markets whose forced-removal timelock has elapsed. `updateWithdrawQueue` is
+ * `onlyAllocatorRole` (owner, curator, or allocator) and is a single call for every selected market.
+ */
+export async function executeUpdateWithdrawQueueRemoval(
+  params: ExecuteSubmitMarketRemovalParams
+): Promise<SubmitMarketRemovalSuccess> {
+  const {
+    ethereum,
+    provider,
+    signer,
+    chainId,
+    vaultAddress,
+    ownerAddress,
+    curatorAddress,
+    ownerKind,
+    curatorKind,
+    connectedAccount,
+    withdrawQueue,
+    markets,
+  } = params
+
+  if (markets.length === 0) {
+    throw new Error('Select at least one market to remove.')
+  }
+
+  const auth = await classifyAllocatorVaultAction(
+    provider,
+    vaultAddress,
+    connectedAccount,
+    { owner: ownerAddress, curator: curatorAddress },
+    ownerKind,
+    curatorKind
+  )
+
+  const callDatas = buildSubmitMarketRemovalVaultCallDatas({
+    withdrawQueue,
+    selected: markets.map((market) => ({ ...market, mode: 'finalize' as const })),
+  })
+
+  return sendAuthorizedVaultBatch({
+    auth,
+    deniedMessage: UPDATE_WITHDRAW_QUEUE_DENIED_MESSAGE,
+    ethereum,
+    signer,
+    chainId,
+    vaultAddress,
+    connectedAccount,
+    callDatas,
+    safeOrigin: UPDATE_WITHDRAW_QUEUE_SAFE_TX_ORIGIN,
+  })
 }
 
 /**

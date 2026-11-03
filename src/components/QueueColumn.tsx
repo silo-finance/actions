@@ -43,6 +43,8 @@ type Props = {
   emptyMessage?: string
   /** Opt-in selection column rendered to the left of each row. */
   selection?: QueueRowSelection
+  /** Optional block rendered under the heading and above the market list. */
+  leading?: ReactNode
   /** Optional footer slot rendered inside the panel (e.g. a Submit Market Removal action). */
   footer?: ReactNode
 }
@@ -56,6 +58,7 @@ export default function QueueColumn({
   loading,
   emptyMessage = 'No markets',
   selection,
+  leading,
   footer,
 }: Props) {
   const heading = count !== undefined ? `${title} (${count})` : title
@@ -65,6 +68,7 @@ export default function QueueColumn({
   return (
     <div className="silo-panel silo-top-card p-5 h-full min-h-[200px] flex flex-col">
       <h2 className="text-lg font-semibold silo-text-main mb-3">{heading}</h2>
+      {leading ? <div className="mb-4">{leading}</div> : null}
       {loading ? (
         <p className="text-sm silo-text-soft">Loading…</p>
       ) : items.length === 0 ? (
