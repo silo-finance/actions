@@ -1,14 +1,14 @@
 {
   "chainId": 50,
   "chainKey": "xdc",
-  "generatedAt": "2026-11-12T00:24:49.140Z",
+  "generatedAt": "2026-11-12T12:14:05.596Z",
   "silos": [
     {
       "chainId": 50,
       "chainKey": "xdc",
-      "siloAddress": "0xf3d1fcb16374fa8f4a5135706c7a5ef4483c1e95",
-      "siloConfigAddress": "0xc23259f0dc7c9704ea978322df1cf80932098594",
-      "siloId": null,
+      "siloAddress": "0x40a686bf959db56a127a3c6aa9aa4a97147ffc77",
+      "siloConfigAddress": "0x519303893fad9de0b5af1bf20a35145f1f2690c4",
+      "siloId": 3003,
       "siloIndex": null,
       "tokenAddress": null,
       "tokenSymbol": null,
