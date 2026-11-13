@@ -1,7 +1,7 @@
 {
   "chainId": 50,
   "chainKey": "xdc",
-  "generatedAt": "2026-11-13T05:10:13.922Z",
+  "generatedAt": "2026-11-13T07:10:27.923Z",
   "silos": [
     {
       "chainId": 50,
@@ -9,13 +9,46 @@
       "siloAddress": "0x00fcf6d60aa804f485cd99a9cae3a7a2793704ca",
       "siloConfigAddress": "0xc23259f0dc7c9704ea978322df1cf80932098594",
       "siloId": null,
-      "siloIndex": null,
+      "siloIndex": 0,
       "tokenAddress": null,
       "tokenSymbol": null,
       "quoteTokenSymbol": null,
       "tokenDecimals": null,
       "siloConfig": null,
-      "otherSilo": null,
+      "otherSilo": {
+        "siloAddress": "0xf3d1fcb16374fa8f4a5135706c7a5ef4483c1e95",
+        "siloConfigAddress": "0xc23259f0dc7c9704ea978322df1cf80932098594",
+        "siloId": null,
+        "tokenAddress": null,
+        "tokenSymbol": null,
+        "quoteTokenSymbol": null,
+        "tokenDecimals": null,
+        "siloConfig": null
+      },
+      "marketVersion": "v3"
+    },
+    {
+      "chainId": 50,
+      "chainKey": "xdc",
+      "siloAddress": "0x12339f823801debd3da0f6e00dabf1da3e62e0ea",
+      "siloConfigAddress": "0x27c2d9f9d4a91e01e066b1416097d70f444231d9",
+      "siloId": null,
+      "siloIndex": 0,
+      "tokenAddress": null,
+      "tokenSymbol": null,
+      "quoteTokenSymbol": null,
+      "tokenDecimals": null,
+      "siloConfig": null,
+      "otherSilo": {
+        "siloAddress": "0x1f5c3aeaaa18749078765bd2b504b32005221603",
+        "siloConfigAddress": "0x27c2d9f9d4a91e01e066b1416097d70f444231d9",
+        "siloId": null,
+        "tokenAddress": null,
+        "tokenSymbol": null,
+        "quoteTokenSymbol": null,
+        "tokenDecimals": null,
+        "siloConfig": null
+      },
       "marketVersion": "v3"
     }
   ]
