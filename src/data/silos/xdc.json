@@ -1,30 +1,39 @@
 {
   "chainId": 50,
   "chainKey": "xdc",
-  "generatedAt": "2026-11-20T18:11:28.631Z",
+  "generatedAt": "2026-11-20T21:08:50.308Z",
   "silos": [
     {
       "chainId": 50,
       "chainKey": "xdc",
-      "siloAddress": "0xc414c974d92fc4bafc3b867456d3e38c238e8221",
-      "siloConfigAddress": "0x3eba91d894d3f20c1284effa8b6fbf4ec50dc8ba",
+      "siloAddress": "0x00fcf6d60aa804f485cd99a9cae3a7a2793704ca",
+      "siloConfigAddress": "0xc23259f0dc7c9704ea978322df1cf80932098594",
       "siloId": null,
-      "siloIndex": 1,
-      "tokenAddress": null,
+      "siloIndex": null,
+      "tokenAddress": "0x7054f74d6cb418e987b73c9f3c23e5cec18217b2",
       "tokenSymbol": null,
       "quoteTokenSymbol": null,
       "tokenDecimals": null,
-      "siloConfig": null,
-      "otherSilo": {
-        "siloAddress": "0xf107e8d834eee5716c14b79901912c88baab9805",
-        "siloConfigAddress": "0x3eba91d894d3f20c1284effa8b6fbf4ec50dc8ba",
-        "siloId": null,
-        "tokenAddress": null,
-        "tokenSymbol": null,
-        "quoteTokenSymbol": null,
-        "tokenDecimals": null,
-        "siloConfig": null
+      "siloConfig": {
+        "daoFee": "100000000000000000",
+        "deployerFee": "0",
+        "silo": "0x00fcf6d60aa804f485cd99a9cae3a7a2793704ca",
+        "token": "0x7054f74d6cb418e987b73c9f3c23e5cec18217b2",
+        "protectedShareToken": "0x346c29e26eca9612c186f40bf54dc475019e8c10",
+        "collateralShareToken": "0x00fcf6d60aa804f485cd99a9cae3a7a2793704ca",
+        "debtShareToken": "0x2edc951eeca851857138b4b68d62abe7efeccf60",
+        "solvencyOracle": "0x3950da31597ee487243d592cd7d32fe222df0b03",
+        "maxLtvOracle": "0x3950da31597ee487243d592cd7d32fe222df0b03",
+        "interestRateModel": "0x9377c21686c88242b4d4665472e149df5010855d",
+        "maxLtv": "700000000000000000",
+        "lt": "750000000000000000",
+        "liquidationTargetLtv": "700000000000000000",
+        "liquidationFee": "70000000000000000",
+        "flashloanFee": "0",
+        "hookReceiver": "0xbc4e25e9e408015a5cdfa9e5d1f6c69e89eeb8f3",
+        "callBeforeQuote": false
       },
+      "otherSilo": null,
       "marketVersion": "v3"
     }
   ]
