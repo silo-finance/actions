@@ -1,14 +1,14 @@
 {
   "chainId": 1776,
   "chainKey": "injective",
-  "generatedAt": "2026-11-20T06:16:35.795Z",
+  "generatedAt": "2026-11-20T10:09:40.368Z",
   "silos": [
     {
       "chainId": 1776,
       "chainKey": "injective",
       "siloAddress": "0x2de94d1aa2246ce8c78c2f716cc94ec8ade0ade2",
       "siloConfigAddress": "0xcd73f3f6dc33b46502cb9c53a67bdded0bbaefc4",
-      "siloId": 3003,
+      "siloId": null,
       "siloIndex": 1,
       "tokenAddress": "0x0000000088827d2d103ee2d9a6b781773ae03ffb",
       "tokenSymbol": "WINJ",
@@ -36,7 +36,7 @@
       "otherSilo": {
         "siloAddress": "0x4aaadf5c3a4d839055531743121e1227153ff0fb",
         "siloConfigAddress": "0xcd73f3f6dc33b46502cb9c53a67bdded0bbaefc4",
-        "siloId": 3003,
+        "siloId": null,
         "tokenAddress": "0x2d6e0e0c209d79b43f5d3d62e93d6a9f1e9317bd",
         "tokenSymbol": "yINJ",
         "quoteTokenSymbol": "WINJ",
@@ -68,7 +68,7 @@
       "chainKey": "injective",
       "siloAddress": "0x4aaadf5c3a4d839055531743121e1227153ff0fb",
       "siloConfigAddress": "0xcd73f3f6dc33b46502cb9c53a67bdded0bbaefc4",
-      "siloId": 3003,
+      "siloId": null,
       "siloIndex": 0,
       "tokenAddress": "0x2d6e0e0c209d79b43f5d3d62e93d6a9f1e9317bd",
       "tokenSymbol": "yINJ",
@@ -96,7 +96,7 @@
       "otherSilo": {
         "siloAddress": "0x2de94d1aa2246ce8c78c2f716cc94ec8ade0ade2",
         "siloConfigAddress": "0xcd73f3f6dc33b46502cb9c53a67bdded0bbaefc4",
-        "siloId": 3003,
+        "siloId": null,
         "tokenAddress": "0x0000000088827d2d103ee2d9a6b781773ae03ffb",
         "tokenSymbol": "WINJ",
         "quoteTokenSymbol": "WINJ",
