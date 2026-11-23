@@ -1,7 +1,7 @@
 {
   "chainId": 1776,
   "chainKey": "injective",
-  "generatedAt": "2026-11-23T14:10:47.203Z",
+  "generatedAt": "2026-11-23T15:10:31.085Z",
   "silos": [
     {
       "chainId": 1776,
@@ -38,7 +38,7 @@
         "siloConfigAddress": "0xcd73f3f6dc33b46502cb9c53a67bdded0bbaefc4",
         "siloId": 3003,
         "tokenAddress": "0x2d6e0e0c209d79b43f5d3d62e93d6a9f1e9317bd",
-        "tokenSymbol": null,
+        "tokenSymbol": "yINJ",
         "quoteTokenSymbol": "WINJ",
         "tokenDecimals": 18,
         "siloConfig": {
@@ -71,7 +71,7 @@
       "siloId": 3003,
       "siloIndex": 0,
       "tokenAddress": "0x2d6e0e0c209d79b43f5d3d62e93d6a9f1e9317bd",
-      "tokenSymbol": null,
+      "tokenSymbol": "yINJ",
       "quoteTokenSymbol": "WINJ",
       "tokenDecimals": 18,
       "siloConfig": {
